@@ -1,0 +1,5 @@
+#!/bin/bash
+source /boot/config/plugins/omniraid/omniraid.cfg
+if [ $SERVICE = enable ]; then
+  /usr/local/emhttp/plugins/omniraid/scripts/start
+fi
