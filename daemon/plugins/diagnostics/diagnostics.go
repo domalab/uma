@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/domalab/omniraid/daemon/lib"
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/lib"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 // DiagnosticsManager provides system diagnostics and health checks

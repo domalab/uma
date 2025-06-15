@@ -5,9 +5,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/domalab/omniraid/daemon/domain"
-	"github.com/domalab/omniraid/daemon/logger"
-	"github.com/domalab/omniraid/daemon/services/api"
+	"github.com/domalab/uma/daemon/domain"
+	"github.com/domalab/uma/daemon/logger"
+	"github.com/domalab/uma/daemon/services/api"
 )
 
 type Orchestrator struct {
@@ -21,7 +21,7 @@ func CreateOrchestrator(ctx *domain.Context) *Orchestrator {
 }
 
 func (o *Orchestrator) Run() error {
-	logger.Blue("starting omniraid %s ...", o.ctx.Config.Version)
+	logger.Blue("starting uma %s ...", o.ctx.Config.Version)
 
 	apiService := api.Create(o.ctx)
 
@@ -41,6 +41,6 @@ func (o *Orchestrator) Run() error {
 		logger.Yellow("Error during shutdown: %v", err)
 	}
 
-	logger.Blue("omniraid shutdown complete")
+	logger.Blue("uma shutdown complete")
 	return nil
 }

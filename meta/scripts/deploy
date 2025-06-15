@@ -2,7 +2,7 @@
 
 patch="${1:-}"
 
-name="omniraid"
+name="uma"
 
 # Get the current date in the specified format
 version=$(date '+%Y.%m.%d')

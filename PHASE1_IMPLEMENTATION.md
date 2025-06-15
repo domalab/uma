@@ -1,30 +1,30 @@
-# OmniRaid Phase 1 Implementation Summary
+# UMA Phase 1 Implementation Summary
 
 ## Completed Tasks
 
-### 1. Complete Rebranding from ControlR to OmniRaid ✅
+### 1. Complete Rebranding from ControlR to UMA ✅
 
 **Files Updated:**
 - `README.md` - Updated project description and features
-- `go.mod` - Changed module name to `github.com/domalab/omniraid`
-- `controlrd.go` → `omniraid.go` - Renamed main binary file
-- `Makefile` - Updated binary name to `omniraid`
-- `daemon/common/const.go` - Updated socket path to `/var/run/omniraid-api.sock`
+- `go.mod` - Changed module name to `github.com/domalab/uma`
+- `controlrd.go` → `uma.go` - Renamed main binary file
+- `Makefile` - Updated binary name to `uma`
+- `daemon/common/const.go` - Updated socket path to `/var/run/uma-api.sock`
 - All import statements across the codebase
 - Plugin configuration files:
-  - `meta/template/controlrd.plg` → `meta/template/omniraid.plg`
-  - `meta/plugin/controlrd.page` → `meta/plugin/omniraid.page`
-  - `meta/plugin/controlrd.png` → `meta/plugin/omniraid.png`
-  - `meta/plugin/images/controlrd.png` → `meta/plugin/images/omniraid.png`
+  - `meta/template/controlrd.plg` → `meta/template/uma.plg`
+  - `meta/plugin/controlrd.page` → `meta/plugin/uma.page`
+  - `meta/plugin/controlrd.png` → `meta/plugin/uma.png`
+  - `meta/plugin/images/controlrd.png` → `meta/plugin/images/uma.png`
 - Script files in `meta/plugin/scripts/` and `meta/plugin/event/`
 - `meta/scripts/deploy` - Updated deployment script
 - `meta/plugin/Api.php` - Updated PHP API interface
 - `.gitignore` - Updated binary name
 
 **Configuration Changes:**
-- Updated all file paths from `/boot/config/plugins/controlrd/` to `/boot/config/plugins/omniraid/`
+- Updated all file paths from `/boot/config/plugins/controlrd/` to `/boot/config/plugins/uma/`
 - Updated service names and process names
-- Updated GitHub repository references to `github.com/domalab/omniraid`
+- Updated GitHub repository references to `github.com/domalab/uma`
 
 ### 2. HTTP REST API Server Implementation ✅
 
@@ -99,24 +99,24 @@
 ### 5. CLI Configuration Management ✅
 
 **New Commands:**
-- `omniraid config show` - Display current configuration
-- `omniraid config set` - Update configuration values
-- `omniraid config generate` - Generate API keys and other values
+- `uma config show` - Display current configuration
+- `uma config set` - Update configuration values
+- `uma config generate` - Generate API keys and other values
 
 **Examples:**
 ```bash
 # Show current configuration
-omniraid config show
+uma config show
 
 # Enable HTTP server on port 8080
-omniraid config set --http-enabled=true --http-port=8080
+uma config set --http-enabled=true --http-port=8080
 
 # Enable authentication
-omniraid config set --auth-enabled=true
+uma config set --auth-enabled=true
 
 # Generate and set API key
-omniraid config generate --api-key
-omniraid config set --api-key=<generated-key>
+uma config generate --api-key
+uma config set --api-key=<generated-key>
 ```
 
 ### 6. Improved Error Handling and Logging ✅
@@ -133,12 +133,12 @@ omniraid config set --api-key=<generated-key>
 ### Dual API Support
 The system now supports both the original Unix socket API (for backward compatibility) and a new HTTP REST API:
 
-1. **Unix Socket API** (`/var/run/omniraid-api.sock`)
+1. **Unix Socket API** (`/var/run/uma-api.sock`)
    - Maintains compatibility with existing ControlR clients
    - JSON-based request/response format
    - Local access only
 
-2. **HTTP REST API** (default port 8080)
+2. **HTTP REST API** (default port 34600)
    - RESTful endpoints with proper HTTP methods
    - CORS support for web applications
    - Authentication and rate limiting
@@ -146,7 +146,7 @@ The system now supports both the original Unix socket API (for backward compatib
 
 ### Service Architecture
 ```
-omniraid
+uma
 ├── Orchestrator (main service coordinator)
 ├── API Service
 │   ├── Unix Socket Server (legacy)
@@ -161,18 +161,18 @@ omniraid
 ## Configuration Files
 
 ### Primary Configuration
-- **Location**: `/boot/config/plugins/omniraid/omniraid.json`
+- **Location**: `/boot/config/plugins/uma/uma.json`
 - **Format**: JSON
 - **Features**: Full configuration with all options
 
 ### Legacy Configuration (Auto-migrated)
-- **Location**: `/boot/config/plugins/omniraid/omniraid.cfg`
+- **Location**: `/boot/config/plugins/uma/uma.cfg`
 - **Format**: INI
 - **Migration**: Automatically converted to JSON format
 
 ## Default Settings
 
-- **HTTP Server**: Enabled on port 8080
+- **HTTP Server**: Enabled on port 34600
 - **Authentication**: Disabled (for easy initial setup)
 - **Rate Limiting**: 100 requests per minute
 - **Logging**: Info level, 10MB max size, 10 backups, 28 days retention
@@ -205,19 +205,19 @@ To test the implementation:
 
 2. **Run with HTTP API enabled**:
    ```bash
-   ./omniraid --http-port=8080
+   ./uma --http-port=34600
    ```
 
 3. **Test API endpoints**:
    ```bash
-   curl http://localhost:8080/api/v1/health
-   curl http://localhost:8080/api/v1/system/info
+   curl http://localhost:34600/api/v1/health
+   curl http://localhost:34600/api/v1/system/info
    ```
 
 4. **Configure via CLI**:
    ```bash
-   ./omniraid config show
-   ./omniraid config set --http-enabled=true
+   ./uma config show
+   ./uma config set --http-enabled=true
    ```
 
 The Phase 1 implementation provides a solid foundation with modern REST API capabilities while maintaining backward compatibility with the existing ControlR ecosystem.

@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/domalab/omniraid/daemon/dto"
-	"github.com/domalab/omniraid/daemon/lib"
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/dto"
+	"github.com/domalab/uma/daemon/lib"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 // GPUMonitor provides GPU monitoring capabilities

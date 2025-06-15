@@ -1,4 +1,4 @@
-# OmniRaid Testing Guide
+# UMA Testing Guide
 
 ## Prerequisites
 
@@ -26,26 +26,26 @@ make clean
 make local
 
 # Verify binary creation
-ls -la omniraid
-./omniraid --version
+ls -la uma
+./uma --version
 ```
 
 ### 2. Configuration Test
 ```bash
 # Test configuration loading
-./omniraid config show
+./uma config show
 
 # Test configuration validation
-./omniraid config validate
+./uma config validate
 ```
 
 ### 3. Plugin Loading Test
 ```bash
 # Test plugin initialization
-./omniraid daemon --dry-run
+./uma daemon --dry-run
 
 # Check plugin registration
-./omniraid plugins list
+./uma plugins list
 ```
 
 ## API Testing
@@ -53,10 +53,10 @@ ls -la omniraid
 ### 1. Start the Daemon
 ```bash
 # Start daemon in foreground for testing
-./omniraid daemon --config ./config.yaml --log-level debug
+./uma daemon --config ./config.yaml --log-level debug
 
 # Or start in background
-./omniraid daemon --config ./config.yaml &
+./uma daemon --config ./config.yaml &
 ```
 
 ### 2. Health Check
@@ -202,7 +202,7 @@ done
 wait
 
 # Memory usage monitoring
-ps aux | grep omniraid
+ps aux | grep uma
 
 # Response time testing
 time curl -s http://localhost:8080/api/v1/storage/array > /dev/null
@@ -251,17 +251,17 @@ time curl -s http://localhost:8080/api/v1/storage/array > /dev/null
 1. **Permission Errors**
    ```bash
    # Ensure proper permissions for system files
-   sudo chown root:root omniraid
-   sudo chmod +x omniraid
+   sudo chown root:root uma
+   sudo chmod +x uma
    ```
 
 2. **Port Conflicts**
    ```bash
    # Check if port 8080 is in use
    netstat -tlnp | grep 8080
-   
+
    # Use different port if needed
-   ./omniraid daemon --port 8081
+   ./uma daemon --port 8081
    ```
 
 3. **Plugin Loading Errors**
@@ -294,19 +294,19 @@ time curl -s http://localhost:8080/api/v1/storage/array > /dev/null
 ### Debug Mode
 ```bash
 # Run with maximum debugging
-./omniraid daemon --log-level trace --debug
+./uma daemon --log-level trace --debug
 
 # Enable API request logging
-./omniraid daemon --log-requests
+./uma daemon --log-requests
 ```
 
 ### Log Analysis
 ```bash
 # Monitor logs in real-time
-tail -f /var/log/omniraid.log
+tail -f /var/log/uma.log
 
 # Search for specific errors
-grep -i error /var/log/omniraid.log
+grep -i error /var/log/uma.log
 ```
 
 ## Expected Test Results
@@ -361,4 +361,4 @@ grep -i error /var/log/omniraid.log
 ]
 ```
 
-This testing guide provides comprehensive validation of all OmniRaid Phase 2 features and ensures production readiness.
+This testing guide provides comprehensive validation of all UMA Phase 2 features and ensures production readiness.

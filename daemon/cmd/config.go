@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/domalab/omniraid/daemon/domain"
-	"github.com/domalab/omniraid/daemon/services/auth"
-	"github.com/domalab/omniraid/daemon/services/config"
+	"github.com/domalab/uma/daemon/domain"
+	"github.com/domalab/uma/daemon/services/auth"
+	"github.com/domalab/uma/daemon/services/config"
 )
 
 // ConfigCmd handles configuration management commands
@@ -138,7 +138,7 @@ func (c *ConfigGenerateCmd) Run(ctx *domain.Context) error {
 		
 		fmt.Printf("Generated API key: %s\n", apiKey)
 		fmt.Printf("\nTo set this as the active API key, run:\n")
-		fmt.Printf("  omniraid config set --api-key=%s\n", apiKey)
+		fmt.Printf("  uma config set --api-key=%s\n", apiKey)
 		return nil
 	}
 

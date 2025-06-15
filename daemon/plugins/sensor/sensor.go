@@ -7,8 +7,8 @@ Check LICENSE file in this folder
 package sensor
 
 import (
-	"github.com/domalab/omniraid/daemon/dto"
-	"github.com/domalab/omniraid/daemon/lib"
+	"github.com/domalab/uma/daemon/dto"
+	"github.com/domalab/uma/daemon/lib"
 )
 
 // Kind -

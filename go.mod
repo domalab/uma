@@ -1,4 +1,4 @@
-module github.com/domalab/omniraid
+module github.com/domalab/uma
 
 go 1.23.0
 

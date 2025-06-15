@@ -1,0 +1,80 @@
+Menu="Utilities"
+Icon="uma.png"
+Title="UMA"
+---
+<?php
+$sName = "uma";
+$uma_cfg = parse_plugin_cfg("uma");
+$uma_service = isset($uma_cfg['SERVICE']) ? $uma_cfg['SERVICE'] 	: "disable";
+$uma_ups = isset($uma_cfg['UPS']) ? $uma_cfg['UPS'] 	: "enable";
+$uma_running = shell_exec("pidof uma | wc -w");
+$uma_version = shell_exec("cat /usr/local/emhttp/plugins/uma/VERSION | tr '\n' ' '");
+?>
+
+<script type="text/javascript">
+	var isRunning = <?=$uma_running;?> === 1;
+	var version = '<?=$uma_version;?>';
+	var color = isRunning ? 'color:green' : 'color:orange'
+	if (isRunning) {
+		document.write("<span style='color:green;'><b>UMA " + version + "</b></span> <br /> <br />");
+		document.write("<p>HTTP API available on port 34600</p>");
+	} else {
+		document.write("<b><font style='color:orange;'>UMA " + version + " (not running)</font></b>")
+	}
+</script>
+
+<form markdown="1" name="uma_settings" method="POST" action="/update.php" target="progressFrame">
+<input type="hidden" name="#file" value="uma/uma.cfg" />
+<input type="hidden" id="command" name="#command" value="" />
+
+Enable UMA plugin :
+: <select id="SERVICE" name="SERVICE" size="1" onChange="checkRUNNING(this.form);">
+  <?=mk_option($uma_service, "disable", "No");?>
+  <?=mk_option($uma_service, "enable", "Yes");?>
+  </select>
+
+Provide UPS status :
+: <select id="UPS" name="UPS" size="1" onChange="checkRUNNING(this.form);">
+  <?=mk_option($uma_ups, "enable", "Yes");?>
+  <?=mk_option($uma_ups, "disable", "No");?>
+  </select>
+
+<input id="DEFAULT" class="stopped" type="submit" value="Default" onClick="resetDATA(this.form)">
+: <input id="btnApply" type="submit" value="Apply" onClick="verifyDATA(this.form)"><input type="button" value="Done" onClick="done()">
+</form>
+
+<script type="text/javascript">
+$(function(){
+	showStatus('<?=$sName;?>');
+	checkRUNNING(document.uma_settings);
+});
+
+function isNumber(value) {
+   return typeof value === 'number' && isFinite(value);
+}
+
+function resetDATA(form) {
+	form.UPS.value = "enable"
+}
+
+function checkRUNNING(form) {
+	if (<?=$uma_running;?> == 1)
+	{
+		$(".stopped").prop("disabled", true);
+		form.btnApply.disabled = "disabled";
+   }
+   else
+	$(".stopped").prop("disabled", (form.SERVICE.value == "enable"));
+	if (form.SERVICE.value == "enable")
+		form.command.value = "/usr/local/emhttp/plugins/uma/scripts/start";
+	else {
+		form.command.value = "/usr/local/emhttp/plugins/uma/scripts/stop";
+		form.btnApply.disabled = (form.SERVICE.value == "enable");
+	}
+}
+
+function verifyDATA(form) {
+	form.SERVICE.value = form.SERVICE.value.replace(/ /g,"_");
+	form.UPS.value = form.UPS.value.replace(/ /g,"_");
+}
+</script>

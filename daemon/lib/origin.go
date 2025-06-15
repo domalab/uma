@@ -3,8 +3,8 @@ package lib
 import (
 	"strings"
 
-	"github.com/domalab/omniraid/daemon/common"
-	"github.com/domalab/omniraid/daemon/dto"
+	"github.com/domalab/uma/daemon/common"
+	"github.com/domalab/uma/daemon/dto"
 
 	"github.com/vaughan0/go-ini"
 )

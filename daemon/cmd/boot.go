@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/domalab/omniraid/daemon/domain"
-	"github.com/domalab/omniraid/daemon/services"
+	"github.com/domalab/uma/daemon/domain"
+	"github.com/domalab/uma/daemon/services"
 )
 
 type Boot struct{}

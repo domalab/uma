@@ -1,6 +1,6 @@
-# OmniRaid
+# UMA (Unraid Management Agent)
 
-_tl;dr_ **OmniRaid** is a comprehensive monitoring and control system for Unraid servers, providing real-time system insights, hardware monitoring, and remote management capabilities.
+_tl;dr_ **UMA** is a comprehensive monitoring and control system for Unraid servers, providing real-time system insights, hardware monitoring, and remote management capabilities.
 
 ## Features
 
@@ -22,13 +22,13 @@ There are 2 ways to install this application
 - Community Applications<br/>
   Go to the Apps tab<br/>
   Click on the Plugins button<br/>
-  Look for OmniRaid<br/>
+  Look for UMA<br/>
   Click Install
 
 - Plugins Tab (manual)<br/>
   Go to the Plugins tab<br/>
   Click on Install Plugin<br/>
-  Paste the following address in the input field: <https://github.com/domalab/omniraid/releases/latest/download/omniraid.plg><br/>
+  Paste the following address in the input field: <https://github.com/domalab/uma/releases/latest/download/uma.plg><br/>
   Click Install
 
 ## Running the app
@@ -37,17 +37,17 @@ After installing the plugin, you can access the web UI, via the following method
 
 - Method 1<br/>
   Go to Settings > Utilities<br/>
-  Click on OmniRaid<br/>
+  Click on UMA<br/>
   Click on Open Web UI<br/>
 
 - Method 2<br/>
   Go to Plugins > Installed Plugins<br/>
-  Click on OmniRaid<br/>
+  Click on UMA<br/>
   Click on Open Web UI<br/>
 
 ## API Access
 
-OmniRaid provides a comprehensive REST API for integration with Home Assistant and other automation systems. The API includes endpoints for:
+UMA provides a comprehensive REST API for integration with Home Assistant and other automation systems. The API includes endpoints for:
 
 - System monitoring and status
 - Storage and array management

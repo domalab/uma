@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/domalab/omniraid/daemon/lib"
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/lib"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 // StorageMonitor provides storage monitoring capabilities
@@ -34,9 +34,9 @@ type DiskInfo struct {
 	Temperature int     `json:"temperature,omitempty"`
 	Health      string  `json:"health"`
 	// Enhanced disk information
-	PowerState    string `json:"power_state"`    // active, standby, sleeping, unknown
-	DiskType      string `json:"disk_type"`      // HDD, SSD, NVMe
-	Interface     string `json:"interface"`      // SATA, NVMe, USB
+	PowerState    string `json:"power_state"` // active, standby, sleeping, unknown
+	DiskType      string `json:"disk_type"`   // HDD, SSD, NVMe
+	Interface     string `json:"interface"`   // SATA, NVMe, USB
 	Model         string `json:"model,omitempty"`
 	SerialNumber  string `json:"serial_number,omitempty"`
 	SpinDownDelay int    `json:"spin_down_delay,omitempty"` // minutes, -1 for disabled
@@ -44,17 +44,27 @@ type DiskInfo struct {
 
 // ArrayInfo represents Unraid array information
 type ArrayInfo struct {
-	State         string     `json:"state"`
-	NumDevices    int        `json:"num_devices"`
-	NumDisks      int        `json:"num_disks"`
-	NumParity     int        `json:"num_parity"`
-	TotalSize     uint64     `json:"total_size"`
-	UsedSize      uint64     `json:"used_size"`
-	FreeSize      uint64     `json:"free_size"`
-	UsedPercent   float64    `json:"used_percent"`
-	Disks         []DiskInfo `json:"disks"`
+	State       string     `json:"state"`
+	NumDevices  int        `json:"num_devices"`
+	NumDisks    int        `json:"num_disks"`
+	NumParity   int        `json:"num_parity"`
+	TotalSize   uint64     `json:"total_size"`
+	UsedSize    uint64     `json:"used_size"`
+	FreeSize    uint64     `json:"free_size"`
+	UsedPercent float64    `json:"used_percent"`
+	Disks       []DiskInfo `json:"disks"`
 	// Enhanced array information
 	SpinDownDelay int `json:"spin_down_delay"` // Default spin-down delay in minutes
+}
+
+// ParityCheckStatus represents the status of a parity check operation
+type ParityCheckStatus struct {
+	Active        bool    `json:"active"`
+	Type          string  `json:"type,omitempty"`           // "check" or "correct"
+	Progress      float64 `json:"progress,omitempty"`       // 0-100
+	Speed         string  `json:"speed,omitempty"`          // e.g., "45.2 MB/s"
+	TimeRemaining string  `json:"time_remaining,omitempty"` // e.g., "2h 15m"
+	Errors        int     `json:"errors,omitempty"`
 }
 
 // CacheInfo represents cache pool information
@@ -569,8 +579,6 @@ func (s *StorageMonitor) getDiskUsage(disk *DiskInfo) error {
 	return nil
 }
 
-
-
 // getDiskTemperature gets disk temperature using smartctl
 func (s *StorageMonitor) getDiskTemperature(disk *DiskInfo) {
 	if disk.Device == "" {
@@ -894,14 +902,14 @@ func (s *StorageMonitor) getDiskTypeAndInterface(disk *DiskInfo) {
 
 		// Check for SSD indicators
 		if strings.Contains(line, "solid state") ||
-		   strings.Contains(line, "ssd") ||
-		   strings.Contains(line, "flash") {
+			strings.Contains(line, "ssd") ||
+			strings.Contains(line, "flash") {
 			disk.DiskType = "SSD"
 		}
 
 		// Check for rotation rate (HDD indicator)
 		if strings.Contains(line, "rotation rate") &&
-		   !strings.Contains(line, "solid state device") {
+			!strings.Contains(line, "solid state device") {
 			disk.DiskType = "HDD"
 		}
 
@@ -1164,4 +1172,248 @@ func (s *StorageMonitor) calculateArrayTotals(arrayInfo *ArrayInfo) {
 func (s *StorageMonitor) calculateCacheTotals(cache *CacheInfo) {
 	// Cache totals are already calculated in getCacheUsage
 	// This method is here for consistency and future enhancements
+}
+
+// Array Control Operations
+
+// StartArray starts the Unraid array
+func (s *StorageMonitor) StartArray(maintenanceMode bool, checkFilesystem bool) error {
+	logger.Blue("Starting Unraid array (maintenance: %v, check_fs: %v)", maintenanceMode, checkFilesystem)
+
+	// Build mdcmd command
+	cmd := "mdcmd start"
+	if maintenanceMode {
+		cmd += " MAINTENANCE=1"
+	}
+	if checkFilesystem {
+		cmd += " CHECK=1"
+	}
+
+	// Execute the command
+	output := lib.GetCmdOutput("sh", "-c", cmd)
+
+	// Check for errors in output
+	for _, line := range output {
+		if strings.Contains(strings.ToLower(line), "error") ||
+			strings.Contains(strings.ToLower(line), "failed") {
+			return fmt.Errorf("array start failed: %s", line)
+		}
+	}
+
+	logger.Blue("Array start command executed successfully")
+	return nil
+}
+
+// StopArray stops the Unraid array
+func (s *StorageMonitor) StopArray(force bool, unmountShares bool) error {
+	logger.Blue("Stopping Unraid array (force: %v, unmount_shares: %v)", force, unmountShares)
+
+	// Build mdcmd command
+	cmd := "mdcmd stop"
+	if force {
+		cmd += " FORCE=1"
+	}
+
+	// Execute the command
+	output := lib.GetCmdOutput("sh", "-c", cmd)
+
+	// Check for errors in output
+	for _, line := range output {
+		if strings.Contains(strings.ToLower(line), "error") ||
+			strings.Contains(strings.ToLower(line), "failed") {
+			return fmt.Errorf("array stop failed: %s", line)
+		}
+	}
+
+	logger.Blue("Array stop command executed successfully")
+	return nil
+}
+
+// GetParityCheckStatus returns the current parity check status
+func (s *StorageMonitor) GetParityCheckStatus() (*ParityCheckStatus, error) {
+	status := &ParityCheckStatus{
+		Active: false,
+	}
+
+	// Check /proc/mdstat for parity check information
+	if exists, _ := lib.Exists("/proc/mdstat"); exists {
+		content, err := os.ReadFile("/proc/mdstat")
+		if err != nil {
+			return status, fmt.Errorf("failed to read mdstat: %v", err)
+		}
+
+		mdstatContent := string(content)
+
+		// Look for parity check indicators
+		if strings.Contains(mdstatContent, "check") || strings.Contains(mdstatContent, "repair") {
+			status.Active = true
+
+			// Parse the type
+			if strings.Contains(mdstatContent, "check") {
+				status.Type = "check"
+			} else if strings.Contains(mdstatContent, "repair") {
+				status.Type = "correct"
+			}
+
+			// Parse progress if available
+			// Example: [==>..................]  recovery = 12.5% (1234567/9876543) finish=123.4min speed=45678K/sec
+			lines := strings.Split(mdstatContent, "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "%") && (strings.Contains(line, "recovery") || strings.Contains(line, "check")) {
+					// Extract progress percentage
+					if idx := strings.Index(line, "%"); idx > 0 {
+						start := idx - 1
+						for start > 0 && (line[start] >= '0' && line[start] <= '9' || line[start] == '.') {
+							start--
+						}
+						if start < idx {
+							if progress, err := strconv.ParseFloat(line[start+1:idx], 64); err == nil {
+								status.Progress = progress
+							}
+						}
+					}
+
+					// Extract speed
+					if speedIdx := strings.Index(line, "speed="); speedIdx >= 0 {
+						speedEnd := strings.Index(line[speedIdx:], " ")
+						if speedEnd > 0 {
+							status.Speed = line[speedIdx+6 : speedIdx+speedEnd]
+						}
+					}
+
+					// Extract time remaining
+					if finishIdx := strings.Index(line, "finish="); finishIdx >= 0 {
+						finishEnd := strings.Index(line[finishIdx:], " ")
+						if finishEnd > 0 {
+							status.TimeRemaining = line[finishIdx+7 : finishIdx+finishEnd]
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return status, nil
+}
+
+// StartParityCheck starts a parity check operation
+func (s *StorageMonitor) StartParityCheck(checkType string, priority string) error {
+	logger.Blue("Starting parity %s with priority %s", checkType, priority)
+
+	// Build mdcmd command
+	cmd := "mdcmd check"
+	if checkType == "correct" {
+		cmd = "mdcmd check CORRECT=1"
+	}
+
+	// Set priority (Unraid uses nice values: low=19, normal=0, high=-10)
+	switch priority {
+	case "low":
+		cmd = "nice -n 19 " + cmd
+	case "high":
+		cmd = "nice -n -10 " + cmd
+		// normal priority uses default nice value (0)
+	}
+
+	// Execute the command
+	output := lib.GetCmdOutput("sh", "-c", cmd)
+
+	// Check for errors in output
+	for _, line := range output {
+		if strings.Contains(strings.ToLower(line), "error") ||
+			strings.Contains(strings.ToLower(line), "failed") {
+			return fmt.Errorf("parity check start failed: %s", line)
+		}
+	}
+
+	logger.Blue("Parity %s started successfully", checkType)
+	return nil
+}
+
+// CancelParityCheck cancels an active parity check operation
+func (s *StorageMonitor) CancelParityCheck() error {
+	logger.Blue("Cancelling parity check")
+
+	// Execute the command to cancel parity check
+	output := lib.GetCmdOutput("mdcmd", "nocheck")
+
+	// Check for errors in output
+	for _, line := range output {
+		if strings.Contains(strings.ToLower(line), "error") ||
+			strings.Contains(strings.ToLower(line), "failed") {
+			return fmt.Errorf("parity check cancel failed: %s", line)
+		}
+	}
+
+	logger.Blue("Parity check cancelled successfully")
+	return nil
+}
+
+// AddDisk adds a disk to the array at the specified position
+func (s *StorageMonitor) AddDisk(device string, position string) error {
+	logger.Blue("Adding disk %s to position %s", device, position)
+
+	// Safety check: ensure array is stopped
+	arrayInfo, err := s.GetArrayInfo()
+	if err != nil {
+		return fmt.Errorf("failed to get array state: %v", err)
+	}
+
+	if arrayInfo.State != "stopped" {
+		return fmt.Errorf("array must be stopped to add disks")
+	}
+
+	// Validate device exists
+	if exists, _ := lib.Exists(device); !exists {
+		return fmt.Errorf("device %s does not exist", device)
+	}
+
+	// Build mdcmd command to assign disk
+	cmd := fmt.Sprintf("mdcmd set %s %s", position, device)
+
+	// Execute the command
+	output := lib.GetCmdOutput("sh", "-c", cmd)
+
+	// Check for errors in output
+	for _, line := range output {
+		if strings.Contains(strings.ToLower(line), "error") ||
+			strings.Contains(strings.ToLower(line), "failed") {
+			return fmt.Errorf("disk add failed: %s", line)
+		}
+	}
+
+	logger.Blue("Disk %s added to position %s successfully", device, position)
+	return nil
+}
+
+// RemoveDisk removes a disk from the specified array position
+func (s *StorageMonitor) RemoveDisk(position string) error {
+	logger.Blue("Removing disk from position %s", position)
+
+	// Safety check: ensure array is stopped
+	arrayInfo, err := s.GetArrayInfo()
+	if err != nil {
+		return fmt.Errorf("failed to get array state: %v", err)
+	}
+
+	if arrayInfo.State != "stopped" {
+		return fmt.Errorf("array must be stopped to remove disks")
+	}
+
+	// Build mdcmd command to unassign disk
+	cmd := fmt.Sprintf("mdcmd unassign %s", position)
+
+	// Execute the command
+	output := lib.GetCmdOutput("sh", "-c", cmd)
+
+	// Check for errors in output
+	for _, line := range output {
+		if strings.Contains(strings.ToLower(line), "error") ||
+			strings.Contains(strings.ToLower(line), "failed") {
+			return fmt.Errorf("disk remove failed: %s", line)
+		}
+	}
+
+	logger.Blue("Disk removed from position %s successfully", position)
+	return nil
 }

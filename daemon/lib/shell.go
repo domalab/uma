@@ -5,7 +5,7 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 // Callback - shell output handler

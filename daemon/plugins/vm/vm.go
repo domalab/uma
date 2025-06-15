@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/domalab/omniraid/daemon/lib"
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/lib"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 // VMManager provides virtual machine management capabilities
@@ -15,23 +15,23 @@ type VMManager struct{}
 
 // VMInfo represents information about a virtual machine
 type VMInfo struct {
-	ID          int               `json:"id"`
-	Name        string            `json:"name"`
-	UUID        string            `json:"uuid"`
-	State       string            `json:"state"`
-	CPUs        int               `json:"cpus"`
-	Memory      uint64            `json:"memory_kb"`
-	Autostart   bool              `json:"autostart"`
-	Persistent  bool              `json:"persistent"`
-	OSType      string            `json:"os_type"`
-	Architecture string           `json:"architecture"`
-	Disks       []VMDisk          `json:"disks"`
-	Networks    []VMNetwork       `json:"networks"`
-	Graphics    []VMGraphics      `json:"graphics"`
-	USBDevices  []VMUSBDevice     `json:"usb_devices"`
-	PCIDevices  []VMPCIDevice     `json:"pci_devices"`
-	CPUUsage    float64           `json:"cpu_usage_percent,omitempty"`
-	MemoryUsage uint64            `json:"memory_usage_kb,omitempty"`
+	ID           int           `json:"id"`
+	Name         string        `json:"name"`
+	UUID         string        `json:"uuid"`
+	State        string        `json:"state"`
+	CPUs         int           `json:"cpus"`
+	Memory       uint64        `json:"memory_kb"`
+	Autostart    bool          `json:"autostart"`
+	Persistent   bool          `json:"persistent"`
+	OSType       string        `json:"os_type"`
+	Architecture string        `json:"architecture"`
+	Disks        []VMDisk      `json:"disks"`
+	Networks     []VMNetwork   `json:"networks"`
+	Graphics     []VMGraphics  `json:"graphics"`
+	USBDevices   []VMUSBDevice `json:"usb_devices"`
+	PCIDevices   []VMPCIDevice `json:"pci_devices"`
+	CPUUsage     float64       `json:"cpu_usage_percent,omitempty"`
+	MemoryUsage  uint64        `json:"memory_usage_kb,omitempty"`
 }
 
 // VMDisk represents a virtual machine disk
@@ -124,7 +124,7 @@ func (v *VMManager) ListVMs(all bool) ([]VMInfo, error) {
 	}
 
 	output := lib.GetCmdOutput("virsh", args...)
-	
+
 	// Parse virsh list output
 	for i, line := range output {
 		// Skip header lines
@@ -138,7 +138,7 @@ func (v *VMManager) ListVMs(all bool) ([]VMInfo, error) {
 		}
 
 		vm := VMInfo{}
-		
+
 		// Parse ID (might be "-" for inactive VMs)
 		if fields[0] != "-" {
 			if id, err := strconv.Atoi(fields[0]); err == nil {
@@ -184,7 +184,7 @@ func (v *VMManager) StartVM(name string) error {
 	}
 
 	output := lib.GetCmdOutput("virsh", "start", name)
-	
+
 	// Check for errors
 	for _, line := range output {
 		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {
@@ -208,7 +208,7 @@ func (v *VMManager) StopVM(name string, force bool) error {
 	}
 
 	output := lib.GetCmdOutput("virsh", command, name)
-	
+
 	// Check for errors
 	for _, line := range output {
 		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {
@@ -227,7 +227,7 @@ func (v *VMManager) RestartVM(name string) error {
 	}
 
 	output := lib.GetCmdOutput("virsh", "reboot", name)
-	
+
 	// Check for errors
 	for _, line := range output {
 		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {
@@ -246,7 +246,7 @@ func (v *VMManager) PauseVM(name string) error {
 	}
 
 	output := lib.GetCmdOutput("virsh", "suspend", name)
-	
+
 	// Check for errors
 	for _, line := range output {
 		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {
@@ -265,7 +265,7 @@ func (v *VMManager) ResumeVM(name string) error {
 	}
 
 	output := lib.GetCmdOutput("virsh", "resume", name)
-	
+
 	// Check for errors
 	for _, line := range output {
 		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {
@@ -274,6 +274,48 @@ func (v *VMManager) ResumeVM(name string) error {
 	}
 
 	logger.Blue("Resumed VM: %s", name)
+	return nil
+}
+
+// HibernateVM hibernates a virtual machine (save state to disk)
+func (v *VMManager) HibernateVM(name string) error {
+	if !v.IsLibvirtAvailable() {
+		return fmt.Errorf("libvirt is not available")
+	}
+
+	// Use virsh save to hibernate the VM (save state to disk)
+	saveFile := fmt.Sprintf("/tmp/%s.save", name)
+	output := lib.GetCmdOutput("virsh", "save", name, saveFile)
+
+	// Check for errors
+	for _, line := range output {
+		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {
+			return fmt.Errorf("failed to hibernate VM: %s", line)
+		}
+	}
+
+	logger.Blue("Hibernated VM: %s (saved to %s)", name, saveFile)
+	return nil
+}
+
+// RestoreVM restores a hibernated virtual machine
+func (v *VMManager) RestoreVM(name string) error {
+	if !v.IsLibvirtAvailable() {
+		return fmt.Errorf("libvirt is not available")
+	}
+
+	// Use virsh restore to restore the VM from hibernation
+	saveFile := fmt.Sprintf("/tmp/%s.save", name)
+	output := lib.GetCmdOutput("virsh", "restore", saveFile)
+
+	// Check for errors
+	for _, line := range output {
+		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {
+			return fmt.Errorf("failed to restore VM: %s", line)
+		}
+	}
+
+	logger.Blue("Restored VM: %s (from %s)", name, saveFile)
 	return nil
 }
 
@@ -324,7 +366,7 @@ func (v *VMManager) SetVMAutostart(name string, autostart bool) error {
 	}
 
 	output := lib.GetCmdOutput("virsh", strings.Fields(command+" "+name)...)
-	
+
 	// Check for errors
 	for _, line := range output {
 		if strings.Contains(line, "error:") || strings.Contains(line, "failed") {

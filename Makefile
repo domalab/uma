@@ -9,7 +9,7 @@ mb_date := $(shell date '+%Y.%m.%d')
 mb_hash := $(shell git rev-parse --short HEAD)
 
 # binary name to kill/restart
-PROG = omniraid
+PROG = uma
 
 # targets not associated with files
 .PHONY: default build test coverage clean kill restart serve

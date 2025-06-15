@@ -7,20 +7,21 @@ import (
 	"os"
 	"time"
 
-	"github.com/domalab/omniraid/daemon/common"
-	"github.com/domalab/omniraid/daemon/domain"
-	"github.com/domalab/omniraid/daemon/dto"
-	"github.com/domalab/omniraid/daemon/logger"
-	"github.com/domalab/omniraid/daemon/plugins/sensor"
-	"github.com/domalab/omniraid/daemon/plugins/ups"
-	"github.com/domalab/omniraid/daemon/plugins/storage"
-	"github.com/domalab/omniraid/daemon/plugins/system"
-	"github.com/domalab/omniraid/daemon/plugins/gpu"
-	"github.com/domalab/omniraid/daemon/plugins/docker"
-	"github.com/domalab/omniraid/daemon/plugins/vm"
-	"github.com/domalab/omniraid/daemon/plugins/diagnostics"
-	"github.com/domalab/omniraid/daemon/services/auth"
-	"github.com/domalab/omniraid/daemon/services/config"
+	"github.com/domalab/uma/daemon/common"
+	"github.com/domalab/uma/daemon/domain"
+	"github.com/domalab/uma/daemon/dto"
+	"github.com/domalab/uma/daemon/logger"
+	"github.com/domalab/uma/daemon/plugins/diagnostics"
+	"github.com/domalab/uma/daemon/plugins/docker"
+	"github.com/domalab/uma/daemon/plugins/gpu"
+	"github.com/domalab/uma/daemon/plugins/notifications"
+	"github.com/domalab/uma/daemon/plugins/sensor"
+	"github.com/domalab/uma/daemon/plugins/storage"
+	"github.com/domalab/uma/daemon/plugins/system"
+	"github.com/domalab/uma/daemon/plugins/ups"
+	"github.com/domalab/uma/daemon/plugins/vm"
+	"github.com/domalab/uma/daemon/services/auth"
+	"github.com/domalab/uma/daemon/services/config"
 )
 
 type Api struct {
@@ -38,15 +39,16 @@ type Api struct {
 	rateLimiter   *auth.RateLimiter
 
 	// Data providers
-	origin      *dto.Origin
-	sensor      sensor.Sensor
-	ups         ups.Ups
-	storage     *storage.StorageMonitor
-	system      *system.SystemMonitor
-	gpu         *gpu.GPUMonitor
-	docker      *docker.DockerManager
-	vm          *vm.VMManager
-	diagnostics *diagnostics.DiagnosticsManager
+	origin        *dto.Origin
+	sensor        sensor.Sensor
+	ups           ups.Ups
+	storage       *storage.StorageMonitor
+	system        *system.SystemMonitor
+	gpu           *gpu.GPUMonitor
+	docker        *docker.DockerManager
+	vm            *vm.VMManager
+	diagnostics   *diagnostics.DiagnosticsManager
+	notifications *notifications.NotificationManager
 }
 
 func Create(ctx *domain.Context) *Api {
@@ -94,6 +96,7 @@ func (a *Api) Run() error {
 	a.docker = docker.NewDockerManager()
 	a.vm = vm.NewVMManager()
 	a.diagnostics = diagnostics.NewDiagnosticsManager()
+	a.notifications = notifications.NewNotificationManager()
 
 	// Start HTTP server if configured
 	if a.httpServer != nil {

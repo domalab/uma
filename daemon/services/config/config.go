@@ -6,14 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/domalab/omniraid/daemon/domain"
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/domain"
+	"github.com/domalab/uma/daemon/logger"
 	"github.com/vaughan0/go-ini"
 )
 
 const (
-	DefaultConfigPath = "/boot/config/plugins/omniraid/omniraid.json"
-	LegacyConfigPath  = "/boot/config/plugins/omniraid/omniraid.cfg"
+	DefaultConfigPath = "/boot/config/plugins/uma/uma.json"
+	LegacyConfigPath  = "/boot/config/plugins/uma/uma.cfg"
 )
 
 // Manager handles configuration loading and saving
@@ -27,7 +27,7 @@ func NewManager(configPath string) *Manager {
 	if configPath == "" {
 		configPath = DefaultConfigPath
 	}
-	
+
 	return &Manager{
 		configPath: configPath,
 		config:     domain.DefaultConfig(),

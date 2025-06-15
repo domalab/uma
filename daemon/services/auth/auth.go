@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/domalab/omniraid/daemon/domain"
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/domain"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 // AuthService handles authentication and authorization

@@ -1,6 +1,6 @@
 package ups
 
-import "github.com/domalab/omniraid/daemon/dto"
+import "github.com/domalab/uma/daemon/dto"
 
 // NoUps -
 type NoUps struct {

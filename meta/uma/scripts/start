@@ -1,0 +1,12 @@
+#!/bin/bash
+# read our configuration
+source /boot/config/plugins/uma/uma.cfg
+
+prog="/usr/local/emhttp/plugins/uma/uma"
+
+# stop it if it's running
+killall uma >/dev/null 2>&1
+
+# run the app
+[[ $UPS = "enable" ]] && SHOWUPS="--show-ups" || SHOWUPS=""
+nohup sudo -H bash -c "$prog $SHOWUPS" >/dev/null 2>&1 &

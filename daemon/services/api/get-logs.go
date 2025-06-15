@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/domalab/omniraid/daemon/lib"
-	"github.com/domalab/omniraid/daemon/logger"
+	"github.com/domalab/uma/daemon/lib"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 var logLocation = map[string]string{
