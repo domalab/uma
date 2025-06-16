@@ -8,7 +8,7 @@ import (
 	"github.com/domalab/uma/daemon/dto"
 	"github.com/domalab/uma/daemon/lib"
 	"github.com/domalab/uma/daemon/logger"
-	"github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 func (a *Api) getInfo() *dto.Info {
@@ -51,20 +51,20 @@ func getPrefs() dto.Prefs {
 		Unit:   "C",
 	}
 
-	file, err := ini.LoadFile(common.Prefs)
+	cfg, err := ini.Load(common.Prefs)
 	if err != nil {
 		logger.Yellow("unable to load/parse prefs file (%s): %s", common.Prefs, err)
 		return prefs
 	}
 
-	for key, value := range file["display"] {
-		if key == "number" {
-			prefs.Number = strings.Replace(value, "\"", "", -1)
-		}
+	// Use improved parsing with automatic quote removal and defaults
+	displaySection := cfg.Section("display")
+	if displaySection != nil {
+		number := displaySection.Key("number").MustString(".,")
+		prefs.Number = strings.Replace(number, "\"", "", -1)
 
-		if key == "unit" {
-			prefs.Unit = strings.Replace(value, "\"", "", -1)
-		}
+		unit := displaySection.Key("unit").MustString("C")
+		prefs.Unit = strings.Replace(unit, "\"", "", -1)
 	}
 
 	return prefs

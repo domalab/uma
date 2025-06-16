@@ -22,7 +22,7 @@ import (
 	"github.com/domalab/uma/daemon/lib"
 	"github.com/domalab/uma/daemon/logger"
 
-	"github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 const (
@@ -48,27 +48,24 @@ func NewNut() *Nut {
 	}
 
 	var name, ip string
-	var ok bool
 
-	file, err := ini.LoadFile(nutConfig)
+	cfg, err := ini.Load(nutConfig)
 	if err != nil {
 		name = "ups"
 		ip = "127.0.0.1"
 		logger.Yellow("nuts: unable to parse config: (%s). Using defaults ...", nutConfig)
 	} else {
-		name, ok = file.Get("", "NAME")
-		if ok {
-			name = strings.ReplaceAll(name, "\"", "")
-		} else {
-			name = "ups"
+		// Use improved parsing with automatic defaults and quote removal
+		name = cfg.Section("").Key("NAME").MustString("ups")
+		name = strings.ReplaceAll(name, "\"", "")
+
+		ip = cfg.Section("").Key("IPADDR").MustString("127.0.0.1")
+		ip = strings.ReplaceAll(ip, "\"", "")
+
+		if name == "ups" {
 			logger.Yellow("nuts: name not found. Defaulting to ups ...")
 		}
-
-		ip, ok = file.Get("", "IPADDR")
-		if ok {
-			ip = strings.ReplaceAll(ip, "\"", "")
-		} else {
-			ip = "127.0.0.1"
+		if ip == "127.0.0.1" {
 			logger.Yellow("nuts: ip not found. Defaulting to 127.0.0.1 ...")
 		}
 	}

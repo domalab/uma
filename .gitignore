@@ -1,1 +1,33 @@
+# Compiled binaries
 omniraid
+uma
+uma-*
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage.out
+*.cover
+
+# Build artifacts
+dist/
+build/
+
+# Configuration files with sensitive data
+config.local.*
+.env.local

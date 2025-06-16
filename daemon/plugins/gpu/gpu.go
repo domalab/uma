@@ -17,22 +17,28 @@ type GPUMonitor struct {
 
 // GPUInfo represents information about a GPU
 type GPUInfo struct {
-	Index           int     `json:"index"`
-	Name            string  `json:"name"`
-	UUID            string  `json:"uuid"`
-	Driver          string  `json:"driver"`
-	Temperature     int     `json:"temperature"`
-	PowerDraw       float64 `json:"power_draw_watts"`
-	PowerLimit      float64 `json:"power_limit_watts"`
-	UtilizationGPU  int     `json:"utilization_gpu_percent"`
-	UtilizationMem  int     `json:"utilization_memory_percent"`
-	MemoryTotal     uint64  `json:"memory_total_bytes"`
-	MemoryUsed      uint64  `json:"memory_used_bytes"`
-	MemoryFree      uint64  `json:"memory_free_bytes"`
-	FanSpeed        int     `json:"fan_speed_percent"`
-	ClockCore       int     `json:"clock_core_mhz"`
-	ClockMemory     int     `json:"clock_memory_mhz"`
-	Status          string  `json:"status"`
+	Index          int     `json:"index"`
+	Name           string  `json:"name"`
+	UUID           string  `json:"uuid"`
+	Driver         string  `json:"driver"`
+	Temperature    int     `json:"temperature"`
+	PowerDraw      float64 `json:"power_draw_watts"`
+	PowerLimit     float64 `json:"power_limit_watts"`
+	UtilizationGPU int     `json:"utilization_gpu_percent"`
+	UtilizationMem int     `json:"utilization_memory_percent"`
+	MemoryTotal    uint64  `json:"memory_total_bytes"`
+	MemoryUsed     uint64  `json:"memory_used_bytes"`
+	MemoryFree     uint64  `json:"memory_free_bytes"`
+	FanSpeed       int     `json:"fan_speed_percent"`
+	ClockCore      int     `json:"clock_core_mhz"`
+	ClockMemory    int     `json:"clock_memory_mhz"`
+	Status         string  `json:"status"`
+	// Human-readable formatted fields
+	MemoryTotalFormatted string `json:"memory_total_formatted"` // "8 GB"
+	MemoryUsedFormatted  string `json:"memory_used_formatted"`  // "6 GB"
+	MemoryFreeFormatted  string `json:"memory_free_formatted"`  // "2 GB"
+	PowerDrawFormatted   string `json:"power_draw_formatted"`   // "150 W"
+	PowerLimitFormatted  string `json:"power_limit_formatted"`  // "200 W"
 }
 
 // NvidiaSMIOutput represents nvidia-smi JSON output structure
@@ -293,6 +299,9 @@ func (g *GPUMonitor) parseNvidiaCSVLine(line string) (GPUInfo, error) {
 		}
 	}
 
+	// Populate formatted fields
+	g.populateFormattedFields(&gpu)
+
 	return gpu, nil
 }
 
@@ -308,7 +317,7 @@ func (g *GPUMonitor) getAMDGPUs() ([]GPUInfo, error) {
 
 	// Get basic GPU information
 	output = lib.GetCmdOutput("rocm-smi", "--showid", "--showproductname")
-	
+
 	// Parse AMD GPU output (simplified implementation)
 	for i, line := range output {
 		if strings.Contains(line, "GPU[") {
@@ -323,6 +332,9 @@ func (g *GPUMonitor) getAMDGPUs() ([]GPUInfo, error) {
 				gpu.Name = strings.TrimSpace(parts[1])
 			}
 
+			// Populate formatted fields
+			g.populateFormattedFields(&gpu)
+
 			gpus = append(gpus, gpu)
 		}
 	}
@@ -336,7 +348,7 @@ func (g *GPUMonitor) getIntelGPUs() ([]GPUInfo, error) {
 
 	// Check for Intel GPU using lspci
 	output := lib.GetCmdOutput("lspci", "-d", "8086:", "-v")
-	
+
 	index := 0
 	for _, line := range output {
 		if strings.Contains(line, "VGA compatible controller") && strings.Contains(line, "Intel") {
@@ -350,6 +362,9 @@ func (g *GPUMonitor) getIntelGPUs() ([]GPUInfo, error) {
 			if parts := strings.Split(line, ":"); len(parts) > 2 {
 				gpu.Name = strings.TrimSpace(parts[2])
 			}
+
+			// Populate formatted fields
+			g.populateFormattedFields(&gpu)
 
 			gpus = append(gpus, gpu)
 			index++
@@ -397,4 +412,42 @@ func (g *GPUMonitor) getMemCondition(percent float64) string {
 		return "warning"
 	}
 	return "normal"
+}
+
+// formatBytes converts bytes to human-readable format
+func (g *GPUMonitor) formatBytes(bytes uint64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+
+	div, exp := uint64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+
+	units := []string{"B", "KB", "MB", "GB", "TB", "PB"}
+	if exp >= len(units) {
+		exp = len(units) - 1
+	}
+
+	return fmt.Sprintf("%.1f %s", float64(bytes)/float64(div), units[exp])
+}
+
+// formatPower converts watts to human-readable format
+func (g *GPUMonitor) formatPower(watts float64) string {
+	if watts == 0 {
+		return "0 W"
+	}
+	return fmt.Sprintf("%.1f W", watts)
+}
+
+// populateFormattedFields populates human-readable formatted fields for a GPU
+func (g *GPUMonitor) populateFormattedFields(gpu *GPUInfo) {
+	gpu.MemoryTotalFormatted = g.formatBytes(gpu.MemoryTotal)
+	gpu.MemoryUsedFormatted = g.formatBytes(gpu.MemoryUsed)
+	gpu.MemoryFreeFormatted = g.formatBytes(gpu.MemoryFree)
+	gpu.PowerDrawFormatted = g.formatPower(gpu.PowerDraw)
+	gpu.PowerLimitFormatted = g.formatPower(gpu.PowerLimit)
 }

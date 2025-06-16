@@ -16,7 +16,7 @@ import (
 	"github.com/domalab/uma/daemon/lib"
 	"github.com/domalab/uma/daemon/logger"
 
-	ini "github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 const (
@@ -134,12 +134,12 @@ func CheckNetworkEnabled() (bool, error) {
 		return false, nil
 	}
 
-	file, err := ini.LoadFile(ipmiConfig)
+	cfg, err := ini.Load(ipmiConfig)
 	if err != nil {
 		return false, err
 	}
 
-	net, _ := file.Get("", "NETWORK")
+	net := cfg.Section("").Key("NETWORK").MustString("disable")
 	net = strings.Replace(net, "\"", "", -1)
 
 	return net == "enable", nil

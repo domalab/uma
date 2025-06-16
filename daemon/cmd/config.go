@@ -26,7 +26,7 @@ func (c *ConfigShowCmd) Run(ctx *domain.Context) error {
 
 	cfg := manager.GetConfig()
 	
-	fmt.Printf("OmniRaid Configuration:\n")
+	fmt.Printf("UMA Configuration:\n")
 	fmt.Printf("  Version: %s\n", cfg.Version)
 	fmt.Printf("  Show UPS: %t\n", cfg.ShowUps)
 	fmt.Printf("\n")

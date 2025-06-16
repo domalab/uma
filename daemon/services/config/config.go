@@ -8,7 +8,7 @@ import (
 
 	"github.com/domalab/uma/daemon/domain"
 	"github.com/domalab/uma/daemon/logger"
-	"github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 const (
@@ -107,7 +107,7 @@ func (m *Manager) loadJSON() error {
 
 // loadLegacyINI loads configuration from legacy INI file
 func (m *Manager) loadLegacyINI() error {
-	file, err := ini.LoadFile(LegacyConfigPath)
+	cfg, err := ini.Load(LegacyConfigPath)
 	if err != nil {
 		return err
 	}
@@ -115,15 +115,12 @@ func (m *Manager) loadLegacyINI() error {
 	// Start with defaults
 	m.config = domain.DefaultConfig()
 
-	// Parse legacy settings
-	if service, exists := file.Get("", "SERVICE"); exists {
-		// Legacy config doesn't have HTTP settings, so we'll enable by default
-		m.config.HTTPServer.Enabled = (service == "enable")
-	}
+	// Parse legacy settings with improved error handling and defaults
+	service := cfg.Section("").Key("SERVICE").MustString("disable")
+	m.config.HTTPServer.Enabled = (service == "enable")
 
-	if ups, exists := file.Get("", "UPS"); exists {
-		m.config.ShowUps = (ups == "enable")
-	}
+	ups := cfg.Section("").Key("UPS").MustString("enable")
+	m.config.ShowUps = (ups == "enable")
 
 	return nil
 }

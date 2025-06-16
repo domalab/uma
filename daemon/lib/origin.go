@@ -6,20 +6,20 @@ import (
 	"github.com/domalab/uma/daemon/common"
 	"github.com/domalab/uma/daemon/dto"
 
-	"github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 func GetOrigin() (*dto.Origin, error) {
 	var origin dto.Origin
 
-	nginx, err := ini.LoadFile(common.Nginx)
+	nginx, err := ini.Load(common.Nginx)
 	if err != nil {
 		origin.ErrorCode = "nginx-state"
 		origin.ErrorText = err.Error()
 		return nil, err
 	}
 
-	vars, err := ini.LoadFile(common.Variables)
+	vars, err := ini.Load(common.Variables)
 	if err != nil {
 		origin.ErrorCode = "var-state"
 		origin.ErrorText = err.Error()
@@ -43,11 +43,8 @@ func GetOrigin() (*dto.Origin, error) {
 	return &origin, nil
 }
 
-func getValueOrDefault(file ini.File, key string, def string) string {
-	value, _ := file.Get("", key)
+func getValueOrDefault(file *ini.File, key string, def string) string {
+	value := file.Section("").Key(key).MustString(def)
 	value = strings.Replace(value, "\"", "", -1)
-	if value == "" {
-		value = def
-	}
 	return value
 }

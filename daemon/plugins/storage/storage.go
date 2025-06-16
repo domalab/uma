@@ -20,6 +20,34 @@ type StorageMonitor struct {
 	bootDisk   DiskInfo
 }
 
+// SMARTAttribute represents a SMART attribute
+type SMARTAttribute struct {
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	Value      int    `json:"value"`
+	Worst      int    `json:"worst"`
+	Threshold  int    `json:"threshold"`
+	RawValue   uint64 `json:"raw_value"`
+	WhenFailed string `json:"when_failed,omitempty"`
+	Flags      string `json:"flags,omitempty"`
+}
+
+// SMARTData represents comprehensive SMART health data
+type SMARTData struct {
+	OverallHealth   string           `json:"overall_health"` // PASSED, FAILED, UNKNOWN
+	SmartSupported  bool             `json:"smart_supported"`
+	SmartEnabled    bool             `json:"smart_enabled"`
+	Temperature     int              `json:"temperature,omitempty"`
+	PowerOnHours    uint64           `json:"power_on_hours,omitempty"`
+	PowerCycleCount uint64           `json:"power_cycle_count,omitempty"`
+	Attributes      []SMARTAttribute `json:"attributes,omitempty"`
+	// Critical health indicators
+	ReallocatedSectors    uint64 `json:"reallocated_sectors"`
+	CurrentPendingSectors uint64 `json:"current_pending_sectors"`
+	OfflineUncorrectable  uint64 `json:"offline_uncorrectable"`
+	ReallocatedEvents     uint64 `json:"reallocated_events"`
+}
+
 // DiskInfo represents information about a disk
 type DiskInfo struct {
 	Device      string  `json:"device"`
@@ -40,6 +68,59 @@ type DiskInfo struct {
 	Model         string `json:"model,omitempty"`
 	SerialNumber  string `json:"serial_number,omitempty"`
 	SpinDownDelay int    `json:"spin_down_delay,omitempty"` // minutes, -1 for disabled
+	// SMART health data
+	SmartData *SMARTData `json:"smart_data,omitempty"`
+}
+
+// ConsolidatedDiskInfo represents enhanced disk information for the new /api/v1/storage/disks endpoint
+type ConsolidatedDiskInfo struct {
+	Device             string  `json:"device"`
+	Name               string  `json:"name"`
+	Role               string  `json:"role"` // array, parity, cache, boot
+	Size               uint64  `json:"size"`
+	SizeFormatted      string  `json:"size_formatted"` // "8 TB"
+	Used               uint64  `json:"used"`
+	UsedFormatted      string  `json:"used_formatted"` // "6.28 TB"
+	Available          uint64  `json:"available"`
+	AvailableFormatted string  `json:"available_formatted"` // "1.72 TB"
+	UsedPercent        float64 `json:"used_percent"`
+	FileSystem         string  `json:"filesystem"`
+	MountPoint         string  `json:"mount_point"`
+	Status             string  `json:"status"`
+	Health             string  `json:"health"`
+
+	// Hardware Information
+	Model        string `json:"model,omitempty"`
+	SerialNumber string `json:"serial_number,omitempty"`
+	DiskType     string `json:"disk_type"` // HDD, SSD, NVMe
+	Interface    string `json:"interface"` // SATA, NVMe, USB
+
+	// Power and Temperature
+	PowerState    string `json:"power_state"` // active, standby, sleeping, unknown
+	Temperature   int    `json:"temperature,omitempty"`
+	SpinDownDelay int    `json:"spin_down_delay,omitempty"` // minutes, -1 for disabled
+
+	// Comprehensive SMART Data
+	SmartData *SMARTData `json:"smart_data,omitempty"`
+}
+
+// DisksResponse represents the response for the /api/v1/storage/disks endpoint
+type DisksResponse struct {
+	ArrayDisks  []ConsolidatedDiskInfo `json:"array_disks"`
+	ParityDisks []ConsolidatedDiskInfo `json:"parity_disks"`
+	CacheDisks  []ConsolidatedDiskInfo `json:"cache_disks"`
+	BootDisk    *ConsolidatedDiskInfo  `json:"boot_disk,omitempty"`
+	Summary     DisksSummary           `json:"summary"`
+}
+
+// DisksSummary provides summary statistics for all disks
+type DisksSummary struct {
+	TotalDisks   int `json:"total_disks"`
+	HealthyDisks int `json:"healthy_disks"`
+	WarningDisks int `json:"warning_disks"`
+	FailingDisks int `json:"failing_disks"`
+	ActiveDisks  int `json:"active_disks"`
+	StandbyDisks int `json:"standby_disks"`
 }
 
 // ArrayInfo represents Unraid array information
@@ -55,6 +136,10 @@ type ArrayInfo struct {
 	Disks       []DiskInfo `json:"disks"`
 	// Enhanced array information
 	SpinDownDelay int `json:"spin_down_delay"` // Default spin-down delay in minutes
+	// Human-readable formatted fields
+	TotalSizeFormatted string `json:"total_size_formatted"` // "8 TB"
+	UsedSizeFormatted  string `json:"used_size_formatted"`  // "6.28 TB"
+	FreeSizeFormatted  string `json:"free_size_formatted"`  // "1.72 TB"
 }
 
 // ParityCheckStatus represents the status of a parity check operation
@@ -77,6 +162,10 @@ type CacheInfo struct {
 	FreeSize    uint64     `json:"free_size"`
 	UsedPercent float64    `json:"used_percent"`
 	Disks       []DiskInfo `json:"disks"`
+	// Human-readable formatted fields
+	TotalSizeFormatted string `json:"total_size_formatted"` // "1 TB"
+	UsedSizeFormatted  string `json:"used_size_formatted"`  // "512 GB"
+	FreeSizeFormatted  string `json:"free_size_formatted"`  // "512 GB"
 }
 
 // NewStorageMonitor creates a new storage monitor
@@ -234,6 +323,8 @@ func (s *StorageMonitor) loadArrayDisks(arrayInfo *ArrayInfo) error {
 			// Get disk health and temperature
 			s.getDiskHealth(&diskInfo)
 			s.getDiskTemperature(&diskInfo)
+			// Get comprehensive SMART data
+			s.getComprehensiveSMARTData(&diskInfo)
 
 			arrayInfo.Disks = append(arrayInfo.Disks, diskInfo)
 
@@ -356,6 +447,8 @@ func (s *StorageMonitor) loadArrayDisksFromMdstat(arrayInfo *ArrayInfo) error {
 				s.getDiskTypeAndInterface(&diskInfo)
 				s.getDiskModel(&diskInfo)
 				s.getDiskSpinDownDelay(&diskInfo, i)
+				// Get comprehensive SMART data
+				s.getComprehensiveSMARTData(&diskInfo)
 			}
 		}
 
@@ -668,6 +761,8 @@ func (s *StorageMonitor) loadCacheDisks(cache *CacheInfo) error {
 
 		s.getDiskHealth(&diskInfo)
 		s.getDiskTemperature(&diskInfo)
+		// Get comprehensive SMART data
+		s.getComprehensiveSMARTData(&diskInfo)
 		cache.Disks = append(cache.Disks, diskInfo)
 	}
 
@@ -702,6 +797,11 @@ func (s *StorageMonitor) getCacheUsage(cache *CacheInfo, mountPoint string) erro
 	if cache.TotalSize > 0 {
 		cache.UsedPercent = float64(cache.UsedSize) / float64(cache.TotalSize) * 100
 	}
+
+	// Populate human-readable formatted fields
+	cache.TotalSizeFormatted = s.formatBytes(cache.TotalSize)
+	cache.UsedSizeFormatted = s.formatBytes(cache.UsedSize)
+	cache.FreeSizeFormatted = s.formatBytes(cache.FreeSize)
 
 	// Get filesystem type
 	file, err := os.Open("/proc/mounts")
@@ -871,6 +971,317 @@ func (s *StorageMonitor) getDiskHealth(disk *DiskInfo) {
 	}
 
 	disk.Health = "unknown"
+}
+
+// getComprehensiveSMARTData collects detailed SMART information for a disk
+func (s *StorageMonitor) getComprehensiveSMARTData(disk *DiskInfo) {
+	if disk.Device == "" {
+		return
+	}
+
+	actualDevice := s.resolveDevicePath(disk.Device)
+	if actualDevice == "" {
+		return
+	}
+
+	smartData := &SMARTData{
+		OverallHealth:  "UNKNOWN",
+		SmartSupported: false,
+		SmartEnabled:   false,
+		Attributes:     make([]SMARTAttribute, 0),
+	}
+
+	// Get SMART information and attributes
+	output := lib.GetCmdOutput("smartctl", "-A", "-i", "-H", actualDevice)
+	s.parseSMARTOutput(output, smartData)
+
+	// Only set SMART data if we got useful information
+	if smartData.SmartSupported || len(smartData.Attributes) > 0 {
+		disk.SmartData = smartData
+	}
+}
+
+// parseSMARTOutput parses smartctl output to extract comprehensive SMART data
+func (s *StorageMonitor) parseSMARTOutput(output []string, smartData *SMARTData) {
+	inAttributeSection := false
+
+	for _, line := range output {
+		line = strings.TrimSpace(line)
+
+		// Parse SMART support and status
+		if strings.Contains(line, "SMART support is:") {
+			if strings.Contains(line, "Available") {
+				smartData.SmartSupported = true
+			}
+		} else if strings.Contains(line, "SMART support is: Enabled") {
+			smartData.SmartEnabled = true
+		} else if strings.Contains(line, "SMART overall-health self-assessment test result:") {
+			if strings.Contains(line, "PASSED") {
+				smartData.OverallHealth = "PASSED"
+			} else if strings.Contains(line, "FAILED") {
+				smartData.OverallHealth = "FAILED"
+			}
+		} else if strings.Contains(line, "SMART Health Status:") {
+			// NVMe drives
+			if strings.Contains(line, "OK") {
+				smartData.OverallHealth = "PASSED"
+			} else {
+				smartData.OverallHealth = "FAILED"
+			}
+		}
+
+		// Parse temperature
+		if strings.Contains(line, "Temperature_Celsius") || strings.Contains(line, "Airflow_Temperature_Cel") {
+			fields := strings.Fields(line)
+			if len(fields) >= 10 {
+				if temp, err := strconv.Atoi(fields[9]); err == nil {
+					smartData.Temperature = temp
+				}
+			}
+		}
+
+		// Parse power on hours
+		if strings.Contains(line, "Power_On_Hours") {
+			fields := strings.Fields(line)
+			if len(fields) >= 10 {
+				if hours, err := strconv.ParseUint(fields[9], 10, 64); err == nil {
+					smartData.PowerOnHours = hours
+				}
+			}
+		}
+
+		// Parse power cycle count
+		if strings.Contains(line, "Power_Cycle_Count") {
+			fields := strings.Fields(line)
+			if len(fields) >= 10 {
+				if cycles, err := strconv.ParseUint(fields[9], 10, 64); err == nil {
+					smartData.PowerCycleCount = cycles
+				}
+			}
+		}
+
+		// Detect start of attribute table
+		if strings.Contains(line, "ID# ATTRIBUTE_NAME") {
+			inAttributeSection = true
+			continue
+		}
+
+		// Parse SMART attributes
+		if inAttributeSection && len(line) > 0 && !strings.HasPrefix(line, "=") {
+			if attr := s.parseSMARTAttribute(line); attr != nil {
+				smartData.Attributes = append(smartData.Attributes, *attr)
+
+				// Extract critical health indicators
+				switch attr.Name {
+				case "Reallocated_Sector_Ct":
+					smartData.ReallocatedSectors = attr.RawValue
+				case "Current_Pending_Sector":
+					smartData.CurrentPendingSectors = attr.RawValue
+				case "Offline_Uncorrectable":
+					smartData.OfflineUncorrectable = attr.RawValue
+				case "Reallocated_Event_Count":
+					smartData.ReallocatedEvents = attr.RawValue
+				}
+			}
+		}
+
+		// End of attribute section
+		if inAttributeSection && (strings.HasPrefix(line, "=") || line == "") {
+			inAttributeSection = false
+		}
+	}
+}
+
+// parseSMARTAttribute parses a single SMART attribute line
+func (s *StorageMonitor) parseSMARTAttribute(line string) *SMARTAttribute {
+	fields := strings.Fields(line)
+	if len(fields) < 10 {
+		return nil
+	}
+
+	// Parse ID
+	id, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return nil
+	}
+
+	// Parse values
+	value, err := strconv.Atoi(fields[3])
+	if err != nil {
+		return nil
+	}
+
+	worst, err := strconv.Atoi(fields[4])
+	if err != nil {
+		return nil
+	}
+
+	threshold, err := strconv.Atoi(fields[5])
+	if err != nil {
+		return nil
+	}
+
+	// Parse raw value (can be complex, take the last field)
+	rawValue, err := strconv.ParseUint(fields[9], 10, 64)
+	if err != nil {
+		// Try to parse hex values or complex formats
+		if strings.HasPrefix(fields[9], "0x") {
+			if val, err := strconv.ParseUint(fields[9][2:], 16, 64); err == nil {
+				rawValue = val
+			}
+		}
+	}
+
+	return &SMARTAttribute{
+		ID:         id,
+		Name:       fields[1],
+		Value:      value,
+		Worst:      worst,
+		Threshold:  threshold,
+		RawValue:   rawValue,
+		WhenFailed: fields[8],
+		Flags:      fields[2],
+	}
+}
+
+// formatBytes converts bytes to human-readable format
+func (s *StorageMonitor) formatBytes(bytes uint64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+
+	div, exp := uint64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+
+	units := []string{"B", "KB", "MB", "GB", "TB", "PB"}
+	if exp >= len(units) {
+		exp = len(units) - 1
+	}
+
+	return fmt.Sprintf("%.1f %s", float64(bytes)/float64(div), units[exp])
+}
+
+// convertDiskInfoToConsolidated converts DiskInfo to ConsolidatedDiskInfo with enhanced formatting
+func (s *StorageMonitor) convertDiskInfoToConsolidated(disk DiskInfo, role string) ConsolidatedDiskInfo {
+	return ConsolidatedDiskInfo{
+		Device:             disk.Device,
+		Name:               disk.Name,
+		Role:               role,
+		Size:               disk.Size,
+		SizeFormatted:      s.formatBytes(disk.Size),
+		Used:               disk.Used,
+		UsedFormatted:      s.formatBytes(disk.Used),
+		Available:          disk.Available,
+		AvailableFormatted: s.formatBytes(disk.Available),
+		UsedPercent:        disk.UsedPercent,
+		FileSystem:         disk.FileSystem,
+		MountPoint:         disk.MountPoint,
+		Status:             disk.Status,
+		Health:             disk.Health,
+		Model:              disk.Model,
+		SerialNumber:       disk.SerialNumber,
+		DiskType:           disk.DiskType,
+		Interface:          disk.Interface,
+		PowerState:         disk.PowerState,
+		Temperature:        disk.Temperature,
+		SpinDownDelay:      disk.SpinDownDelay,
+		SmartData:          disk.SmartData,
+	}
+}
+
+// GetConsolidatedDisksInfo returns consolidated disk information for the new /api/v1/storage/disks endpoint
+func (s *StorageMonitor) GetConsolidatedDisksInfo() (*DisksResponse, error) {
+	response := &DisksResponse{
+		ArrayDisks:  make([]ConsolidatedDiskInfo, 0),
+		ParityDisks: make([]ConsolidatedDiskInfo, 0),
+		CacheDisks:  make([]ConsolidatedDiskInfo, 0),
+		Summary:     DisksSummary{},
+	}
+
+	// Get array information
+	arrayInfo, err := s.GetArrayInfo()
+	if err != nil {
+		logger.Yellow("Failed to get array info for consolidated disks: %v", err)
+	} else {
+		// Process array disks
+		for _, disk := range arrayInfo.Disks {
+			var role string
+			if strings.HasPrefix(disk.Name, "parity") {
+				role = "parity"
+				consolidated := s.convertDiskInfoToConsolidated(disk, role)
+				response.ParityDisks = append(response.ParityDisks, consolidated)
+			} else if strings.HasPrefix(disk.Name, "disk") {
+				role = "array"
+				consolidated := s.convertDiskInfoToConsolidated(disk, role)
+				response.ArrayDisks = append(response.ArrayDisks, consolidated)
+			}
+		}
+	}
+
+	// Get cache information
+	cacheInfos, err := s.GetCacheInfo()
+	if err != nil {
+		logger.Yellow("Failed to get cache info for consolidated disks: %v", err)
+	} else {
+		for _, cacheInfo := range cacheInfos {
+			for _, disk := range cacheInfo.Disks {
+				consolidated := s.convertDiskInfoToConsolidated(disk, "cache")
+				response.CacheDisks = append(response.CacheDisks, consolidated)
+			}
+		}
+	}
+
+	// Get boot disk information
+	bootDisk, err := s.GetBootDiskInfo()
+	if err != nil {
+		logger.Yellow("Failed to get boot disk info for consolidated disks: %v", err)
+	} else {
+		consolidated := s.convertDiskInfoToConsolidated(*bootDisk, "boot")
+		response.BootDisk = &consolidated
+	}
+
+	// Calculate summary statistics
+	s.calculateDisksSummary(response)
+
+	return response, nil
+}
+
+// calculateDisksSummary calculates summary statistics for all disks
+func (s *StorageMonitor) calculateDisksSummary(response *DisksResponse) {
+	allDisks := make([]ConsolidatedDiskInfo, 0)
+
+	// Collect all disks
+	allDisks = append(allDisks, response.ArrayDisks...)
+	allDisks = append(allDisks, response.ParityDisks...)
+	allDisks = append(allDisks, response.CacheDisks...)
+	if response.BootDisk != nil {
+		allDisks = append(allDisks, *response.BootDisk)
+	}
+
+	response.Summary.TotalDisks = len(allDisks)
+
+	// Count health and power states
+	for _, disk := range allDisks {
+		switch disk.Health {
+		case "healthy":
+			response.Summary.HealthyDisks++
+		case "failing":
+			response.Summary.FailingDisks++
+		default:
+			response.Summary.WarningDisks++
+		}
+
+		switch disk.PowerState {
+		case "active":
+			response.Summary.ActiveDisks++
+		case "standby", "sleeping":
+			response.Summary.StandbyDisks++
+		}
+	}
 }
 
 // getDiskTypeAndInterface determines disk type (HDD/SSD/NVMe) and interface
@@ -1166,6 +1577,11 @@ func (s *StorageMonitor) calculateArrayTotals(arrayInfo *ArrayInfo) {
 	if arrayInfo.TotalSize > 0 {
 		arrayInfo.UsedPercent = float64(arrayInfo.UsedSize) / float64(arrayInfo.TotalSize) * 100
 	}
+
+	// Populate human-readable formatted fields
+	arrayInfo.TotalSizeFormatted = s.formatBytes(arrayInfo.TotalSize)
+	arrayInfo.UsedSizeFormatted = s.formatBytes(arrayInfo.UsedSize)
+	arrayInfo.FreeSizeFormatted = s.formatBytes(arrayInfo.FreeSize)
 }
 
 // calculateCacheTotals calculates total sizes for cache pools

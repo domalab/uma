@@ -1,9 +1,11 @@
 package api
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -21,7 +23,10 @@ import (
 	"github.com/domalab/uma/daemon/logger"
 	"github.com/domalab/uma/daemon/plugins/notifications"
 	"github.com/domalab/uma/daemon/plugins/storage"
+	"github.com/domalab/uma/daemon/services/auth"
 	"github.com/domalab/uma/daemon/services/command"
+	"github.com/domalab/uma/daemon/services/config"
+	"github.com/go-playground/validator/v10"
 )
 
 // Array control request/response structures
@@ -241,18 +246,30 @@ type HTTPServer struct {
 	port            int
 	commandExecutor *command.CommandExecutor
 	generalCache    *GeneralFormatCache
+	wsManager       *WebSocketManager
+	authService     *auth.AuthService
+	configService   *config.ViperConfigService
+	validator       *validator.Validate
 }
 
 // NewHTTPServer creates a new HTTP server instance
 func NewHTTPServer(api *Api, port int) *HTTPServer {
-	return &HTTPServer{
+	httpServer := &HTTPServer{
 		api:             api,
 		port:            port,
 		commandExecutor: command.NewCommandExecutor(),
 		generalCache: &GeneralFormatCache{
 			cacheDuration: 30 * time.Second, // Cache for 30 seconds
 		},
+		authService:   api.authService, // Use auth service from API
+		configService: config.NewViperConfigService(),
+		validator:     validator.New(),
 	}
+
+	// Initialize WebSocket manager
+	httpServer.wsManager = NewWebSocketManager(httpServer)
+
+	return httpServer
 }
 
 // Start starts the HTTP server
@@ -278,6 +295,7 @@ func (h *HTTPServer) Start() error {
 	mux.HandleFunc("/api/v1/storage/cache", h.handleStorageCache)
 	mux.HandleFunc("/api/v1/storage/boot", h.handleStorageBoot)
 	mux.HandleFunc("/api/v1/storage/general", h.handleStorageGeneral)
+	mux.HandleFunc("/api/v1/storage/disks", h.handleStorageDisks)
 
 	// Array Control API routes
 	mux.HandleFunc("/api/v1/array/start", h.handleArrayStart)
@@ -310,6 +328,11 @@ func (h *HTTPServer) Start() error {
 	mux.HandleFunc("/api/v1/docker/images", h.handleDockerImages)
 	mux.HandleFunc("/api/v1/docker/info", h.handleDockerInfo)
 
+	// Docker Bulk Operations API routes
+	mux.HandleFunc("/api/v1/docker/containers/bulk/start", h.handleDockerBulkStart)
+	mux.HandleFunc("/api/v1/docker/containers/bulk/stop", h.handleDockerBulkStop)
+	mux.HandleFunc("/api/v1/docker/containers/bulk/restart", h.handleDockerBulkRestart)
+
 	// VM API routes
 	mux.HandleFunc("/api/v1/vm/list", h.handleVMList)
 	mux.HandleFunc("/api/v1/vm/", h.handleVM)
@@ -334,8 +357,24 @@ func (h *HTTPServer) Start() error {
 	// Configuration routes
 	mux.HandleFunc("/api/v1/config", h.handleConfig)
 
+	// Documentation routes
+	mux.HandleFunc("/api/v1/docs", h.handleSwaggerUI)
+	mux.HandleFunc("/api/v1/openapi.json", h.handleOpenAPISpec)
+
+	// Metrics route
+	mux.HandleFunc("/metrics", h.handleMetrics)
+
+	// WebSocket routes
+	mux.HandleFunc("/api/v1/ws/system/stats", h.handleSystemStatsWebSocket)
+	mux.HandleFunc("/api/v1/ws/docker/events", h.handleDockerEventsWebSocket)
+	mux.HandleFunc("/api/v1/ws/storage/status", h.handleStorageStatusWebSocket)
+
 	// Build middleware chain
 	handler := h.corsMiddleware(mux)
+	handler = h.requestIDMiddleware(handler)
+	handler = h.versioningMiddleware(handler)
+	handler = h.compressionMiddleware(handler)
+	handler = h.metricsMiddleware(handler)
 	handler = h.loggingMiddleware(handler)
 	handler = h.api.rateLimiter.RateLimitMiddleware(handler)
 	handler = h.api.authService.AuthMiddleware(handler)
@@ -355,6 +394,9 @@ func (h *HTTPServer) Start() error {
 			logger.Yellow("HTTP server error: %v", err)
 		}
 	}()
+
+	// Start WebSocket broadcasters
+	h.startWebSocketBroadcasters()
 
 	return nil
 }
@@ -406,6 +448,98 @@ func (cache *GeneralFormatCache) invalidateCache() {
 	cache.vmData = nil
 }
 
+// Response helper methods for standardized API responses
+
+// parsePaginationParams extracts pagination parameters from request
+func (h *HTTPServer) parsePaginationParams(r *http.Request) *dto.PaginationParams {
+	params := &dto.PaginationParams{}
+
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if page, err := strconv.Atoi(pageStr); err == nil {
+			params.Page = page
+		}
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil {
+			params.Limit = limit
+		}
+	}
+
+	if perPageStr := r.URL.Query().Get("per_page"); perPageStr != "" {
+		if perPage, err := strconv.Atoi(perPageStr); err == nil {
+			params.PerPage = perPage
+		}
+	}
+
+	return params
+}
+
+// writeStandardResponse writes a standardized API response
+func (h *HTTPServer) writeStandardResponse(w http.ResponseWriter, status int, data interface{}, pagination *dto.PaginationInfo) {
+	response := dto.StandardResponse{
+		Data:       data,
+		Pagination: pagination,
+		Meta: &dto.ResponseMeta{
+			RequestID: h.getRequestID(w),
+			Version:   h.api.ctx.Config.Version,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+		},
+	}
+
+	h.writeJSON(w, status, response)
+}
+
+// writePaginatedResponse writes a paginated API response
+func (h *HTTPServer) writePaginatedResponse(w http.ResponseWriter, status int, data interface{}, total int, params *dto.PaginationParams) {
+	pagination := dto.CalculatePagination(total, params)
+	h.writeStandardResponse(w, status, data, pagination)
+}
+
+// getRequestID gets the request ID from context or response header
+func (h *HTTPServer) getRequestID(w http.ResponseWriter) string {
+	// Check if request ID was set in response headers by middleware
+	if requestID := w.Header().Get("X-Request-ID"); requestID != "" {
+		return requestID
+	}
+
+	// Generate a simple request ID as fallback
+	return fmt.Sprintf("req_%d", time.Now().UnixNano())
+}
+
+// getRequestIDFromContext gets the request ID from request context
+func (h *HTTPServer) getRequestIDFromContext(r *http.Request) string {
+	if requestID, ok := r.Context().Value("request_id").(string); ok {
+		return requestID
+	}
+	return ""
+}
+
+// paginateSlice applies pagination to a slice and returns the paginated subset
+func (h *HTTPServer) paginateSlice(items interface{}, params *dto.PaginationParams) (interface{}, int) {
+	// This is a generic pagination helper - in practice, you'd implement type-specific versions
+	// For now, we'll handle common slice types
+
+	switch v := items.(type) {
+	case []interface{}:
+		total := len(v)
+		start := (params.GetPage() - 1) * params.GetLimit()
+		end := start + params.GetLimit()
+
+		if start >= total {
+			return []interface{}{}, total
+		}
+		if end > total {
+			end = total
+		}
+
+		return v[start:end], total
+	default:
+		// For other types, return as-is (no pagination)
+		return items, 0
+	}
+}
+
 // handleSystemInfo handles GET /api/v1/system/info
 func (h *HTTPServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -451,14 +585,166 @@ func (h *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	health := map[string]interface{}{
-		"status":    "healthy",
-		"timestamp": time.Now().UTC(),
-		"version":   h.api.ctx.Config.Version,
-		"service":   "uma",
+	// Get request ID for tracking and start timing
+	requestID := h.getRequestIDFromContext(r)
+	startTime := time.Now()
+
+	health := h.getEnhancedHealthStatus()
+
+	// Record health check metrics
+	duration := time.Since(startTime)
+	if dependencies, ok := health["dependencies"].(map[string]string); ok {
+		status, _ := health["status"].(string)
+		RecordHealthCheck(status, dependencies, duration, requestID)
 	}
 
 	h.writeJSON(w, http.StatusOK, health)
+}
+
+// getEnhancedHealthStatus returns comprehensive health status information
+func (h *HTTPServer) getEnhancedHealthStatus() map[string]interface{} {
+	startTime := time.Now()
+
+	// Check dependencies
+	dependencies := h.checkDependencies()
+
+	// Calculate overall status
+	overallStatus := "healthy"
+	for _, status := range dependencies {
+		if status != "healthy" {
+			overallStatus = "degraded"
+			break
+		}
+	}
+
+	// Get metrics
+	metrics := h.getHealthMetrics()
+
+	health := map[string]interface{}{
+		"status":       overallStatus,
+		"version":      h.api.ctx.Config.Version,
+		"service":      "uma",
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+		"dependencies": dependencies,
+		"metrics":      metrics,
+		"checks": map[string]interface{}{
+			"response_time_ms": time.Since(startTime).Milliseconds(),
+		},
+	}
+
+	return health
+}
+
+// checkDependencies checks the health of various system dependencies
+func (h *HTTPServer) checkDependencies() map[string]string {
+	dependencies := make(map[string]string)
+
+	// Check Docker
+	dependencies["docker"] = h.checkDockerHealth()
+
+	// Check libvirt (VMs)
+	dependencies["libvirt"] = h.checkLibvirtHealth()
+
+	// Check storage
+	dependencies["storage"] = h.checkStorageHealth()
+
+	// Check notifications system
+	dependencies["notifications"] = h.checkNotificationsHealth()
+
+	return dependencies
+}
+
+// checkDockerHealth checks if Docker daemon is accessible
+func (h *HTTPServer) checkDockerHealth() string {
+	if h.api.docker == nil {
+		return "unavailable"
+	}
+
+	// Try to get Docker info
+	_, err := h.api.docker.GetDockerInfo()
+	if err != nil {
+		return "unhealthy"
+	}
+
+	return "healthy"
+}
+
+// checkLibvirtHealth checks if libvirt is accessible
+func (h *HTTPServer) checkLibvirtHealth() string {
+	if h.api.vm == nil {
+		return "unavailable"
+	}
+
+	// Try to list VMs
+	_, err := h.api.vm.ListVMs(false)
+	if err != nil {
+		return "unhealthy"
+	}
+
+	return "healthy"
+}
+
+// checkStorageHealth checks if storage monitoring is working
+func (h *HTTPServer) checkStorageHealth() string {
+	if h.api.storage == nil {
+		return "unavailable"
+	}
+
+	// Try to get array info
+	_, err := h.api.storage.GetArrayInfo()
+	if err != nil {
+		return "unhealthy"
+	}
+
+	return "healthy"
+}
+
+// checkNotificationsHealth checks if notifications system is working
+func (h *HTTPServer) checkNotificationsHealth() string {
+	if h.api.notifications == nil {
+		return "unavailable"
+	}
+
+	// Try to get notification stats
+	_, err := h.api.notifications.GetNotificationStats()
+	if err != nil {
+		return "unhealthy"
+	}
+
+	return "healthy"
+}
+
+// getHealthMetrics returns system metrics for health monitoring
+func (h *HTTPServer) getHealthMetrics() map[string]interface{} {
+	metrics := make(map[string]interface{})
+
+	// Get uptime from system
+	if uptimeInfo, err := h.api.system.GetUptimeInfo(); err == nil {
+		metrics["uptime_seconds"] = int64(uptimeInfo.Uptime)
+		metrics["uptime_human"] = fmt.Sprintf("%.0f seconds", uptimeInfo.Uptime)
+	}
+
+	// Get memory usage
+	if memInfo, err := h.api.system.GetMemoryInfo(); err == nil {
+		metrics["memory_usage_percent"] = memInfo.UsedPercent
+		metrics["memory_total_bytes"] = memInfo.Total
+		metrics["memory_used_bytes"] = memInfo.Used
+		metrics["memory_total_formatted"] = memInfo.TotalFormatted
+		metrics["memory_used_formatted"] = memInfo.UsedFormatted
+	}
+
+	// Get basic system info
+	if cpuInfo, err := h.api.system.GetCPUInfo(); err == nil {
+		metrics["cpu_usage_percent"] = cpuInfo.Usage
+		metrics["cpu_temperature"] = cpuInfo.Temperature
+		metrics["cpu_cores"] = cpuInfo.Cores
+		metrics["cpu_model"] = cpuInfo.Model
+	}
+
+	// Add API call metrics (placeholder - would need actual implementation)
+	metrics["api_calls_total"] = 0 // This would be tracked by middleware
+
+	return metrics
 }
 
 // handleConfig handles GET/PUT /api/v1/config
@@ -712,6 +998,47 @@ func (h *HTTPServer) handleStorageGeneral(w http.ResponseWriter, r *http.Request
 	logger.Blue("General format data collection completed in %v", duration)
 
 	h.writeJSON(w, http.StatusOK, generalFormat)
+}
+
+// handleStorageDisks handles GET /api/v1/storage/disks
+func (h *HTTPServer) handleStorageDisks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Check if client wants paginated response
+	params := h.parsePaginationParams(r)
+	usePagination := r.URL.Query().Get("page") != "" || r.URL.Query().Get("limit") != ""
+
+	disksInfo, err := h.api.storage.GetConsolidatedDisksInfo()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get consolidated disks info: %v", err))
+		return
+	}
+
+	if usePagination {
+		// For pagination, we'll flatten all disks into a single array
+		allDisks := make([]interface{}, 0)
+		for _, disk := range disksInfo.ArrayDisks {
+			allDisks = append(allDisks, disk)
+		}
+		for _, disk := range disksInfo.ParityDisks {
+			allDisks = append(allDisks, disk)
+		}
+		for _, disk := range disksInfo.CacheDisks {
+			allDisks = append(allDisks, disk)
+		}
+		if disksInfo.BootDisk != nil {
+			allDisks = append(allDisks, *disksInfo.BootDisk)
+		}
+
+		paginatedDisks, total := h.paginateSlice(allDisks, params)
+		h.writePaginatedResponse(w, http.StatusOK, paginatedDisks, total, params)
+	} else {
+		// Return the original structured format for backward compatibility
+		h.writeJSON(w, http.StatusOK, disksInfo)
+	}
 }
 
 // convertToGeneralFormatOptimized converts array info to general format with caching and parallel processing
@@ -1315,6 +1642,58 @@ func (h *HTTPServer) getMemoryData() map[string]interface{} {
 
 // getTemperatureData returns temperature sensor data in standard format
 func (h *HTTPServer) getTemperatureData() map[string]interface{} {
+	// Get enhanced temperature data
+	enhancedData, err := h.api.system.GetEnhancedTemperatureData()
+	if err != nil {
+		// Fallback to basic temperature data
+		return h.getBasicTemperatureData()
+	}
+
+	// Convert enhanced data to API format
+	result := make(map[string]interface{})
+
+	// Add sensor chips
+	if len(enhancedData.Sensors) > 0 {
+		result["sensor_chips"] = enhancedData.Sensors
+	}
+
+	// Add standalone fan data
+	if len(enhancedData.Fans) > 0 {
+		result["fans"] = enhancedData.Fans
+	}
+
+	// Add backward compatibility sensors array
+	sensors := make([]map[string]interface{}, 0)
+	for chipName, chip := range enhancedData.Sensors {
+		for _, temp := range chip.Temperatures {
+			sensors = append(sensors, map[string]interface{}{
+				"name":  fmt.Sprintf("%s - %s", chipName, temp.Label),
+				"value": float64(temp.Value) / 1000.0, // Convert back to Celsius for compatibility
+				"unit":  "°C",
+				"chip":  chipName,
+			})
+		}
+	}
+
+	// Add CPU temperature from system plugin for compatibility
+	if cpuInfo, err := h.api.system.GetCPUInfo(); err == nil && cpuInfo.Temperature > 0 {
+		sensors = append(sensors, map[string]interface{}{
+			"name":  "CPU",
+			"value": cpuInfo.Temperature,
+			"unit":  "°C",
+			"chip":  "system",
+		})
+	}
+
+	if len(sensors) > 0 {
+		result["sensors"] = sensors
+	}
+
+	return result
+}
+
+// getBasicTemperatureData returns basic temperature data as fallback
+func (h *HTTPServer) getBasicTemperatureData() map[string]interface{} {
 	sensors := make([]map[string]interface{}, 0)
 
 	// Get CPU temperature from system plugin
@@ -1606,14 +1985,30 @@ func (h *HTTPServer) handleDockerContainers(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Parse query parameters
 	all := r.URL.Query().Get("all") == "true"
+	params := h.parsePaginationParams(r)
+	usePagination := r.URL.Query().Get("page") != "" || r.URL.Query().Get("limit") != ""
+
 	containers, err := h.api.docker.ListContainers(all)
 	if err != nil {
 		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list containers: %v", err))
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, containers)
+	if usePagination {
+		// Convert containers to interface{} slice for pagination
+		containerList := make([]interface{}, len(containers))
+		for i, container := range containers {
+			containerList[i] = container
+		}
+
+		paginatedContainers, total := h.paginateSlice(containerList, params)
+		h.writePaginatedResponse(w, http.StatusOK, paginatedContainers, total, params)
+	} else {
+		// Return original format for backward compatibility
+		h.writeJSON(w, http.StatusOK, containers)
+	}
 }
 
 // handleDockerContainer handles Docker container operations
@@ -3843,7 +4238,7 @@ func (h *HTTPServer) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -3852,6 +4247,169 @@ func (h *HTTPServer) corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// requestIDMiddleware adds request ID tracking for debugging and tracing
+func (h *HTTPServer) requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if request already has an ID from client
+		requestID := r.Header.Get("X-Request-ID")
+
+		// Generate a new request ID if not provided
+		if requestID == "" {
+			requestID = h.generateRequestID()
+		}
+
+		// Set the request ID in response headers
+		w.Header().Set("X-Request-ID", requestID)
+
+		// Add request ID to request context for use in handlers
+		ctx := context.WithValue(r.Context(), "request_id", requestID)
+		r = r.WithContext(ctx)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// generateRequestID creates a unique request ID for tracing
+func (h *HTTPServer) generateRequestID() string {
+	// Use timestamp + random component for uniqueness
+	timestamp := time.Now().UnixNano()
+	return fmt.Sprintf("req_%d_%d", timestamp, timestamp%10000)
+}
+
+// compressionMiddleware adds gzip compression for large responses
+func (h *HTTPServer) compressionMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if client accepts gzip encoding
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Only compress responses for certain endpoints or large responses
+		shouldCompress := h.shouldCompressResponse(r)
+		if !shouldCompress {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Set compression headers
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Vary", "Accept-Encoding")
+
+		// Create gzip writer
+		gzipWriter := gzip.NewWriter(w)
+		defer gzipWriter.Close()
+
+		// Create wrapper that writes to gzip writer
+		gzipResponseWriter := &gzipResponseWriter{
+			ResponseWriter: w,
+			Writer:         gzipWriter,
+		}
+
+		next.ServeHTTP(gzipResponseWriter, r)
+	})
+}
+
+// shouldCompressResponse determines if a response should be compressed
+func (h *HTTPServer) shouldCompressResponse(r *http.Request) bool {
+	// Compress responses for endpoints that typically return large data
+	compressiblePaths := []string{
+		"/api/v1/storage/disks",
+		"/api/v1/docker/containers",
+		"/api/v1/notifications",
+		"/api/v1/openapi.json",
+		"/api/v1/system/resources",
+	}
+
+	for _, path := range compressiblePaths {
+		if strings.HasPrefix(r.URL.Path, path) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// gzipResponseWriter wraps http.ResponseWriter to compress responses
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	Writer io.Writer
+}
+
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+// versioningMiddleware handles API version negotiation
+func (h *HTTPServer) versioningMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Parse Accept header for version negotiation
+		acceptHeader := r.Header.Get("Accept")
+		apiVersion := h.parseAPIVersion(acceptHeader)
+
+		// Set the negotiated version in request context
+		ctx := context.WithValue(r.Context(), "api_version", apiVersion)
+		r = r.WithContext(ctx)
+
+		// Set version information in response headers
+		w.Header().Set("X-API-Version", apiVersion)
+		w.Header().Set("X-API-Supported-Versions", "v1")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// parseAPIVersion extracts API version from Accept header
+func (h *HTTPServer) parseAPIVersion(acceptHeader string) string {
+	// Default to v1 if no specific version requested
+	defaultVersion := "v1"
+
+	if acceptHeader == "" {
+		return defaultVersion
+	}
+
+	// Look for version-specific media types
+	// Format: application/vnd.uma.v1+json
+	if strings.Contains(acceptHeader, "application/vnd.uma.v1+json") {
+		return "v1"
+	}
+
+	// Look for version parameter in Accept header
+	// Format: application/json; version=v1
+	if strings.Contains(acceptHeader, "version=v1") {
+		return "v1"
+	}
+
+	// Future versions can be added here
+	// if strings.Contains(acceptHeader, "application/vnd.uma.v2+json") {
+	//     return "v2"
+	// }
+
+	return defaultVersion
+}
+
+// getAPIVersionFromContext retrieves the API version from request context
+func (h *HTTPServer) getAPIVersionFromContext(r *http.Request) string {
+	if version, ok := r.Context().Value("api_version").(string); ok {
+		return version
+	}
+	return "v1" // Default fallback
+}
+
+// writeVersionedResponse writes a response with version-specific formatting
+func (h *HTTPServer) writeVersionedResponse(w http.ResponseWriter, r *http.Request, status int, data interface{}, pagination *dto.PaginationInfo) {
+	version := h.getAPIVersionFromContext(r)
+
+	switch version {
+	case "v1":
+		// Current v1 format with standardized response structure
+		h.writeStandardResponse(w, status, data, pagination)
+	default:
+		// Future versions can have different response formats
+		h.writeStandardResponse(w, status, data, pagination)
+	}
 }
 
 // loggingMiddleware logs HTTP requests
@@ -3865,7 +4423,12 @@ func (h *HTTPServer) loggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(wrapper, r)
 
 		duration := time.Since(start)
-		logger.LightGreen("HTTP %s %s %d %v", r.Method, r.URL.Path, wrapper.statusCode, duration)
+		requestID := h.getRequestIDFromContext(r)
+		if requestID != "" {
+			logger.LightGreen("HTTP %s %s %d %v [%s]", r.Method, r.URL.Path, wrapper.statusCode, duration, requestID)
+		} else {
+			logger.LightGreen("HTTP %s %s %d %v", r.Method, r.URL.Path, wrapper.statusCode, duration)
+		}
 	})
 }
 
@@ -3982,6 +4545,10 @@ func (h *HTTPServer) handleNotificationsMarkAllRead(w http.ResponseWriter, r *ht
 
 // handleGetNotifications handles GET /api/v1/notifications with filtering
 func (h *HTTPServer) handleGetNotifications(w http.ResponseWriter, r *http.Request) {
+	// Parse pagination parameters
+	params := h.parsePaginationParams(r)
+	usePagination := r.URL.Query().Get("page") != "" || r.URL.Query().Get("limit") != ""
+
 	// Parse query parameters for filtering
 	filter := &notifications.NotificationFilter{}
 
@@ -4005,7 +4572,8 @@ func (h *HTTPServer) handleGetNotifications(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+	// For backward compatibility, still support the old limit parameter
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" && !usePagination {
 		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
 			filter.Limit = limit
 		}
@@ -4024,16 +4592,28 @@ func (h *HTTPServer) handleGetNotifications(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	notifications, err := h.api.notifications.GetNotifications(filter)
+	notificationsList, err := h.api.notifications.GetNotifications(filter)
 	if err != nil {
 		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get notifications: %v", err))
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, map[string]interface{}{
-		"notifications": notifications,
-		"count":         len(notifications),
-	})
+	if usePagination {
+		// Convert notifications to interface{} slice for pagination
+		notificationItems := make([]interface{}, len(notificationsList))
+		for i, notification := range notificationsList {
+			notificationItems[i] = notification
+		}
+
+		paginatedNotifications, total := h.paginateSlice(notificationItems, params)
+		h.writePaginatedResponse(w, http.StatusOK, paginatedNotifications, total, params)
+	} else {
+		// Return original format for backward compatibility
+		h.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"notifications": notificationsList,
+			"count":         len(notificationsList),
+		})
+	}
 }
 
 // handleCreateNotification handles POST /api/v1/notifications
