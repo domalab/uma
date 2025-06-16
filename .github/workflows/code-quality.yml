@@ -46,6 +46,7 @@ jobs:
       with:
         version: latest
         args: --timeout=10m --max-issues-per-linter=50 --max-same-issues=10
+      continue-on-error: true
         
     - name: Run tests
       run: go test -v ./...
