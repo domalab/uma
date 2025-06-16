@@ -1,47 +1,150 @@
 Menu="Utilities"
 Icon="uma.png"
 Title="UMA"
+Markdown="false"
 ---
+<style>
+.uma-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+.uma-status {
+    background: #f5f5f5;
+    border-left: 4px solid #4CAF50;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+.uma-status.stopped {
+    border-left-color: #ff9800;
+}
+.uma-form-group {
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+}
+.uma-form-group label {
+    min-width: 150px;
+    font-weight: bold;
+}
+.uma-form-group input, .uma-form-group select {
+    margin-left: 10px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+.uma-button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 5px;
+    text-decoration: none;
+    display: inline-block;
+}
+.uma-button:hover {
+    background-color: #45a049;
+}
+.uma-button.secondary {
+    background-color: #2196F3;
+}
+.uma-button.secondary:hover {
+    background-color: #1976D2;
+}
+.uma-web-ui-link {
+    background-color: #2196F3;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    text-decoration: none;
+    display: inline-block;
+    margin: 10px 0;
+    transition: background-color 0.3s;
+}
+.uma-web-ui-link:hover {
+    background-color: #1976D2;
+    color: white;
+    text-decoration: none;
+}
+</style>
 <?php
 $sName = "uma";
 $uma_cfg = parse_plugin_cfg("uma");
-$uma_service = isset($uma_cfg['SERVICE']) ? $uma_cfg['SERVICE'] 	: "disable";
-$uma_ups = isset($uma_cfg['UPS']) ? $uma_cfg['UPS'] 	: "enable";
+$uma_service = isset($uma_cfg['SERVICE']) ? $uma_cfg['SERVICE'] : "enable";
+$uma_port = isset($uma_cfg['PORT']) ? $uma_cfg['PORT'] : "34600";
+$uma_ups = isset($uma_cfg['UPS']) ? $uma_cfg['UPS'] : "enable";
 $uma_running = shell_exec("pidof uma | wc -w");
 $uma_version = shell_exec("cat /usr/local/emhttp/plugins/uma/VERSION | tr '\n' ' '");
+$server_ip = $_SERVER['SERVER_ADDR'];
 ?>
 
-<script type="text/javascript">
-	var isRunning = <?=$uma_running;?> === 1;
-	var version = '<?=$uma_version;?>';
-	var color = isRunning ? 'color:green' : 'color:orange'
-	if (isRunning) {
-		document.write("<span style='color:green;'><b>UMA " + version + "</b></span> <br /> <br />");
-		document.write("<p>HTTP API available on port 34600</p>");
-	} else {
-		document.write("<b><font style='color:orange;'>UMA " + version + " (not running)</font></b>")
-	}
-</script>
+<div class="uma-container">
+	<div class="uma-status <?php echo ($uma_running == 1) ? '' : 'stopped'; ?>">
+		<h3>UMA (Unraid Management Agent) <?=$uma_version;?></h3>
+		<?php if ($uma_running == 1): ?>
+			<p style="color: green; font-weight: bold;">✓ Service is running</p>
+			<p>HTTP API available on port <?=$uma_port;?></p>
+			<p>Phase 3 Enhanced Features: JWT Authentication, Chi Router, Viper Configuration</p>
+			<a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
+				🚀 Open Web UI (Swagger API Documentation)
+			</a>
+		<?php else: ?>
+			<p style="color: orange; font-weight: bold;">⚠ Service is not running</p>
+			<p>Configure and start the service below to access the Web UI</p>
+		<?php endif; ?>
+	</div>
 
-<form markdown="1" name="uma_settings" method="POST" action="/update.php" target="progressFrame">
-<input type="hidden" name="#file" value="uma/uma.cfg" />
-<input type="hidden" id="command" name="#command" value="" />
+	<form name="uma_settings" method="POST" action="/update.php" target="progressFrame" style="margin-top: 20px;">
+		<input type="hidden" name="#file" value="uma/uma.cfg" />
+		<input type="hidden" id="command" name="#command" value="" />
 
-Enable UMA plugin :
-: <select id="SERVICE" name="SERVICE" size="1" onChange="checkRUNNING(this.form);">
-  <?=mk_option($uma_service, "disable", "No");?>
-  <?=mk_option($uma_service, "enable", "Yes");?>
-  </select>
+		<h4>Configuration Settings</h4>
 
-Provide UPS status :
-: <select id="UPS" name="UPS" size="1" onChange="checkRUNNING(this.form);">
-  <?=mk_option($uma_ups, "enable", "Yes");?>
-  <?=mk_option($uma_ups, "disable", "No");?>
-  </select>
+		<div class="uma-form-group">
+			<label for="SERVICE">Enable UMA:</label>
+			<select id="SERVICE" name="SERVICE" size="1" onChange="checkRUNNING(this.form);">
+				<?=mk_option($uma_service, "disable", "No");?>
+				<?=mk_option($uma_service, "enable", "Yes");?>
+			</select>
+		</div>
 
-<input id="DEFAULT" class="stopped" type="submit" value="Default" onClick="resetDATA(this.form)">
-: <input id="btnApply" type="submit" value="Apply" onClick="verifyDATA(this.form)"><input type="button" value="Done" onClick="done()">
-</form>
+		<div class="uma-form-group">
+			<label for="PORT">HTTP Port:</label>
+			<input id="PORT" name="PORT" type="number" value="<?=$uma_port;?>" min="1024" max="65535" placeholder="34600" style="width:100px;" onChange="checkRUNNING(this.form);">
+			<small style="margin-left: 10px; color: #666;">Port range: 1024-65535 (default: 34600)</small>
+		</div>
+
+		<div class="uma-form-group">
+			<label for="UPS">Provide UPS status:</label>
+			<select id="UPS" name="UPS" size="1" onChange="checkRUNNING(this.form);">
+				<?=mk_option($uma_ups, "enable", "Yes");?>
+				<?=mk_option($uma_ups, "disable", "No");?>
+			</select>
+		</div>
+
+		<?php if ($uma_running == 1): ?>
+		<div class="uma-form-group">
+			<label>Quick Access:</label>
+			<a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
+				Open Web UI
+			</a>
+		</div>
+		<?php endif; ?>
+
+		<div style="margin-top: 30px;">
+			<input id="DEFAULT" class="stopped uma-button secondary" type="submit" value="Default" onClick="resetDATA(this.form)">
+			<input id="btnApply" class="uma-button" type="submit" value="Apply" onClick="return verifyDATA(this.form)">
+			<input type="button" class="uma-button secondary" value="Done" onClick="done()">
+		</div>
+	</form>
+</div>
 
 <script type="text/javascript">
 $(function(){
@@ -54,7 +157,9 @@ function isNumber(value) {
 }
 
 function resetDATA(form) {
-	form.UPS.value = "enable"
+	form.SERVICE.value = "enable";
+	form.PORT.value = "34600";
+	form.UPS.value = "enable";
 }
 
 function checkRUNNING(form) {
@@ -74,7 +179,23 @@ function checkRUNNING(form) {
 }
 
 function verifyDATA(form) {
+	// Validate port number
+	var port = parseInt(form.PORT.value);
+	if (isNaN(port) || port < 1024 || port > 65535) {
+		alert("Port must be a number between 1024 and 65535");
+		return false;
+	}
+
+	// Check for common reserved ports
+	var reservedPorts = [22, 23, 25, 53, 80, 110, 143, 443, 993, 995, 3389, 5432, 3306];
+	if (reservedPorts.includes(port)) {
+		if (!confirm("Port " + port + " is commonly used by other services. Are you sure you want to use this port?")) {
+			return false;
+		}
+	}
+
 	form.SERVICE.value = form.SERVICE.value.replace(/ /g,"_");
+	form.PORT.value = port.toString();
 	form.UPS.value = form.UPS.value.replace(/ /g,"_");
 }
 </script>

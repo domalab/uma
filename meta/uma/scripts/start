@@ -7,6 +7,11 @@ prog="/usr/local/emhttp/plugins/uma/uma"
 # stop it if it's running
 killall uma >/dev/null 2>&1
 
+# validate port number
+if [[ ! "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65535 ]; then
+    PORT="34600"
+fi
+
 # run the app
 [[ $UPS = "enable" ]] && SHOWUPS="--show-ups" || SHOWUPS=""
-nohup sudo -H bash -c "$prog $SHOWUPS" >/dev/null 2>&1 &
+nohup sudo -H bash -c "$prog boot --http-port=$PORT $SHOWUPS" >/dev/null 2>&1 &

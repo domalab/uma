@@ -3,11 +3,11 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "uma">
 <!ENTITY author      "Ruaan Deysel">
-<!ENTITY version     "2025.06.15">
+<!ENTITY version     "2025.06.16">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY pluginURL   "https://github.com/domalab/uma/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY md5         "f8e217322b53a0a4af525577684c6711">
+<!ENTITY md5         "a0c03504f6549291bc73eec561924b62">
 ]>
 
 <PLUGIN  name="&name;"
@@ -19,10 +19,36 @@
 
 <CHANGES>
 
+###2025.06.16
+- Phase 3 Enhanced Features: JWT Authentication, Chi Router, Viper Configuration
+- Added configurable HTTP port setting (default: 34600)
+- Added "Open Web UI" button for direct access to Swagger API documentation
+- Enhanced plugin interface with port validation and reserved port warnings
+- Optimized binary size to 14.4MB with all Phase 1-3 features
+- Improved service management with proper port configuration
+- Added backward compatibility for existing installations
+
+###2025.06.15
+- Initial UMA (Unraid Management Agent) release
+- Comprehensive monitoring and control system for Unraid servers
+- REST API with OpenAPI 3.1.1 documentation
+- WebSocket support for real-time monitoring
+- Prometheus metrics collection
+- Structured logging with Zerolog
+
 </CHANGES>
 
 <!--
 UMA (Unraid Management Agent) is a comprehensive monitoring and control system for Unraid servers.
+
+Phase 3 Enhanced Features:
+- JWT Authentication with role-based access control
+- Enhanced routing with Chi router and middleware
+- Configuration management with Viper and hot reload
+- Optimized 14.4MB binary (28% under 20MB target)
+- Configurable HTTP port with validation
+- Direct Web UI access to Swagger API documentation
+- 100% backward compatibility maintained
 -->
 
 <!--
@@ -37,7 +63,8 @@ Get the UMA bundle.
 <FILE Name="/boot/config/plugins/&name;/&name;.cfg">
 <INLINE>
 <![CDATA[
-SERVICE="disable"
+SERVICE="enable"
+PORT="34600"
 UPS="enable"
 ]]>
 </INLINE>
@@ -111,7 +138,8 @@ echo ""
 #!/bin/sh
 # This will check each entry in the config so nothing is missing, and if missing, sets to default
 CFGFILE=/boot/config/plugins/uma/uma.cfg
-[ ! `cat "$CFGFILE" | grep SERVICE` ] && echo "SERVICE=\"disable\"" >> "$CFGFILE"
+[ ! `cat "$CFGFILE" | grep SERVICE` ] && echo "SERVICE=\"enable\"" >> "$CFGFILE"
+[ ! `cat "$CFGFILE" | grep ^PORT` ] && echo "PORT=\"34600\"" >> "$CFGFILE"
 [ ! `cat "$CFGFILE" | grep ^UPS` ] && echo "UPS=\"enable\"" >> "$CFGFILE"
 rm /tmp/uma-chkconf
 ]]>
