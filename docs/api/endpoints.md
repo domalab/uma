@@ -299,6 +299,258 @@ curl -X POST \
      http://your-unraid-ip:34600/api/v1/docker/containers/bulk/restart
 ```
 
+## Docker Individual Container Control
+
+### POST /docker/containers/{id}/start
+Start a specific Docker container.
+
+**Path Parameters:**
+- `id` (string, required) - Container ID or name
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "X-Request-ID: container-start-501" \
+     http://your-unraid-ip:34600/api/v1/docker/containers/plex/start
+```
+
+**Response:**
+```json
+{
+  "message": "Container started successfully",
+  "container_id": "plex",
+  "timestamp": "2025-06-16T14:30:00Z"
+}
+```
+
+### POST /docker/containers/{id}/stop
+Stop a specific Docker container.
+
+**Path Parameters:**
+- `id` (string, required) - Container ID or name
+
+**Query Parameters:**
+- `timeout` (integer, optional, default: 10) - Timeout in seconds before force kill
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "X-Request-ID: container-stop-502" \
+     "http://your-unraid-ip:34600/api/v1/docker/containers/plex/stop?timeout=30"
+```
+
+### POST /docker/containers/{id}/restart
+Restart a specific Docker container.
+
+**Path Parameters:**
+- `id` (string, required) - Container ID or name
+
+**Query Parameters:**
+- `timeout` (integer, optional, default: 10) - Timeout in seconds before force kill
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "X-Request-ID: container-restart-503" \
+     "http://your-unraid-ip:34600/api/v1/docker/containers/plex/restart?timeout=30"
+```
+
+### POST /docker/containers/{id}/pause
+Pause a specific Docker container.
+
+**Path Parameters:**
+- `id` (string, required) - Container ID or name
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "X-Request-ID: container-pause-504" \
+     http://your-unraid-ip:34600/api/v1/docker/containers/plex/pause
+```
+
+### POST /docker/containers/{id}/resume
+Resume a paused Docker container.
+
+**Path Parameters:**
+- `id` (string, required) - Container ID or name
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "X-Request-ID: container-resume-505" \
+     http://your-unraid-ip:34600/api/v1/docker/containers/plex/resume
+```
+
+## System Control Endpoints
+
+### GET /system/scripts
+List all available user scripts.
+
+**Example Request:**
+```bash
+curl -H "Authorization: Bearer your-jwt-token" \
+     http://your-unraid-ip:34600/api/v1/system/scripts
+```
+
+**Response:**
+```json
+[
+  {
+    "name": "backup-script",
+    "path": "/boot/config/plugins/user.scripts/scripts/backup-script/script",
+    "description": "Daily backup script",
+    "executable": true,
+    "last_run": "2025-06-16T02:00:00Z"
+  }
+]
+```
+
+### POST /system/scripts
+Execute a user script.
+
+**Request Body:**
+```json
+{
+  "script_name": "backup-script",
+  "parameters": ["--full", "--compress"],
+  "background": true
+}
+```
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer your-jwt-token" \
+     -H "X-Request-ID: script-exec-601" \
+     -d '{"script_name": "backup-script", "background": true}' \
+     http://your-unraid-ip:34600/api/v1/system/scripts
+```
+
+**Response:**
+```json
+{
+  "message": "Script executed successfully",
+  "script_name": "backup-script",
+  "background": true,
+  "timestamp": "2025-06-16T14:30:00Z"
+}
+```
+
+### POST /system/reboot
+Safely reboot the system.
+
+**Request Body (optional):**
+```json
+{
+  "delay": 30,
+  "message": "System maintenance reboot"
+}
+```
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer your-jwt-token" \
+     -H "X-Request-ID: system-reboot-701" \
+     -d '{"delay": 30, "message": "Scheduled maintenance"}' \
+     http://your-unraid-ip:34600/api/v1/system/reboot
+```
+
+**Response:**
+```json
+{
+  "message": "System reboot initiated successfully",
+  "operation": "reboot",
+  "delay": 30,
+  "timestamp": "2025-06-16T14:30:00Z",
+  "scheduled_time": "2025-06-16T14:30:30Z"
+}
+```
+
+### POST /system/shutdown
+Safely shutdown the system.
+
+**Request Body (optional):**
+```json
+{
+  "delay": 60,
+  "message": "System maintenance shutdown"
+}
+```
+
+**Example Request:**
+```bash
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer your-jwt-token" \
+     -H "X-Request-ID: system-shutdown-801" \
+     -d '{"delay": 60, "message": "Scheduled maintenance"}' \
+     http://your-unraid-ip:34600/api/v1/system/shutdown
+```
+
+### GET /system/logs
+Retrieve system logs with filtering.
+
+**Query Parameters:**
+- `type` (string, optional, default: "system") - Log type: system, kernel, docker, nginx, unraid
+- `lines` (integer, optional, default: 100) - Number of lines to retrieve (1-10000)
+- `since` (string, optional) - ISO 8601 timestamp to filter logs from
+
+**Example Request:**
+```bash
+curl -H "Authorization: Bearer your-jwt-token" \
+     "http://your-unraid-ip:34600/api/v1/system/logs?type=system&lines=50&since=2025-06-16T12:00:00Z"
+```
+
+**Response:**
+```json
+{
+  "log_type": "system",
+  "lines_requested": 50,
+  "lines_returned": 45,
+  "since": "2025-06-16T12:00:00Z",
+  "logs": [
+    {
+      "timestamp": "2025-06-16T14:30:00Z",
+      "level": "INFO",
+      "source": "kernel",
+      "message": "System startup completed"
+    }
+  ],
+  "timestamp": "2025-06-16T14:30:00Z"
+}
+```
+
+## Enhanced UPS Monitoring
+
+### GET /system/ups
+Get comprehensive UPS status and metrics.
+
+**Example Request:**
+```bash
+curl http://your-unraid-ip:34600/api/v1/system/ups
+```
+
+**Response:**
+```json
+{
+  "status": "online",
+  "battery_charge": 100.0,
+  "runtime": 220.0,
+  "load_percent": 0.0,
+  "input_voltage": 246.0,
+  "output_voltage": 246.0,
+  "model": "Back-UPS XS 950U",
+  "name": "Cube",
+  "serial_number": "4B1920P16814",
+  "nominal_power": 480.0,
+  "connected": true,
+  "ups_type": "apc"
+}
+```
+
 ## Documentation Endpoints
 
 ### GET /docs

@@ -1,0 +1,199 @@
+name: 🔌 WebSocket Issue
+description: Report issues with UMA WebSocket real-time updates
+title: "[WebSocket] "
+labels: ["websocket", "real-time"]
+assignees: 
+  - domalab
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🔌 UMA WebSocket Issue
+        
+        Thank you for reporting a WebSocket issue! This template is for problems with **real-time WebSocket connections** in the UMA REST API.
+        
+        ## 📋 When to use this template:
+        - ✅ WebSocket connections failing to establish
+        - ✅ Real-time updates not working
+        - ✅ WebSocket disconnection issues
+        - ✅ Missing or delayed data in WebSocket streams
+        - ✅ WebSocket authentication problems
+        
+        ## ❌ When NOT to use this template:
+        - 🚫 **API Bugs**: REST API endpoints not working → Use "API Bug Report" template
+        - 🚫 **Feature Requests**: Want new WebSocket features → Use "Feature Request" template
+
+  - type: dropdown
+    id: websocket_endpoint
+    attributes:
+      label: 🔗 WebSocket Endpoint
+      description: "Which WebSocket endpoint is experiencing issues?"
+      options:
+        - "/api/v1/ws/system/stats"
+        - "/api/v1/ws/docker/events"
+        - "/api/v1/ws/storage/status"
+        - "/api/v1/ws/vm/events"
+        - "/api/v1/ws/ups/status"
+        - "Multiple endpoints"
+        - "Other/Custom endpoint"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: 🏷️ Issue Type
+      description: "What type of WebSocket issue are you experiencing?"
+      options:
+        - "Connection fails to establish"
+        - "Connection drops frequently"
+        - "No data received after connection"
+        - "Delayed or missing updates"
+        - "Authentication/authorization failure"
+        - "Malformed data received"
+        - "High CPU/memory usage"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue_description
+    attributes:
+      label: 📝 Issue Description
+      description: "Detailed description of the WebSocket problem"
+      placeholder: |
+        **What's happening:**
+        WebSocket connection to /api/v1/ws/system/stats establishes successfully but stops receiving data after 30 seconds.
+        
+        **Expected behavior:**
+        Should receive continuous system statistics updates every 5 seconds.
+        
+        **Frequency:**
+        Happens consistently after 30-60 seconds of connection.
+    validations:
+      required: true
+
+  - type: textarea
+    id: client_details
+    attributes:
+      label: 💻 Client Details
+      description: "Information about your WebSocket client"
+      placeholder: |
+        **Client Type:**
+        - Browser JavaScript
+        - Home Assistant WebSocket integration
+        - Python websockets library
+        - Node.js ws library
+        - Other: [specify]
+        
+        **Client Code/Configuration:**
+        ```javascript
+        const ws = new WebSocket('ws://192.168.20.21:34600/api/v1/ws/system/stats');
+        ws.onmessage = function(event) {
+            console.log('Received:', event.data);
+        };
+        ```
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: connection_logs
+    attributes:
+      label: 📋 Connection Logs
+      description: "WebSocket connection logs and error messages"
+      placeholder: |
+        **Client-side logs:**
+        ```
+        WebSocket connection established
+        Received: {"cpu_usage": 25.5, "memory_usage": 45.2}
+        Received: {"cpu_usage": 26.1, "memory_usage": 45.3}
+        WebSocket connection closed: code 1006
+        ```
+        
+        **UMA Server logs:**
+        ```
+        2025-06-16 10:30:00 INFO [WebSocket] Client connected to /api/v1/ws/system/stats
+        2025-06-16 10:30:30 ERROR [WebSocket] Failed to send data: broken pipe
+        ```
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: uma_version
+    attributes:
+      label: 📦 UMA Version
+      description: "Version of the UMA REST API"
+      placeholder: "2025.06.16"
+    validations:
+      required: true
+
+  - type: input
+    id: connection_count
+    attributes:
+      label: 🔢 Concurrent Connections
+      description: "Number of simultaneous WebSocket connections"
+      placeholder: "1 / 5 / 10+"
+    validations:
+      required: false
+
+  - type: textarea
+    id: network_environment
+    attributes:
+      label: 🌐 Network Environment
+      description: "Network setup and configuration details"
+      placeholder: |
+        **Network Setup:**
+        - Direct connection to Unraid server
+        - Through reverse proxy (nginx, traefik, etc.)
+        - VPN connection
+        - Different VLAN/subnet
+        
+        **Firewall/Security:**
+        - Firewall enabled/disabled
+        - Security software
+        - Network restrictions
+      render: markdown
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: troubleshooting_steps
+    attributes:
+      label: ✅ Troubleshooting Steps Completed
+      description: "Please confirm you have tried the following:"
+      options:
+        - label: "I have tested with a simple WebSocket client (browser console, wscat, etc.)"
+          required: false
+        - label: "I have checked UMA server logs for WebSocket errors"
+          required: false
+        - label: "I have tested with different WebSocket endpoints"
+          required: false
+        - label: "I have verified network connectivity to the UMA server"
+          required: false
+        - label: "I have tested with firewall/security software disabled"
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 🔧 Quick WebSocket Test
+        
+        You can test WebSocket connectivity using your browser's developer console:
+        
+        ```javascript
+        // Test system stats WebSocket
+        const ws = new WebSocket('ws://YOUR_UNRAID_IP:34600/api/v1/ws/system/stats');
+        ws.onopen = () => console.log('Connected');
+        ws.onmessage = (e) => console.log('Data:', e.data);
+        ws.onerror = (e) => console.log('Error:', e);
+        ws.onclose = (e) => console.log('Closed:', e.code, e.reason);
+        ```
+        
+        ## 📚 WebSocket Documentation
+        
+        - **API Docs**: [WebSocket Endpoints](http://your-unraid-server:34600/api/v1/docs#websocket)
+        - **Real-time Updates**: Available for system stats, Docker events, storage status
+        - **Authentication**: May require API key or JWT token depending on configuration

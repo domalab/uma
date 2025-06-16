@@ -1,0 +1,188 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for the UMA REST API
+title: "[Feature] "
+labels: ["enhancement", "feature-request"]
+assignees:
+  - domalab
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # ✨ UMA Feature Request
+
+        Thank you for suggesting a new feature! This template is for requesting **new features or enhancements** for the UMA REST API.
+
+        ## 📋 When to use this template:
+        - ✅ Request new API endpoints or functionality
+        - ✅ Suggest improvements to existing features
+        - ✅ Propose new monitoring capabilities
+        - ✅ Request new Docker/VM control features
+        - ✅ Suggest WebSocket enhancements
+
+        ## ❌ When NOT to use this template:
+        - 🚫 **Bug Reports**: Existing features are broken → Use "API Bug Report" template
+        - 🚫 **Unraid Issues**: Problems with Unraid integration → Use "Unraid Integration Issue" template
+
+  - type: dropdown
+    id: feature_category
+    attributes:
+      label: 🏷️ Feature Category
+      description: "What type of feature are you requesting?"
+      options:
+        - "New API endpoint"
+        - "Enhanced monitoring capabilities"
+        - "Docker/VM control improvements"
+        - "Storage management features"
+        - "UPS monitoring enhancements"
+        - "WebSocket real-time updates"
+        - "Authentication/security features"
+        - "Performance optimization"
+        - "Configuration options"
+        - "Documentation improvement"
+        - "Home Assistant integration"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: 📝 Feature Description
+      description: "Clear description of the feature you'd like to see"
+      placeholder: |
+        **What feature would you like:**
+        Add a new API endpoint /api/v1/system/network/interfaces that provides detailed network interface statistics including bandwidth usage, packet counts, and error rates.
+
+        **Why would this be useful:**
+        It would enable better network monitoring in Home Assistant and help identify network performance issues on the Unraid server.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: 🎯 Use Case / Problem Solved
+      description: "What problem does this feature solve? How would you use it?"
+      placeholder: |
+        **Problem:**
+        Currently there's no way to monitor network performance and bandwidth usage on the Unraid server through the API.
+
+        **Use Case:**
+        I want to create Home Assistant dashboards that show network utilization, identify bandwidth-heavy containers, and alert on network issues.
+
+        **Benefit:**
+        This would provide comprehensive network monitoring capabilities and help optimize server performance.
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: 💡 Proposed Solution
+      description: "How do you think this feature should work?"
+      placeholder: |
+        **API Endpoint:**
+        - GET /api/v1/system/network/interfaces
+        - Returns array of network interfaces with statistics
+
+        **Response Format:**
+        ```json
+        {
+          "interfaces": [
+            {
+              "name": "eth0",
+              "rx_bytes": 1234567890,
+              "tx_bytes": 987654321,
+              "rx_packets": 12345,
+              "tx_packets": 9876,
+              "errors": 0,
+              "speed": "1000Mbps"
+            }
+          ]
+        }
+        ```
+
+        **WebSocket Updates:**
+        - Real-time updates via /api/v1/ws/network/stats
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 Alternatives Considered
+      description: "Have you considered any alternative solutions or workarounds?"
+      placeholder: |
+        **Current workarounds:**
+        - Manual calculation based on usage patterns
+        - Using template sensors in Home Assistant
+        
+        **Why they're not ideal:**
+        - Requires manual maintenance
+        - Not accurate for varying usage patterns
+      render: markdown
+    validations:
+      required: false
+
+  - type: input
+    id: affected_systems
+    attributes:
+      label: 🖥️ Affected Systems
+      description: "Which Unraid systems or configurations would benefit from this feature?"
+      placeholder: "All Unraid servers / Servers with multiple NICs / High-bandwidth setups"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 📊 Priority Level
+      description: "How important is this feature to you?"
+      options:
+        - "Low - Nice to have"
+        - "Medium - Would improve my experience"
+        - "High - Significantly impacts usability"
+        - "Critical - Blocking important use cases"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: 🤝 Contribution
+      description: "Would you be willing to help implement this feature?"
+      options:
+        - label: "I'm willing to test development versions"
+        - label: "I can help with documentation"
+        - label: "I have programming skills and could contribute code"
+        - label: "I can provide detailed requirements and feedback"
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: 📝 Additional Context
+      description: "Any other relevant information, mockups, or examples"
+      placeholder: |
+        - Screenshots or mockups of desired UI
+        - Examples from other integrations
+        - Technical considerations
+        - Related feature requests
+      render: markdown
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✅ Checklist
+      description: "Please confirm you have done the following:"
+      options:
+        - label: "I have searched existing issues to make sure this isn't a duplicate"
+          required: true
+        - label: "This feature request is for the UMA REST API"
+          required: true
+        - label: "I have clearly described the problem this feature would solve"
+          required: true

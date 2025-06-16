@@ -9,9 +9,9 @@ _tl;dr_ **UMA** is a comprehensive monitoring and control system for Unraid serv
 - **System Monitoring**: CPU, RAM, storage, and boot disk status with real-time metrics
 - **Hardware Sensors**: Temperature monitoring, fan speeds, and system health via IPMI
 - **Storage Management**: Array disk health, cache disk status, SMART data, and usage statistics
-- **Power Management**: UPS status and metrics (NUT integration)
+- **Power Management**: Real UPS monitoring with APC and NUT integration, system power control (reboot/shutdown)
 - **GPU Monitoring**: GPU usage, temperature, and status
-- **Docker Management**: Container control with bulk operations (start, stop, restart multiple containers)
+- **Docker Management**: Complete container control with individual and bulk operations (start, stop, restart, pause, resume)
 - **VM Control**: Virtual machine management and status monitoring
 
 ### Advanced API & Integration
@@ -25,7 +25,7 @@ _tl;dr_ **UMA** is a comprehensive monitoring and control system for Unraid serv
 ### Security & Production Features
 
 - **JWT Authentication**: Role-based access control with API key and JWT token support
-- **Enhanced Routing**: Chi router with organized route groups and advanced middleware
+- **Optimized HTTP Mux**: Clean HTTP multiplexer with organized route groups and efficient middleware
 - **Configuration Management**: Viper-based configuration with hot reload and environment variables
 - **Enhanced Security**: Modern dependency management with security vulnerability elimination
 - **Input Validation**: Comprehensive request validation with user-friendly error messages
@@ -234,11 +234,20 @@ monitoring:
 ### Phase 3: Enhanced Features (Latest)
 
 - ✅ **JWT Authentication**: Role-based access control with Admin, Operator, and Viewer roles
-- ✅ **Enhanced Routing**: Chi router with organized route groups and improved performance
+- ✅ **Optimized HTTP Mux**: Clean HTTP multiplexer with organized route groups and improved performance
 - ✅ **Configuration Management**: Viper integration with hot reload and environment variables
 - ✅ **Optimized Binary**: 14.4MB optimized binary (28% under 20MB target) with all features
 - ✅ **Authentication API**: Complete user management with API key generation and JWT tokens
 - ✅ **Backward Compatibility**: 100% API compatibility maintained with existing integrations
+
+### Enhanced Functionality: 100% Coverage Achieved
+
+- ✅ **Docker Individual Container Control**: Complete individual container management (start, stop, restart, pause, resume)
+- ✅ **System Control Endpoints**: User script execution, system logs access, power management (reboot/shutdown)
+- ✅ **Enhanced UPS Integration**: Real hardware integration with APC and NUT systems, comprehensive monitoring data
+- ✅ **38+ API Endpoints**: Complete coverage of all Unraid management operations
+- ✅ **OpenAPI 3.1.1 Documentation**: Comprehensive API documentation with all new endpoints
+- ✅ **Production Deployment**: Single binary deployment with clean architecture and optimized performance
 
 ### Phase 2: Production Readiness
 
@@ -279,7 +288,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Credits
 
 - [Go](https://golang.org/) - Programming language
-- [Chi](https://github.com/go-chi/chi) - HTTP router and middleware (Phase 3)
+- [Go HTTP Mux](https://pkg.go.dev/net/http#ServeMux) - Optimized HTTP multiplexer with custom middleware
 - [Viper](https://github.com/spf13/viper) - Configuration management (Phase 3)
 - [JWT-Go](https://github.com/golang-jwt/jwt) - JWT authentication (Phase 3)
 - [Validator](https://github.com/go-playground/validator) - Input validation

@@ -1,0 +1,212 @@
+name: 🖥️ Unraid Integration Issue
+description: Report issues with UMA integration on Unraid servers
+title: "[Unraid] "
+labels: ["unraid", "integration"]
+assignees:
+  - domalab
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🖥️ Unraid Integration Issue
+
+        Thank you for reporting an Unraid integration issue! This template is for problems specific to **UMA running on Unraid servers**.
+
+        ## 📋 When to use this template:
+        - ✅ UMA fails to start or install on Unraid
+        - ✅ Issues with Unraid-specific features (array management, disk monitoring, etc.)
+        - ✅ Problems with Docker/VM integration on Unraid
+        - ✅ Unraid plugin installation or configuration issues
+
+        ## ❌ When NOT to use this template:
+        - 🚫 **API Bugs**: API endpoints not working correctly → Use "API Bug Report" template
+        - 🚫 **Feature Requests**: Want new API features → Use "Feature Request" template
+        - 🚫 **General Questions**: Setup help or configuration → Check documentation first
+
+  - type: input
+    id: unraid_version
+    attributes:
+      label: 🖥️ Unraid Version
+      description: "Your Unraid server version"
+      placeholder: "6.12.10"
+    validations:
+      required: true
+
+  - type: input
+    id: uma_version
+    attributes:
+      label: 📦 UMA Version
+      description: "UMA version you're trying to install/run"
+      placeholder: "2025.06.16"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation_method
+    attributes:
+      label: 📥 Installation Method
+      description: "How are you installing/running UMA?"
+      options:
+        - "Unraid Plugin (Community Applications)"
+        - "Manual binary installation"
+        - "Docker container"
+        - "Compiled from source"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: hardware_info
+    attributes:
+      label: 🔧 Hardware Information
+      description: "Unraid server hardware details"
+      placeholder: "CPU: Intel i5-8400, RAM: 32GB, Motherboard: ASUS Prime"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: issue_category
+    attributes:
+      label: 🏷️ Issue Category
+      description: "What type of Unraid integration issue are you experiencing?"
+      options:
+        - "UMA fails to start/install"
+        - "Array management not working"
+        - "Disk monitoring issues"
+        - "Docker integration problems"
+        - "VM control not working"
+        - "Parity check monitoring issues"
+        - "UPS integration problems"
+        - "Plugin installation/configuration"
+        - "Permission/access issues"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue_description
+    attributes:
+      label: 🔍 Issue Description
+      description: "Detailed description of the problem you're experiencing"
+      placeholder: |
+        **What's happening:**
+        UMA fails to start with permission denied error when trying to access /proc/mdstat
+
+        **Expected behavior:**
+        UMA should start successfully and provide array status information
+
+        **Error messages:**
+        Permission denied: cannot read /proc/mdstat
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: system_info
+    attributes:
+      label: 📊 System Information
+      description: "Unraid system information to help diagnose the issue"
+      placeholder: |
+        **Unraid System Info:**
+        - CPU: Intel i5-8400
+        - RAM: 32GB
+        - Boot device: USB 3.0 32GB
+        - Array disks: 6x 8TB WD Red
+        - Cache: 1TB NVMe SSD
+
+        **Network:**
+        - IP: 192.168.1.100
+        - Subnet: 192.168.1.0/24
+        - Gateway: 192.168.1.1
+
+        **Docker/VM Status:**
+        - Docker enabled: Yes
+        - VMs enabled: Yes
+        - Number of containers: 15
+        - Number of VMs: 2
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: installation_logs
+    attributes:
+      label: 📋 Installation/Error Logs
+      description: |
+        Relevant logs from UMA installation or runtime. Include:
+
+        **UMA Logs:**
+        ```bash
+        tail -f /tmp/uma.log
+        ```
+
+        **Unraid System Log:**
+        ```bash
+        tail -f /var/log/syslog
+        ```
+
+        **Plugin Installation Log (if applicable):**
+        Check Community Applications log
+      placeholder: |
+        ```
+        2025-06-16 10:30:00 ERROR [UMA] Failed to bind to port 34600: permission denied
+        2025-06-16 10:30:01 ERROR [UMA] Cannot access /proc/mdstat: permission denied
+        ```
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_info
+    attributes:
+      label: 📝 Additional Information
+      description: "Any other relevant information about your Unraid setup"
+      placeholder: |
+        - Custom Unraid configurations or modifications
+        - Network setup details (VLANs, firewalls, reverse proxy)
+        - Other plugins or Docker containers that might conflict
+        - Previous attempts to resolve the issue
+        - Screenshots of error messages or configuration screens
+      render: markdown
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: troubleshooting_steps
+    attributes:
+      label: ✅ Troubleshooting Steps Completed
+      description: "Please confirm you have tried the following:"
+      options:
+        - label: "I have searched existing issues to make sure this isn't a duplicate"
+          required: true
+        - label: "I have restarted the Unraid server"
+          required: false
+        - label: "I have checked Unraid system logs for errors"
+          required: false
+        - label: "I have verified UMA has proper permissions"
+          required: false
+        - label: "I have tested with firewall/security software disabled"
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 📚 Helpful Resources
+
+        - **📖 Installation Guide**: [UMA Installation](https://github.com/domalab/uma#installation)
+        - **🔧 API Documentation**: [Swagger UI](http://your-unraid-server:34600/api/v1/docs)
+        - **💬 Unraid Community**: [Unraid Forums](https://forums.unraid.net/)
+        - **📋 System Requirements**: [UMA Requirements](https://github.com/domalab/uma#requirements)
+
+        ## ⏱️ What Happens Next?
+
+        1. **Review**: We'll review your Unraid setup and issue details
+        2. **Analysis**: We'll analyze the integration problem and potential solutions
+        3. **Development**: If needed, we'll work on fixing Unraid-specific issues
+        4. **Testing**: You may be asked to test development versions
+        5. **Release**: Fixes will be included in a future release
+
+        **Note**: Some Unraid integration issues may require specific server configurations or permissions. We'll work with you to find the best solution.
+
+        Thank you for helping improve UMA's Unraid integration! 🙏

@@ -1,0 +1,158 @@
+name: 🐛 API Bug Report
+description: Report a bug or issue with the UMA REST API
+title: "[Bug] "
+labels: ["bug", "api"]
+assignees:
+  - domalab
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🐛 UMA REST API Bug Report
+
+        Thank you for reporting a bug! This template is for issues with the **UMA REST API** that are not working correctly.
+
+        ## 📋 When to use this template:
+        - ✅ API endpoints returning incorrect data or errors
+        - ✅ Authentication or authorization issues
+        - ✅ WebSocket connection problems
+        - ✅ System monitoring data inaccuracies
+        - ✅ Docker/VM control operations failing
+
+        ## ❌ When NOT to use this template:
+        - 🚫 **Feature Requests**: Want new API endpoints or features → Use "Feature Request" template
+        - 🚫 **Unraid Integration**: Issues with Unraid server setup → Use "Unraid Integration Issue" template
+
+  - type: input
+    id: api_endpoint
+    attributes:
+      label: 🔗 API Endpoint
+      description: "The specific API endpoint experiencing issues"
+      placeholder: "/api/v1/system/ups or /api/v1/docker/containers"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: bug_category
+    attributes:
+      label: 🏷️ Bug Category
+      description: "What type of issue are you experiencing?"
+      options:
+        - "API endpoint returns 500/error"
+        - "Incorrect data returned"
+        - "Authentication/authorization failure"
+        - "WebSocket connection issues"
+        - "Docker/VM control not working"
+        - "Storage monitoring inaccurate"
+        - "UPS monitoring issues"
+        - "System monitoring problems"
+        - "Performance/timeout issues"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: 📝 Bug Description
+      description: "Clear description of what's wrong and what you expected to happen"
+      placeholder: |
+        **What's happening:**
+        The /api/v1/system/ups endpoint returns "unknown" status even though UPS is connected and working.
+
+        **What should happen:**
+        The endpoint should return real UPS status data from apcupsd daemon.
+
+        **When did this start:**
+        After updating to version X.X.X or fresh installation
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: 🔄 Steps to Reproduce
+      description: "Step-by-step instructions to reproduce the issue"
+      placeholder: |
+        1. Start UMA REST API on Unraid server
+        2. Make GET request to /api/v1/system/ups
+        3. Observe incorrect or error response
+        4. Check UMA logs for any error messages
+      render: markdown
+    validations:
+      required: true
+
+  - type: input
+    id: uma_version
+    attributes:
+      label: 📦 UMA Version
+      description: "Version of the UMA REST API"
+      placeholder: "2025.06.16 or check /api/v1/health endpoint"
+    validations:
+      required: true
+
+  - type: input
+    id: unraid_version
+    attributes:
+      label: 🖥️ Unraid Version
+      description: "Your Unraid server version"
+      placeholder: "6.12.10 or 6.11.5"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 📋 UMA Logs
+      description: |
+        UMA REST API logs related to the issue. Check logs with:
+
+        ```bash
+        # On Unraid server
+        tail -f /tmp/uma.log
+
+        # Or check systemd logs if running as service
+        journalctl -u uma -f
+        ```
+      placeholder: |
+        ```
+        2025-06-16 10:30:00 ERROR [UMA] Failed to connect to apcupsd daemon
+        2025-06-16 10:30:01 WARN [UMA] Docker API connection timeout
+        ```
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: 📝 Additional Context
+      description: "Any other relevant information"
+      placeholder: |
+        - Unraid server hardware details
+        - Network configuration (VLANs, firewalls, etc.)
+        - Recent changes to your Unraid setup
+        - Workarounds you've tried
+        - Screenshots of API responses or error messages
+        - Related Docker containers or VMs
+      render: markdown
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✅ Checklist
+      description: "Please confirm you have done the following:"
+      options:
+        - label: "I have searched existing issues to make sure this isn't a duplicate"
+          required: true
+        - label: "I have tested the API endpoint using curl or Swagger UI"
+          required: true
+        - label: "I have checked UMA logs for error messages"
+          required: false
+        - label: "I have tried restarting the UMA service"
+          required: false
+        - label: "I have verified my Unraid server is functioning normally"
+          required: false

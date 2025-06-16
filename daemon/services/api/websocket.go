@@ -270,12 +270,9 @@ func (h *HTTPServer) systemStatsBroadcaster() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			stats := h.collectSystemStats()
-			h.wsManager.broadcast("system/stats", "system_stats", stats)
-		}
+	for range ticker.C {
+		stats := h.collectSystemStats()
+		h.wsManager.broadcast("system/stats", "system_stats", stats)
 	}
 }
 
@@ -322,13 +319,10 @@ func (h *HTTPServer) dockerEventsBroadcaster() {
 
 	var lastContainerStates map[string]string
 
-	for {
-		select {
-		case <-ticker.C:
-			events := h.collectDockerEvents(&lastContainerStates)
-			if len(events) > 0 {
-				h.wsManager.broadcast("docker/events", "docker_events", events)
-			}
+	for range ticker.C {
+		events := h.collectDockerEvents(&lastContainerStates)
+		if len(events) > 0 {
+			h.wsManager.broadcast("docker/events", "docker_events", events)
 		}
 	}
 }
@@ -403,13 +397,10 @@ func (h *HTTPServer) storageStatusBroadcaster() {
 
 	var lastDiskStates map[string]string
 
-	for {
-		select {
-		case <-ticker.C:
-			updates := h.collectStorageUpdates(&lastDiskStates)
-			if len(updates) > 0 {
-				h.wsManager.broadcast("storage/status", "storage_updates", updates)
-			}
+	for range ticker.C {
+		updates := h.collectStorageUpdates(&lastDiskStates)
+		if len(updates) > 0 {
+			h.wsManager.broadcast("storage/status", "storage_updates", updates)
 		}
 	}
 }

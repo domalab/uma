@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 API Documentation
+    url: http://your-unraid-server:34600/api/v1/docs
+    about: Access the interactive Swagger API documentation
+  - name: 💬 Unraid Community
+    url: https://forums.unraid.net/
+    about: Get help from the Unraid community forums
+  - name: 🔧 Installation Guide
+    url: https://github.com/domalab/uma#installation
+    about: Follow the installation and setup instructions
+  - name: 📊 System Requirements
+    url: https://github.com/domalab/uma#requirements
+    about: Check UMA system requirements and compatibility

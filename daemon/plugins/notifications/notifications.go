@@ -3,7 +3,6 @@ package notifications
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -170,7 +169,7 @@ func (nm *NotificationManager) GetNotifications(filter *NotificationFilter) ([]*
 func (nm *NotificationManager) GetNotification(id string) (*Notification, error) {
 	filePath := filepath.Join(nm.storageDir, id+".json")
 
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("notification not found")
@@ -233,7 +232,7 @@ func (nm *NotificationManager) DeleteNotification(id string) error {
 
 // ClearAllNotifications clears all notifications
 func (nm *NotificationManager) ClearAllNotifications() error {
-	files, err := ioutil.ReadDir(nm.storageDir)
+	files, err := os.ReadDir(nm.storageDir)
 	if err != nil {
 		return fmt.Errorf("failed to read notifications directory: %v", err)
 	}
@@ -321,7 +320,7 @@ func (nm *NotificationManager) saveNotification(notification *Notification) erro
 		return fmt.Errorf("failed to marshal notification: %v", err)
 	}
 
-	if err := ioutil.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write notification file: %v", err)
 	}
 
@@ -330,7 +329,7 @@ func (nm *NotificationManager) saveNotification(notification *Notification) erro
 
 // loadAllNotifications loads all notifications from disk
 func (nm *NotificationManager) loadAllNotifications() ([]*Notification, error) {
-	files, err := ioutil.ReadDir(nm.storageDir)
+	files, err := os.ReadDir(nm.storageDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read notifications directory: %v", err)
 	}
@@ -340,7 +339,7 @@ func (nm *NotificationManager) loadAllNotifications() ([]*Notification, error) {
 		if strings.HasSuffix(file.Name(), ".json") {
 			filePath := filepath.Join(nm.storageDir, file.Name())
 
-			data, err := ioutil.ReadFile(filePath)
+			data, err := os.ReadFile(filePath)
 			if err != nil {
 				logger.Yellow("Failed to read notification file %s: %v", file.Name(), err)
 				continue

@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/domalab/uma/daemon/lib"
 	"github.com/domalab/uma/daemon/logger"
@@ -140,6 +142,57 @@ type ArrayInfo struct {
 	TotalSizeFormatted string `json:"total_size_formatted"` // "8 TB"
 	UsedSizeFormatted  string `json:"used_size_formatted"`  // "6.28 TB"
 	FreeSizeFormatted  string `json:"free_size_formatted"`  // "1.72 TB"
+}
+
+// ZFSVdev represents a ZFS virtual device
+type ZFSVdev struct {
+	Name        string    `json:"name"`
+	Type        string    `json:"type"`   // disk, mirror, raidz1, raidz2, raidz3, spare, cache, log
+	State       string    `json:"state"`  // ONLINE, DEGRADED, FAULTED, OFFLINE, UNAVAIL, REMOVED
+	Health      string    `json:"health"` // ONLINE, DEGRADED, FAULTED, OFFLINE, UNAVAIL, REMOVED
+	ReadErrors  uint64    `json:"read_errors"`
+	WriteErrors uint64    `json:"write_errors"`
+	CksumErrors uint64    `json:"cksum_errors"`
+	Children    []ZFSVdev `json:"children,omitempty"` // For mirror/raidz groups
+}
+
+// ZFSPool represents a ZFS storage pool
+type ZFSPool struct {
+	Name           string    `json:"name"`
+	State          string    `json:"state"`           // ONLINE, DEGRADED, FAULTED, OFFLINE, UNAVAIL, REMOVED
+	Health         string    `json:"health"`          // ONLINE, DEGRADED, FAULTED, OFFLINE, UNAVAIL, REMOVED
+	Size           uint64    `json:"size"`            // Total pool size in bytes
+	Allocated      uint64    `json:"allocated"`       // Allocated space in bytes
+	Free           uint64    `json:"free"`            // Free space in bytes
+	UsedPercent    float64   `json:"used_percent"`    // Used percentage
+	SizeFormatted  string    `json:"size_formatted"`  // "8.0 TB"
+	AllocFormatted string    `json:"alloc_formatted"` // "6.28 TB"
+	FreeFormatted  string    `json:"free_formatted"`  // "1.72 TB"
+	Fragmentation  float64   `json:"fragmentation"`   // Fragmentation percentage
+	Deduplication  float64   `json:"deduplication"`   // Dedup ratio
+	Compression    float64   `json:"compression"`     // Compression ratio
+	ReadOps        uint64    `json:"read_ops"`        // Read operations
+	WriteOps       uint64    `json:"write_ops"`       // Write operations
+	ReadBandwidth  uint64    `json:"read_bandwidth"`  // Read bandwidth in bytes/sec
+	WriteBandwidth uint64    `json:"write_bandwidth"` // Write bandwidth in bytes/sec
+	Vdevs          []ZFSVdev `json:"vdevs"`           // Virtual devices in the pool
+	LastScrub      string    `json:"last_scrub"`      // Last scrub date/time
+	ScrubStatus    string    `json:"scrub_status"`    // none, scrub in progress, scrub completed
+	ErrorCount     uint64    `json:"error_count"`     // Total error count
+	Version        string    `json:"version"`         // ZFS version
+	Features       []string  `json:"features"`        // Enabled features
+	LastUpdated    string    `json:"last_updated"`    // ISO 8601 timestamp
+}
+
+// ZFSInfo represents comprehensive ZFS information
+type ZFSInfo struct {
+	Available   bool      `json:"available"`     // Whether ZFS is available on the system
+	Version     string    `json:"version"`       // ZFS version
+	Pools       []ZFSPool `json:"pools"`         // All ZFS pools
+	ARCSize     uint64    `json:"arc_size"`      // ARC cache size in bytes
+	ARCMax      uint64    `json:"arc_max"`       // ARC max size in bytes
+	ARCHitRatio float64   `json:"arc_hit_ratio"` // ARC hit ratio percentage
+	LastUpdated string    `json:"last_updated"`  // ISO 8601 timestamp
 }
 
 // ParityCheckStatus represents the status of a parity check operation
@@ -890,7 +943,6 @@ func (s *StorageMonitor) getDiskPowerState(disk *DiskInfo) {
 	// - Exit code 0: Device is active
 	// - Exit code 2: Device is in standby
 	// - Other codes: Error or unknown state
-	output := lib.GetCmdOutput("smartctl", "-n", "standby", actualDevice)
 
 	// Check the exit code by running the command and capturing both output and exit status
 	cmd := exec.Command("smartctl", "-n", "standby", actualDevice)
@@ -913,7 +965,7 @@ func (s *StorageMonitor) getDiskPowerState(disk *DiskInfo) {
 	}
 
 	// Method 2: Fall back to hdparm if SMART fails
-	output = lib.GetCmdOutput("hdparm", "-C", actualDevice)
+	output := lib.GetCmdOutput("hdparm", "-C", actualDevice)
 	for _, line := range output {
 		line = strings.TrimSpace(line)
 		if strings.Contains(line, "drive state is:") {
@@ -1592,11 +1644,21 @@ func (s *StorageMonitor) calculateCacheTotals(cache *CacheInfo) {
 
 // Array Control Operations
 
-// StartArray starts the Unraid array
+// StartArray starts the Unraid array with proper orchestration sequence
 func (s *StorageMonitor) StartArray(maintenanceMode bool, checkFilesystem bool) error {
-	logger.Blue("Starting Unraid array (maintenance: %v, check_fs: %v)", maintenanceMode, checkFilesystem)
+	logger.Blue("Starting Unraid array with orchestration (maintenance: %v, check_fs: %v)", maintenanceMode, checkFilesystem)
 
-	// Build mdcmd command
+	// Step 1: Validate array configuration
+	if err := s.validateArrayConfiguration(); err != nil {
+		return fmt.Errorf("array configuration validation failed: %v", err)
+	}
+
+	// Step 2: Check for any running parity operations
+	if err := s.checkParityOperations(); err != nil {
+		return fmt.Errorf("parity operation check failed: %v", err)
+	}
+
+	// Step 3: Start array via mdcmd with proper parameters
 	cmd := "mdcmd start"
 	if maintenanceMode {
 		cmd += " MAINTENANCE=1"
@@ -1605,7 +1667,7 @@ func (s *StorageMonitor) StartArray(maintenanceMode bool, checkFilesystem bool) 
 		cmd += " CHECK=1"
 	}
 
-	// Execute the command
+	logger.Blue("Executing array start command: %s", cmd)
 	output := lib.GetCmdOutput("sh", "-c", cmd)
 
 	// Check for errors in output
@@ -1616,21 +1678,71 @@ func (s *StorageMonitor) StartArray(maintenanceMode bool, checkFilesystem bool) 
 		}
 	}
 
-	logger.Blue("Array start command executed successfully")
+	// Step 4: Wait for array to become available
+	if err := s.waitForArrayState("started", 60); err != nil {
+		return fmt.Errorf("array failed to start within timeout: %v", err)
+	}
+
+	// Step 5: Verify filesystem mounts
+	if err := s.verifyFilesystemMounts(); err != nil {
+		logger.Yellow("Warning: Some filesystems may not have mounted properly: %v", err)
+	}
+
+	logger.Blue("Array start orchestration completed successfully")
 	return nil
 }
 
-// StopArray stops the Unraid array
-func (s *StorageMonitor) StopArray(force bool, unmountShares bool) error {
-	logger.Blue("Stopping Unraid array (force: %v, unmount_shares: %v)", force, unmountShares)
+// StopArray stops the Unraid array with proper orchestration sequence
+func (s *StorageMonitor) StopArray(force bool, unmountShares bool, stopContainers bool, stopVMs bool) error {
+	logger.Blue("Stopping Unraid array with orchestration (force: %v, unmount_shares: %v, stop_containers: %v, stop_vms: %v)",
+		force, unmountShares, stopContainers, stopVMs)
 
-	// Build mdcmd command
+	// Step 1: Stop Docker containers if requested
+	if stopContainers {
+		logger.Blue("Step 1: Stopping Docker containers...")
+		if err := s.stopDockerContainers(); err != nil && !force {
+			return fmt.Errorf("failed to stop Docker containers: %v", err)
+		}
+	}
+
+	// Step 2: Stop VMs if requested
+	if stopVMs {
+		logger.Blue("Step 2: Stopping virtual machines...")
+		if err := s.stopVirtualMachines(); err != nil && !force {
+			return fmt.Errorf("failed to stop virtual machines: %v", err)
+		}
+	}
+
+	// Step 3: Handle running parity operations
+	if !force {
+		logger.Blue("Step 3: Checking for running parity operations...")
+		if err := s.handleParityOperations(); err != nil {
+			return fmt.Errorf("failed to handle parity operations: %v", err)
+		}
+	}
+
+	// Step 4: Unmount user shares (FUSE mounts)
+	if unmountShares {
+		logger.Blue("Step 4: Unmounting user shares...")
+		if err := s.unmountUserShares(); err != nil && !force {
+			return fmt.Errorf("failed to unmount user shares: %v", err)
+		}
+	}
+
+	// Step 5: Unmount array disks in reverse dependency order
+	logger.Blue("Step 5: Unmounting array disks...")
+	if err := s.unmountArrayDisks(); err != nil && !force {
+		return fmt.Errorf("failed to unmount array disks: %v", err)
+	}
+
+	// Step 6: Stop MD devices using mdcmd
+	logger.Blue("Step 6: Stopping MD devices...")
 	cmd := "mdcmd stop"
 	if force {
 		cmd += " FORCE=1"
 	}
 
-	// Execute the command
+	logger.Blue("Executing array stop command: %s", cmd)
 	output := lib.GetCmdOutput("sh", "-c", cmd)
 
 	// Check for errors in output
@@ -1641,7 +1753,12 @@ func (s *StorageMonitor) StopArray(force bool, unmountShares bool) error {
 		}
 	}
 
-	logger.Blue("Array stop command executed successfully")
+	// Step 7: Wait for array to stop
+	if err := s.waitForArrayState("stopped", 120); err != nil {
+		return fmt.Errorf("array failed to stop within timeout: %v", err)
+	}
+
+	logger.Blue("Array stop orchestration completed successfully")
 	return nil
 }
 
@@ -1832,4 +1949,786 @@ func (s *StorageMonitor) RemoveDisk(position string) error {
 
 	logger.Blue("Disk removed from position %s successfully", position)
 	return nil
+}
+
+// Array Orchestration Helper Methods
+
+// validateArrayConfiguration validates the array configuration before starting
+func (s *StorageMonitor) validateArrayConfiguration() error {
+	logger.Blue("Validating array configuration...")
+
+	// Check if array configuration exists
+	if exists, _ := lib.Exists("/boot/config/disk.cfg"); !exists {
+		return fmt.Errorf("array configuration file not found")
+	}
+
+	// Read disk assignments to ensure we have valid configuration
+	diskAssignments, err := s.readDiskAssignments()
+	if err != nil {
+		return fmt.Errorf("failed to read disk assignments: %v", err)
+	}
+
+	if len(diskAssignments) == 0 {
+		return fmt.Errorf("no disks assigned to array")
+	}
+
+	// Validate that assigned devices exist
+	for device, assignment := range diskAssignments {
+		if exists, _ := lib.Exists(device); !exists {
+			logger.Yellow("Warning: Assigned device %s (%s) not found", device, assignment.Name)
+		}
+	}
+
+	logger.Blue("Array configuration validation completed")
+	return nil
+}
+
+// checkParityOperations checks for any running parity operations
+func (s *StorageMonitor) checkParityOperations() error {
+	logger.Blue("Checking for running parity operations...")
+
+	// Check mdstat for any active sync operations
+	output := lib.GetCmdOutput("cat", "/proc/mdstat")
+	for _, line := range output {
+		if strings.Contains(line, "resync") || strings.Contains(line, "recovery") || strings.Contains(line, "check") {
+			return fmt.Errorf("parity operation in progress: %s", strings.TrimSpace(line))
+		}
+	}
+
+	logger.Blue("No active parity operations found")
+	return nil
+}
+
+// waitForArrayState waits for the array to reach the specified state
+func (s *StorageMonitor) waitForArrayState(expectedState string, timeoutSeconds int) error {
+	logger.Blue("Waiting for array state: %s (timeout: %ds)", expectedState, timeoutSeconds)
+
+	for i := 0; i < timeoutSeconds; i++ {
+		currentState := s.getArrayState()
+		if currentState == expectedState {
+			logger.Blue("Array reached expected state: %s", expectedState)
+			return nil
+		}
+
+		if i%10 == 0 { // Log every 10 seconds
+			logger.Blue("Array state: %s, waiting for: %s (%d/%ds)", currentState, expectedState, i, timeoutSeconds)
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	return fmt.Errorf("timeout waiting for array state %s", expectedState)
+}
+
+// verifyFilesystemMounts verifies that array filesystems are properly mounted
+func (s *StorageMonitor) verifyFilesystemMounts() error {
+	logger.Blue("Verifying filesystem mounts...")
+
+	// Check /proc/mounts for array disk mounts
+	output := lib.GetCmdOutput("cat", "/proc/mounts")
+	mountedDisks := 0
+
+	for _, line := range output {
+		if strings.Contains(line, "/mnt/disk") || strings.Contains(line, "/mnt/cache") {
+			mountedDisks++
+		}
+	}
+
+	if mountedDisks == 0 {
+		return fmt.Errorf("no array disks appear to be mounted")
+	}
+
+	logger.Blue("Verified %d array disk mounts", mountedDisks)
+	return nil
+}
+
+// stopDockerContainers stops all running Docker containers
+func (s *StorageMonitor) stopDockerContainers() error {
+	logger.Blue("Stopping all Docker containers...")
+
+	// Get list of running containers
+	output := lib.GetCmdOutput("docker", "ps", "-q")
+	if len(output) == 0 {
+		logger.Blue("No running Docker containers found")
+		return nil
+	}
+
+	containerIDs := make([]string, 0)
+	for _, line := range output {
+		if strings.TrimSpace(line) != "" {
+			containerIDs = append(containerIDs, strings.TrimSpace(line))
+		}
+	}
+
+	if len(containerIDs) == 0 {
+		logger.Blue("No running Docker containers found")
+		return nil
+	}
+
+	// Stop all containers with timeout
+	logger.Blue("Stopping %d Docker containers...", len(containerIDs))
+	args := append([]string{"stop", "-t", "30"}, containerIDs...)
+	output = lib.GetCmdOutput("docker", args...)
+
+	// Check for errors
+	for _, line := range output {
+		if strings.Contains(strings.ToLower(line), "error") {
+			return fmt.Errorf("failed to stop containers: %s", line)
+		}
+	}
+
+	logger.Blue("Successfully stopped %d Docker containers", len(containerIDs))
+	return nil
+}
+
+// stopVirtualMachines stops all running virtual machines
+func (s *StorageMonitor) stopVirtualMachines() error {
+	logger.Blue("Stopping all virtual machines...")
+
+	// Get list of running VMs via virsh
+	output := lib.GetCmdOutput("virsh", "list", "--state-running", "--name")
+	if len(output) == 0 {
+		logger.Blue("No running virtual machines found")
+		return nil
+	}
+
+	vmNames := make([]string, 0)
+	for _, line := range output {
+		vmName := strings.TrimSpace(line)
+		if vmName != "" {
+			vmNames = append(vmNames, vmName)
+		}
+	}
+
+	if len(vmNames) == 0 {
+		logger.Blue("No running virtual machines found")
+		return nil
+	}
+
+	// Shutdown VMs gracefully
+	logger.Blue("Shutting down %d virtual machines...", len(vmNames))
+	for _, vmName := range vmNames {
+		logger.Blue("Shutting down VM: %s", vmName)
+		output := lib.GetCmdOutput("virsh", "shutdown", vmName)
+
+		// Check for errors
+		for _, line := range output {
+			if strings.Contains(strings.ToLower(line), "error") {
+				logger.Yellow("Warning: Failed to shutdown VM %s: %s", vmName, line)
+			}
+		}
+	}
+
+	// Wait for VMs to shutdown (up to 60 seconds)
+	logger.Blue("Waiting for VMs to shutdown...")
+	for i := 0; i < 60; i++ {
+		output := lib.GetCmdOutput("virsh", "list", "--state-running", "--name")
+		runningVMs := 0
+		for _, line := range output {
+			if strings.TrimSpace(line) != "" {
+				runningVMs++
+			}
+		}
+
+		if runningVMs == 0 {
+			logger.Blue("All VMs have shutdown successfully")
+			return nil
+		}
+
+		if i%10 == 0 {
+			logger.Blue("Waiting for %d VMs to shutdown... (%d/60s)", runningVMs, i)
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	logger.Yellow("Warning: Some VMs may still be running after timeout")
+	return nil
+}
+
+// handleParityOperations handles any running parity operations
+func (s *StorageMonitor) handleParityOperations() error {
+	logger.Blue("Handling running parity operations...")
+
+	// Check for active parity operations
+	output := lib.GetCmdOutput("cat", "/proc/mdstat")
+	for _, line := range output {
+		if strings.Contains(line, "resync") || strings.Contains(line, "recovery") || strings.Contains(line, "check") {
+			logger.Blue("Found active parity operation: %s", strings.TrimSpace(line))
+
+			// Cancel the parity operation
+			logger.Blue("Cancelling parity operation...")
+			if err := s.CancelParityCheck(); err != nil {
+				return fmt.Errorf("failed to cancel parity operation: %v", err)
+			}
+
+			// Wait a moment for cancellation to take effect
+			time.Sleep(5 * time.Second)
+			break
+		}
+	}
+
+	logger.Blue("Parity operations handled successfully")
+	return nil
+}
+
+// unmountUserShares unmounts all user shares (FUSE mounts)
+func (s *StorageMonitor) unmountUserShares() error {
+	logger.Blue("Unmounting user shares...")
+
+	// Get list of mounted user shares
+	output := lib.GetCmdOutput("mount")
+	userShares := make([]string, 0)
+
+	for _, line := range output {
+		if strings.Contains(line, "shfs") && strings.Contains(line, "/mnt/user") {
+			parts := strings.Fields(line)
+			if len(parts) >= 3 {
+				mountPoint := parts[2]
+				userShares = append(userShares, mountPoint)
+			}
+		}
+	}
+
+	if len(userShares) == 0 {
+		logger.Blue("No user shares found to unmount")
+		return nil
+	}
+
+	// Unmount each user share
+	logger.Blue("Unmounting %d user shares...", len(userShares))
+	for _, mountPoint := range userShares {
+		logger.Blue("Unmounting user share: %s", mountPoint)
+		output := lib.GetCmdOutput("umount", mountPoint)
+
+		// Check for errors
+		for _, line := range output {
+			if strings.Contains(strings.ToLower(line), "error") || strings.Contains(strings.ToLower(line), "busy") {
+				return fmt.Errorf("failed to unmount user share %s: %s", mountPoint, line)
+			}
+		}
+	}
+
+	logger.Blue("Successfully unmounted %d user shares", len(userShares))
+	return nil
+}
+
+// unmountArrayDisks unmounts array disks in reverse dependency order
+func (s *StorageMonitor) unmountArrayDisks() error {
+	logger.Blue("Unmounting array disks...")
+
+	// Get list of mounted array disks
+	output := lib.GetCmdOutput("mount")
+	arrayMounts := make([]string, 0)
+
+	for _, line := range output {
+		if strings.Contains(line, "/mnt/disk") || strings.Contains(line, "/mnt/cache") {
+			parts := strings.Fields(line)
+			if len(parts) >= 3 {
+				mountPoint := parts[2]
+				arrayMounts = append(arrayMounts, mountPoint)
+			}
+		}
+	}
+
+	if len(arrayMounts) == 0 {
+		logger.Blue("No array disks found to unmount")
+		return nil
+	}
+
+	// Sort mount points in reverse order for proper unmounting
+	// This ensures dependencies are handled correctly
+	sort.Sort(sort.Reverse(sort.StringSlice(arrayMounts)))
+
+	// Unmount each array disk
+	logger.Blue("Unmounting %d array disks...", len(arrayMounts))
+	for _, mountPoint := range arrayMounts {
+		logger.Blue("Unmounting array disk: %s", mountPoint)
+
+		// Try lazy unmount first, then force if needed
+		_ = lib.GetCmdOutput("umount", "-l", mountPoint)
+
+		// Check if unmount was successful
+		stillMounted := false
+		checkOutput := lib.GetCmdOutput("mount")
+		for _, line := range checkOutput {
+			if strings.Contains(line, mountPoint) {
+				stillMounted = true
+				break
+			}
+		}
+
+		if stillMounted {
+			logger.Yellow("Lazy unmount failed for %s, trying force unmount...", mountPoint)
+			output = lib.GetCmdOutput("umount", "-f", mountPoint)
+
+			// Check for errors
+			for _, line := range output {
+				if strings.Contains(strings.ToLower(line), "error") {
+					return fmt.Errorf("failed to force unmount %s: %s", mountPoint, line)
+				}
+			}
+		}
+	}
+
+	logger.Blue("Successfully unmounted %d array disks", len(arrayMounts))
+	return nil
+}
+
+// GetZFSInfo returns comprehensive ZFS information
+func (s *StorageMonitor) GetZFSInfo() (*ZFSInfo, error) {
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
+	zfsInfo := &ZFSInfo{
+		Available:   false,
+		Pools:       make([]ZFSPool, 0),
+		LastUpdated: timestamp,
+	}
+
+	// Check if ZFS is available
+	if !s.isZFSAvailable() {
+		return zfsInfo, nil
+	}
+
+	zfsInfo.Available = true
+
+	// Get ZFS version
+	if version := s.getZFSVersion(); version != "" {
+		zfsInfo.Version = version
+	}
+
+	// Get ZFS pools
+	pools, err := s.getZFSPools()
+	if err != nil {
+		logger.Yellow("Failed to get ZFS pools: %v", err)
+	} else {
+		zfsInfo.Pools = pools
+	}
+
+	// Get ARC statistics
+	arcSize, arcMax, hitRatio := s.getZFSARCStats()
+	zfsInfo.ARCSize = arcSize
+	zfsInfo.ARCMax = arcMax
+	zfsInfo.ARCHitRatio = hitRatio
+
+	return zfsInfo, nil
+}
+
+// isZFSAvailable checks if ZFS is available on the system
+func (s *StorageMonitor) isZFSAvailable() bool {
+	// Check if zpool command exists
+	if _, err := exec.LookPath("zpool"); err != nil {
+		return false
+	}
+
+	// Check if zfs command exists
+	if _, err := exec.LookPath("zfs"); err != nil {
+		return false
+	}
+
+	// Check if ZFS kernel module is loaded
+	if exists, _ := lib.Exists("/proc/spl/kstat/zfs"); !exists {
+		return false
+	}
+
+	return true
+}
+
+// getZFSVersion gets the ZFS version
+func (s *StorageMonitor) getZFSVersion() string {
+	output := lib.GetCmdOutput("zfs", "version")
+	if len(output) > 0 {
+		// Parse version from output like "zfs-2.1.5-1"
+		for _, line := range output {
+			if strings.Contains(line, "zfs-") {
+				parts := strings.Fields(line)
+				if len(parts) > 0 {
+					return strings.TrimPrefix(parts[0], "zfs-")
+				}
+			}
+		}
+	}
+	return "unknown"
+}
+
+// getZFSPools gets information about all ZFS pools
+func (s *StorageMonitor) getZFSPools() ([]ZFSPool, error) {
+	pools := make([]ZFSPool, 0)
+
+	// Get list of pools
+	poolNames := s.getZFSPoolNames()
+	if len(poolNames) == 0 {
+		return pools, nil
+	}
+
+	for _, poolName := range poolNames {
+		pool, err := s.getZFSPoolInfo(poolName)
+		if err != nil {
+			logger.Yellow("Failed to get info for pool %s: %v", poolName, err)
+			continue
+		}
+		pools = append(pools, pool)
+	}
+
+	return pools, nil
+}
+
+// getZFSPoolNames gets the names of all ZFS pools
+func (s *StorageMonitor) getZFSPoolNames() []string {
+	output := lib.GetCmdOutput("zpool", "list", "-H", "-o", "name")
+	poolNames := make([]string, 0)
+
+	for _, line := range output {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			poolNames = append(poolNames, line)
+		}
+	}
+
+	return poolNames
+}
+
+// getZFSPoolInfo gets detailed information about a specific ZFS pool
+func (s *StorageMonitor) getZFSPoolInfo(poolName string) (ZFSPool, error) {
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
+	pool := ZFSPool{
+		Name:        poolName,
+		Vdevs:       make([]ZFSVdev, 0),
+		Features:    make([]string, 0),
+		LastUpdated: timestamp,
+	}
+
+	// Get pool status and properties
+	if err := s.parseZFSPoolStatus(&pool); err != nil {
+		return pool, err
+	}
+
+	// Get pool usage statistics
+	if err := s.parseZFSPoolUsage(&pool); err != nil {
+		return pool, err
+	}
+
+	// Get pool I/O statistics
+	s.parseZFSPoolIOStats(&pool)
+
+	// Get pool features
+	s.parseZFSPoolFeatures(&pool)
+
+	return pool, nil
+}
+
+// getZFSARCStats gets ZFS ARC cache statistics
+func (s *StorageMonitor) getZFSARCStats() (uint64, uint64, float64) {
+	var arcSize, arcMax uint64
+	var hitRatio float64
+
+	// Read ARC stats from /proc/spl/kstat/zfs/arcstats
+	content, err := os.ReadFile("/proc/spl/kstat/zfs/arcstats")
+	if err != nil {
+		return 0, 0, 0
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var hits, misses uint64
+
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+
+		switch fields[0] {
+		case "size":
+			if val, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
+				arcSize = val
+			}
+		case "c_max":
+			if val, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
+				arcMax = val
+			}
+		case "hits":
+			if val, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
+				hits = val
+			}
+		case "misses":
+			if val, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
+				misses = val
+			}
+		}
+	}
+
+	// Calculate hit ratio
+	if hits+misses > 0 {
+		hitRatio = float64(hits) / float64(hits+misses) * 100
+	}
+
+	return arcSize, arcMax, hitRatio
+}
+
+// parseZFSPoolStatus parses zpool status output for a pool
+func (s *StorageMonitor) parseZFSPoolStatus(pool *ZFSPool) error {
+	output := lib.GetCmdOutput("zpool", "status", pool.Name)
+	if len(output) == 0 {
+		return fmt.Errorf("no status output for pool %s", pool.Name)
+	}
+
+	inVdevSection := false
+
+	for _, line := range output {
+		line = strings.TrimSpace(line)
+
+		// Parse pool state and health
+		if strings.HasPrefix(line, "state:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				pool.State = parts[1]
+				pool.Health = parts[1] // State and health are often the same
+			}
+		} else if strings.HasPrefix(line, "status:") {
+			// Additional status information
+			continue
+		} else if strings.HasPrefix(line, "action:") {
+			// Action recommendations
+			continue
+		} else if strings.HasPrefix(line, "scan:") {
+			// Parse scrub information
+			s.parseZFSScrubInfo(line, pool)
+		} else if strings.Contains(line, "errors:") {
+			// Parse error count
+			parts := strings.Fields(line)
+			for i, part := range parts {
+				if part == "errors:" && i+1 < len(parts) {
+					if errors, err := strconv.ParseUint(parts[i+1], 10, 64); err == nil {
+						pool.ErrorCount = errors
+					}
+					break
+				}
+			}
+		} else if strings.HasPrefix(line, pool.Name) {
+			// Start of vdev section
+			inVdevSection = true
+			continue
+		} else if inVdevSection && line != "" {
+			// Parse vdev information
+			vdev := s.parseZFSVdevLine(line)
+			if vdev != nil {
+				pool.Vdevs = append(pool.Vdevs, *vdev)
+			}
+		}
+	}
+
+	return nil
+}
+
+// parseZFSPoolUsage parses zpool list output for usage statistics
+func (s *StorageMonitor) parseZFSPoolUsage(pool *ZFSPool) error {
+	output := lib.GetCmdOutput("zpool", "list", "-H", "-o", "size,alloc,free,fragmentation,dedup,compress", pool.Name)
+	if len(output) == 0 {
+		return fmt.Errorf("no usage output for pool %s", pool.Name)
+	}
+
+	fields := strings.Fields(output[0])
+	if len(fields) < 6 {
+		return fmt.Errorf("invalid usage output for pool %s", pool.Name)
+	}
+
+	// Parse size (field 0)
+	pool.Size = s.parseZFSSize(fields[0])
+	pool.SizeFormatted = fields[0]
+
+	// Parse allocated (field 1)
+	pool.Allocated = s.parseZFSSize(fields[1])
+	pool.AllocFormatted = fields[1]
+
+	// Parse free (field 2)
+	pool.Free = s.parseZFSSize(fields[2])
+	pool.FreeFormatted = fields[2]
+
+	// Calculate used percentage
+	if pool.Size > 0 {
+		pool.UsedPercent = float64(pool.Allocated) / float64(pool.Size) * 100
+	}
+
+	// Parse fragmentation (field 3)
+	if fragStr := strings.TrimSuffix(fields[3], "%"); fragStr != "-" {
+		if frag, err := strconv.ParseFloat(fragStr, 64); err == nil {
+			pool.Fragmentation = frag
+		}
+	}
+
+	// Parse deduplication ratio (field 4)
+	if dedupStr := strings.TrimSuffix(fields[4], "x"); dedupStr != "-" {
+		if dedup, err := strconv.ParseFloat(dedupStr, 64); err == nil {
+			pool.Deduplication = dedup
+		}
+	}
+
+	// Parse compression ratio (field 5)
+	if compStr := strings.TrimSuffix(fields[5], "x"); compStr != "-" {
+		if comp, err := strconv.ParseFloat(compStr, 64); err == nil {
+			pool.Compression = comp
+		}
+	}
+
+	return nil
+}
+
+// parseZFSPoolIOStats parses zpool iostat output for I/O statistics
+func (s *StorageMonitor) parseZFSPoolIOStats(pool *ZFSPool) {
+	output := lib.GetCmdOutput("zpool", "iostat", "-H", pool.Name, "1", "1")
+	if len(output) < 2 {
+		return
+	}
+
+	// Skip header and get the data line
+	fields := strings.Fields(output[1])
+	if len(fields) < 7 {
+		return
+	}
+
+	// Parse read/write operations and bandwidth
+	if readOps, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+		pool.ReadOps = readOps
+	}
+	if writeOps, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
+		pool.WriteOps = writeOps
+	}
+	if readBW, err := strconv.ParseUint(fields[3], 10, 64); err == nil {
+		pool.ReadBandwidth = readBW
+	}
+	if writeBW, err := strconv.ParseUint(fields[4], 10, 64); err == nil {
+		pool.WriteBandwidth = writeBW
+	}
+}
+
+// parseZFSPoolFeatures parses zpool get output for enabled features
+func (s *StorageMonitor) parseZFSPoolFeatures(pool *ZFSPool) {
+	output := lib.GetCmdOutput("zpool", "get", "-H", "-o", "property,value", "all", pool.Name)
+
+	for _, line := range output {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			property := fields[0]
+			value := fields[1]
+
+			// Collect enabled features
+			if strings.HasPrefix(property, "feature@") && (value == "enabled" || value == "active") {
+				featureName := strings.TrimPrefix(property, "feature@")
+				pool.Features = append(pool.Features, featureName)
+			} else if property == "version" {
+				pool.Version = value
+			}
+		}
+	}
+}
+
+// parseZFSScrubInfo parses scrub information from zpool status
+func (s *StorageMonitor) parseZFSScrubInfo(line string, pool *ZFSPool) {
+	if strings.Contains(line, "scrub repaired") {
+		pool.ScrubStatus = "completed"
+		// Extract last scrub date if available
+		if strings.Contains(line, "on") {
+			parts := strings.Split(line, "on")
+			if len(parts) > 1 {
+				pool.LastScrub = strings.TrimSpace(parts[len(parts)-1])
+			}
+		}
+	} else if strings.Contains(line, "scrub in progress") {
+		pool.ScrubStatus = "in_progress"
+	} else if strings.Contains(line, "none requested") {
+		pool.ScrubStatus = "none"
+	}
+}
+
+// parseZFSVdevLine parses a vdev line from zpool status
+func (s *StorageMonitor) parseZFSVdevLine(line string) *ZFSVdev {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return nil
+	}
+
+	vdev := &ZFSVdev{
+		Name:   fields[0],
+		State:  fields[1],
+		Health: fields[1],
+	}
+
+	// Parse error counts if available
+	if len(fields) >= 5 {
+		if readErr, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
+			vdev.ReadErrors = readErr
+		}
+		if writeErr, err := strconv.ParseUint(fields[3], 10, 64); err == nil {
+			vdev.WriteErrors = writeErr
+		}
+		if cksumErr, err := strconv.ParseUint(fields[4], 10, 64); err == nil {
+			vdev.CksumErrors = cksumErr
+		}
+	}
+
+	// Determine vdev type based on name
+	if strings.Contains(vdev.Name, "mirror") {
+		vdev.Type = "mirror"
+	} else if strings.Contains(vdev.Name, "raidz") {
+		if strings.Contains(vdev.Name, "raidz3") {
+			vdev.Type = "raidz3"
+		} else if strings.Contains(vdev.Name, "raidz2") {
+			vdev.Type = "raidz2"
+		} else {
+			vdev.Type = "raidz1"
+		}
+	} else if strings.HasPrefix(vdev.Name, "/dev/") || strings.Contains(vdev.Name, "sd") || strings.Contains(vdev.Name, "nvme") {
+		vdev.Type = "disk"
+	} else {
+		vdev.Type = "unknown"
+	}
+
+	return vdev
+}
+
+// parseZFSSize converts ZFS size strings to bytes
+func (s *StorageMonitor) parseZFSSize(sizeStr string) uint64 {
+	if sizeStr == "-" || sizeStr == "" {
+		return 0
+	}
+
+	// Remove any trailing characters and convert to uppercase
+	sizeStr = strings.ToUpper(strings.TrimSpace(sizeStr))
+
+	// Extract numeric part and unit
+	var numStr string
+	var unit string
+
+	for i, char := range sizeStr {
+		if char >= '0' && char <= '9' || char == '.' {
+			numStr += string(char)
+		} else {
+			unit = sizeStr[i:]
+			break
+		}
+	}
+
+	// Parse the numeric value
+	value, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0
+	}
+
+	// Convert based on unit
+	switch unit {
+	case "K", "KB":
+		return uint64(value * 1024)
+	case "M", "MB":
+		return uint64(value * 1024 * 1024)
+	case "G", "GB":
+		return uint64(value * 1024 * 1024 * 1024)
+	case "T", "TB":
+		return uint64(value * 1024 * 1024 * 1024 * 1024)
+	case "P", "PB":
+		return uint64(value * 1024 * 1024 * 1024 * 1024 * 1024)
+	default:
+		// Assume bytes if no unit
+		return uint64(value)
+	}
 }

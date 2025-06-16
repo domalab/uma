@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -29,6 +30,14 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// Context key types for type safety
+type contextKey string
+
+const (
+	requestIDKey  contextKey = "request_id"
+	apiVersionKey contextKey = "api_version"
+)
+
 // Array control request/response structures
 type ArrayStartRequest struct {
 	MaintenanceMode bool `json:"maintenance_mode"`
@@ -36,8 +45,10 @@ type ArrayStartRequest struct {
 }
 
 type ArrayStopRequest struct {
-	Force         bool `json:"force"`
-	UnmountShares bool `json:"unmount_shares"`
+	Force          bool `json:"force"`
+	UnmountShares  bool `json:"unmount_shares"`
+	StopContainers bool `json:"stop_containers"`
+	StopVMs        bool `json:"stop_vms"`
 }
 
 type ParityCheckRequest struct {
@@ -293,21 +304,37 @@ func (h *HTTPServer) Start() error {
 
 	// System monitoring endpoints
 	mux.HandleFunc("/api/v1/system/info", h.handleSystemInfo)
+	mux.HandleFunc("/api/v1/system/cpu", h.handleSystemCPU)
+	mux.HandleFunc("/api/v1/system/memory", h.handleSystemMemory)
+	mux.HandleFunc("/api/v1/system/fans", h.handleSystemFans)
 	mux.HandleFunc("/api/v1/system/temperature", h.handleSystemTemperature)
 	mux.HandleFunc("/api/v1/system/gpu", h.handleSystemGPU)
 	mux.HandleFunc("/api/v1/system/ups", h.handleSystemUPS)
 	mux.HandleFunc("/api/v1/system/network", h.handleSystemNetwork)
-	mux.HandleFunc("/api/v1/system/cpu", h.handleSystemCPU)
-	mux.HandleFunc("/api/v1/system/memory", h.handleSystemMemory)
 	mux.HandleFunc("/api/v1/system/resources", h.handleSystemResources)
 	mux.HandleFunc("/api/v1/system/filesystems", h.handleSystemFilesystems)
+
+	// System control endpoints
+	mux.HandleFunc("/api/v1/system/scripts", h.handleSystemScripts)
+	mux.HandleFunc("/api/v1/system/execute", h.handleSystemExecute)
+	mux.HandleFunc("/api/v1/system/reboot", h.handleSystemReboot)
+	mux.HandleFunc("/api/v1/system/shutdown", h.handleSystemShutdown)
+	mux.HandleFunc("/api/v1/system/logs", h.handleSystemLogs)
+	mux.HandleFunc("/api/v1/system/logs/all", h.handleSystemLogsAll)
+	mux.HandleFunc("/api/v1/system/parity/disk", h.handleParityDisk)
+	mux.HandleFunc("/api/v1/system/parity/check", h.handleParityCheck)
 
 	// Storage management endpoints
 	mux.HandleFunc("/api/v1/storage/disks", h.handleStorageDisks)
 	mux.HandleFunc("/api/v1/storage/array", h.handleStorageArray)
 	mux.HandleFunc("/api/v1/storage/cache", h.handleStorageCache)
 	mux.HandleFunc("/api/v1/storage/boot", h.handleStorageBoot)
+	mux.HandleFunc("/api/v1/storage/zfs", h.handleStorageZFS)
 	mux.HandleFunc("/api/v1/storage/general", h.handleStorageGeneral)
+
+	// Array control endpoints with enhanced orchestration
+	mux.HandleFunc("/api/v1/storage/array/start", h.handleArrayStart)
+	mux.HandleFunc("/api/v1/storage/array/stop", h.handleArrayStop)
 
 	// Docker endpoints
 	mux.HandleFunc("/api/v1/docker/containers", h.handleDockerContainers)
@@ -317,6 +344,9 @@ func (h *HTTPServer) Start() error {
 	mux.HandleFunc("/api/v1/docker/containers/bulk/start", h.handleDockerBulkStart)
 	mux.HandleFunc("/api/v1/docker/containers/bulk/stop", h.handleDockerBulkStop)
 	mux.HandleFunc("/api/v1/docker/containers/bulk/restart", h.handleDockerBulkRestart)
+
+	// Individual Docker container control endpoints
+	mux.HandleFunc("/api/v1/docker/containers/", h.handleDockerContainer) // Handles individual container operations
 
 	// VM management endpoints
 	mux.HandleFunc("/api/v1/vms", h.handleVMList)
@@ -462,7 +492,7 @@ func (h *HTTPServer) getRequestID(w http.ResponseWriter) string {
 
 // getRequestIDFromContext gets the request ID from request context
 func (h *HTTPServer) getRequestIDFromContext(r *http.Request) string {
-	if requestID, ok := r.Context().Value("request_id").(string); ok {
+	if requestID, ok := r.Context().Value(requestIDKey).(string); ok {
 		return requestID
 	}
 	return ""
@@ -657,6 +687,26 @@ func (h *HTTPServer) getHealthMetrics() map[string]interface{} {
 		metrics["memory_used_bytes"] = memInfo.Used
 		metrics["memory_total_formatted"] = memInfo.TotalFormatted
 		metrics["memory_used_formatted"] = memInfo.UsedFormatted
+
+		// Add detailed memory breakdown
+		metrics["memory_available_bytes"] = memInfo.Available
+		metrics["memory_available_formatted"] = memInfo.AvailableFormatted
+		metrics["memory_free_bytes"] = memInfo.Free
+		metrics["memory_free_formatted"] = memInfo.FreeFormatted
+		metrics["memory_cached_bytes"] = memInfo.Cached
+		metrics["memory_cached_formatted"] = memInfo.CachedFormatted
+		metrics["memory_buffers_bytes"] = memInfo.Buffers
+		metrics["memory_buffers_formatted"] = memInfo.BuffersFormatted
+
+		// Add memory breakdown by category if available
+		if memInfo.Breakdown != nil {
+			metrics["memory_vm_bytes"] = memInfo.Breakdown.VM
+			metrics["memory_vm_formatted"] = memInfo.Breakdown.VMFormatted
+			metrics["memory_docker_bytes"] = memInfo.Breakdown.Docker
+			metrics["memory_docker_formatted"] = memInfo.Breakdown.DockerFormatted
+			metrics["memory_zfs_arc_bytes"] = memInfo.Breakdown.ZFSCache
+			metrics["memory_zfs_arc_formatted"] = memInfo.Breakdown.ZFSCacheFormatted
+		}
 	}
 
 	// Get basic system info
@@ -667,8 +717,18 @@ func (h *HTTPServer) getHealthMetrics() map[string]interface{} {
 		metrics["cpu_model"] = cpuInfo.Model
 	}
 
+	// Get CPU load averages
+	if loadInfo, err := h.api.system.GetLoadInfo(); err == nil {
+		metrics["cpu_load_1m"] = loadInfo.Load1
+		metrics["cpu_load_5m"] = loadInfo.Load5
+		metrics["cpu_load_15m"] = loadInfo.Load15
+	}
+
 	// Add API call metrics (placeholder - would need actual implementation)
 	metrics["api_calls_total"] = 0 // This would be tracked by middleware
+
+	// Add global timestamp
+	metrics["last_updated"] = time.Now().UTC().Format(time.RFC3339)
 
 	return metrics
 }
@@ -840,6 +900,30 @@ func (h *HTTPServer) handleSystemGPU(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, gpuData)
 }
 
+// handleSystemFans handles GET /api/v1/system/fans
+func (h *HTTPServer) handleSystemFans(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
+	// Get enhanced temperature data which includes fan information
+	enhancedData, err := h.api.system.GetEnhancedTemperatureData()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get fan information: %v", err))
+		return
+	}
+
+	response := map[string]interface{}{
+		"fans":         enhancedData.Fans,
+		"last_updated": timestamp,
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
 // handleSystemFilesystems handles GET /api/v1/system/filesystems
 func (h *HTTPServer) handleSystemFilesystems(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -897,6 +981,32 @@ func (h *HTTPServer) handleStorageBoot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, bootInfo)
+}
+
+// handleStorageZFS handles GET /api/v1/storage/zfs
+func (h *HTTPServer) handleStorageZFS(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	zfsInfo, err := h.api.storage.GetZFSInfo()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get ZFS info: %v", err))
+		return
+	}
+
+	// Return appropriate response based on ZFS availability
+	if !zfsInfo.Available {
+		h.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"available":    false,
+			"message":      "ZFS is not available on this system",
+			"last_updated": zfsInfo.LastUpdated,
+		})
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, zfsInfo)
 }
 
 // handleStorageGeneral handles GET /api/v1/storage/general
@@ -1377,39 +1487,909 @@ func (h *HTTPServer) convertDisksOptimized(disks []storage.DiskInfo) []map[strin
 	return processedDisks
 }
 
+// handleDockerContainer handles individual Docker container operations
+func (h *HTTPServer) handleDockerContainer(w http.ResponseWriter, r *http.Request) {
+	// Extract container ID and operation from URL path
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/docker/containers/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 2 {
+		h.writeError(w, http.StatusBadRequest, "Container ID and operation are required")
+		return
+	}
+
+	containerID := parts[0]
+	operation := parts[1]
+
+	if containerID == "" {
+		h.writeError(w, http.StatusBadRequest, "Container ID is required")
+		return
+	}
+
+	// Only allow POST methods for container operations
+	if r.Method != http.MethodPost {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Handle different container operations
+	switch operation {
+	case "start":
+		h.handleDockerContainerStart(w, r, containerID)
+	case "stop":
+		h.handleDockerContainerStop(w, r, containerID)
+	case "restart":
+		h.handleDockerContainerRestart(w, r, containerID)
+	case "pause":
+		h.handleDockerContainerPause(w, r, containerID)
+	case "resume", "unpause":
+		h.handleDockerContainerResume(w, r, containerID)
+	default:
+		h.writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown operation: %s", operation))
+	}
+}
+
+// handleDockerContainerStart handles starting an individual Docker container
+func (h *HTTPServer) handleDockerContainerStart(w http.ResponseWriter, r *http.Request, containerID string) {
+	err := h.api.docker.StartContainer(containerID)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to start container %s: %v", containerID, err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "Container started successfully",
+		"container_id": containerID,
+		"operation":    "start",
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// handleDockerContainerStop handles stopping an individual Docker container
+func (h *HTTPServer) handleDockerContainerStop(w http.ResponseWriter, r *http.Request, containerID string) {
+	// Default timeout of 10 seconds, can be overridden with query parameter
+	timeout := 10
+	if timeoutParam := r.URL.Query().Get("timeout"); timeoutParam != "" {
+		if t, err := strconv.Atoi(timeoutParam); err == nil {
+			timeout = t
+		}
+	}
+
+	err := h.api.docker.StopContainer(containerID, timeout)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to stop container %s: %v", containerID, err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "Container stopped successfully",
+		"container_id": containerID,
+		"operation":    "stop",
+		"timeout":      timeout,
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// handleDockerContainerRestart handles restarting an individual Docker container
+func (h *HTTPServer) handleDockerContainerRestart(w http.ResponseWriter, r *http.Request, containerID string) {
+	// Default timeout of 10 seconds, can be overridden with query parameter
+	timeout := 10
+	if timeoutParam := r.URL.Query().Get("timeout"); timeoutParam != "" {
+		if t, err := strconv.Atoi(timeoutParam); err == nil {
+			timeout = t
+		}
+	}
+
+	err := h.api.docker.RestartContainer(containerID, timeout)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to restart container %s: %v", containerID, err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "Container restarted successfully",
+		"container_id": containerID,
+		"operation":    "restart",
+		"timeout":      timeout,
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// handleSystemScripts handles GET/POST /api/v1/system/scripts
+func (h *HTTPServer) handleSystemScripts(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		// List all user scripts
+		scripts, err := h.getUserScripts()
+		if err != nil {
+			h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get user scripts: %v", err))
+			return
+		}
+
+		response := ScriptListResponse{Scripts: scripts}
+		h.writeJSON(w, http.StatusOK, response)
+
+	case http.MethodPost:
+		// Execute a script
+		scriptName := r.URL.Query().Get("name")
+		if scriptName == "" {
+			h.writeError(w, http.StatusBadRequest, "Script name is required")
+			return
+		}
+
+		var req ScriptExecuteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			h.writeError(w, http.StatusBadRequest, "Invalid JSON request")
+			return
+		}
+
+		response, err := h.executeUserScript(scriptName, req)
+		if err != nil {
+			h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to execute script: %v", err))
+			return
+		}
+
+		h.writeJSON(w, http.StatusOK, response)
+
+	default:
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleSystemReboot handles POST /api/v1/system/reboot
+func (h *HTTPServer) handleSystemReboot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req SystemRebootRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Allow empty body with default values
+		req = SystemRebootRequest{
+			DelaySeconds: 0,
+			Message:      "System reboot initiated via UMA API",
+			Force:        false,
+		}
+	}
+
+	// Validate delay
+	if req.DelaySeconds < 0 || req.DelaySeconds > 300 {
+		h.writeError(w, http.StatusBadRequest, "Delay must be between 0 and 300 seconds")
+		return
+	}
+
+	err := h.executeSystemReboot(req.DelaySeconds, req.Message, req.Force)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to initiate reboot: %v", err))
+		return
+	}
+
+	response := PowerOperationResponse{
+		Success:       true,
+		Message:       "System reboot initiated",
+		OperationID:   fmt.Sprintf("reboot_%d", time.Now().Unix()),
+		ScheduledTime: time.Now().Add(time.Duration(req.DelaySeconds) * time.Second).Format(time.RFC3339),
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// CommandExecuteRequest represents a command execution request
+type CommandExecuteRequest struct {
+	Command          string `json:"command"`
+	Timeout          int    `json:"timeout,omitempty"`           // Timeout in seconds, default 30
+	WorkingDirectory string `json:"working_directory,omitempty"` // Optional working directory
+}
+
+// CommandExecuteResponse represents a command execution response
+type CommandExecuteResponse struct {
+	ExitCode        int    `json:"exit_code"`
+	Stdout          string `json:"stdout"`
+	Stderr          string `json:"stderr"`
+	ExecutionTimeMs int64  `json:"execution_time_ms"`
+	Command         string `json:"command"`
+	WorkingDir      string `json:"working_directory,omitempty"`
+}
+
+// handleSystemExecute handles POST /api/v1/system/execute
+func (h *HTTPServer) handleSystemExecute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Parse request body
+	var request CommandExecuteRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate command
+	if strings.TrimSpace(request.Command) == "" {
+		h.writeError(w, http.StatusBadRequest, "Command is required")
+		return
+	}
+
+	// Set default timeout
+	if request.Timeout <= 0 {
+		request.Timeout = 30
+	}
+
+	// Limit maximum timeout to 300 seconds (5 minutes)
+	if request.Timeout > 300 {
+		request.Timeout = 300
+	}
+
+	// Security: Basic command sanitization
+	if h.isCommandBlacklisted(request.Command) {
+		h.writeError(w, http.StatusForbidden, "Command not allowed")
+		return
+	}
+
+	// Execute command
+	response := h.executeCommand(request)
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// handleSystemShutdown handles POST /api/v1/system/shutdown
+func (h *HTTPServer) handleSystemShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req SystemShutdownRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Allow empty body with default values
+		req = SystemShutdownRequest{
+			DelaySeconds: 0,
+			Message:      "System shutdown initiated via UMA API",
+			Force:        false,
+		}
+	}
+
+	// Validate delay
+	if req.DelaySeconds < 0 || req.DelaySeconds > 300 {
+		h.writeError(w, http.StatusBadRequest, "Delay must be between 0 and 300 seconds")
+		return
+	}
+
+	err := h.executeSystemShutdown(req.DelaySeconds, req.Message, req.Force)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to initiate shutdown: %v", err))
+		return
+	}
+
+	response := PowerOperationResponse{
+		Success:       true,
+		Message:       "System shutdown initiated",
+		OperationID:   fmt.Sprintf("shutdown_%d", time.Now().Unix()),
+		ScheduledTime: time.Now().Add(time.Duration(req.DelaySeconds) * time.Second).Format(time.RFC3339),
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// handleSystemLogs handles GET /api/v1/system/logs
+func (h *HTTPServer) handleSystemLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Parse query parameters
+	logType := r.URL.Query().Get("type")
+	if logType == "" {
+		logType = "system"
+	}
+
+	// Support custom log file path
+	customPath := r.URL.Query().Get("path")
+
+	// Support grep filtering
+	grepFilter := r.URL.Query().Get("grep")
+
+	// Support tail parameter (alias for lines)
+	lines := 100
+	if linesParam := r.URL.Query().Get("lines"); linesParam != "" {
+		if l, err := strconv.Atoi(linesParam); err == nil && l > 0 && l <= 10000 {
+			lines = l
+		}
+	}
+	if tailParam := r.URL.Query().Get("tail"); tailParam != "" {
+		if l, err := strconv.Atoi(tailParam); err == nil && l > 0 && l <= 10000 {
+			lines = l
+		}
+	}
+
+	follow := r.URL.Query().Get("follow") == "true"
+	since := r.URL.Query().Get("since") // ISO 8601 format
+
+	var logs []string
+	var err error
+
+	if customPath != "" {
+		// Use custom log file path
+		logs, err = h.getCustomLogFile(customPath, lines, grepFilter, since)
+	} else {
+		// Use standard log types
+		logs, err = h.getSystemLogs(logType, lines, follow, since)
+	}
+
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get system logs: %v", err))
+		return
+	}
+
+	// Apply grep filter if specified and not already applied
+	if grepFilter != "" && customPath == "" {
+		logs = h.filterLogLines(logs, grepFilter)
+	}
+
+	response := map[string]interface{}{
+		"type":  logType,
+		"lines": lines,
+		"logs":  logs,
+	}
+
+	if customPath != "" {
+		response["path"] = customPath
+	}
+	if grepFilter != "" {
+		response["grep_filter"] = grepFilter
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// LogFileInfo represents metadata about a log file
+type LogFileInfo struct {
+	Path         string `json:"path"`
+	Name         string `json:"name"`
+	Size         int64  `json:"size"`
+	ModifiedTime string `json:"modified_time"`
+	Readable     bool   `json:"readable"`
+}
+
+// handleSystemLogsAll handles GET /api/v1/system/logs/all
+func (h *HTTPServer) handleSystemLogsAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Parse query parameters
+	directory := r.URL.Query().Get("directory")
+	if directory == "" {
+		directory = "/var/log"
+	}
+
+	recursive := r.URL.Query().Get("recursive") != "false" // Default to true
+
+	filePattern := r.URL.Query().Get("file_pattern")
+
+	maxFiles := 50
+	if maxFilesParam := r.URL.Query().Get("max_files"); maxFilesParam != "" {
+		if m, err := strconv.Atoi(maxFilesParam); err == nil && m > 0 && m <= 1000 {
+			maxFiles = m
+		}
+	}
+
+	// Security: Restrict to /var/log and subdirectories only
+	if !strings.HasPrefix(directory, "/var/log") {
+		h.writeError(w, http.StatusForbidden, "Access restricted to /var/log directory")
+		return
+	}
+
+	logFiles, err := h.scanLogFiles(directory, recursive, filePattern, maxFiles)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to scan log files: %v", err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"directory":    directory,
+		"recursive":    recursive,
+		"file_pattern": filePattern,
+		"max_files":    maxFiles,
+		"total_found":  len(logFiles),
+		"files":        logFiles,
+	})
+}
+
+// getCustomLogFile reads a custom log file with filtering
+func (h *HTTPServer) getCustomLogFile(filePath string, lines int, grepFilter, since string) ([]string, error) {
+	// Security: Restrict to /var/log directory
+	if !strings.HasPrefix(filePath, "/var/log") {
+		return nil, fmt.Errorf("access restricted to /var/log directory")
+	}
+
+	// Check if file exists and is readable
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return []string{}, nil
+	}
+
+	// Build tail command
+	args := []string{"-n", strconv.Itoa(lines), filePath}
+	cmd := exec.Command("tail", args...)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read log file: %v", err)
+	}
+
+	logLines := strings.Split(strings.TrimSpace(string(output)), "\n")
+
+	// Apply grep filter if specified
+	if grepFilter != "" {
+		logLines = h.filterLogLines(logLines, grepFilter)
+	}
+
+	// Apply since filter if specified
+	if since != "" {
+		logLines = h.filterLogLinesBySince(logLines, since)
+	}
+
+	return logLines, nil
+}
+
+// filterLogLines filters log lines using grep-like pattern matching
+func (h *HTTPServer) filterLogLines(lines []string, pattern string) []string {
+	filtered := make([]string, 0)
+	for _, line := range lines {
+		if strings.Contains(strings.ToLower(line), strings.ToLower(pattern)) {
+			filtered = append(filtered, line)
+		}
+	}
+	return filtered
+}
+
+// filterLogLinesBySince filters log lines by timestamp
+func (h *HTTPServer) filterLogLinesBySince(lines []string, since string) []string {
+	sinceTime, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		return lines // Return original if parsing fails
+	}
+
+	filtered := make([]string, 0)
+	for _, line := range lines {
+		// Simple time parsing - this could be improved based on log format
+		if strings.Contains(line, sinceTime.Format("2006-01-02")) {
+			filtered = append(filtered, line)
+		}
+	}
+	return filtered
+}
+
+// scanLogFiles scans for log files in the specified directory
+func (h *HTTPServer) scanLogFiles(directory string, recursive bool, filePattern string, maxFiles int) ([]LogFileInfo, error) {
+	logFiles := make([]LogFileInfo, 0)
+	count := 0
+
+	walkFunc := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip files with errors
+		}
+
+		if count >= maxFiles {
+			return filepath.SkipDir
+		}
+
+		// Skip directories unless we're doing recursive scan
+		if info.IsDir() {
+			if !recursive && path != directory {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Apply file pattern filter if specified
+		if filePattern != "" {
+			matched, err := filepath.Match(filePattern, info.Name())
+			if err != nil || !matched {
+				return nil
+			}
+		}
+
+		// Check if file is likely a log file
+		if h.isLogFile(path, info.Name()) {
+			logFile := LogFileInfo{
+				Path:         path,
+				Name:         info.Name(),
+				Size:         info.Size(),
+				ModifiedTime: info.ModTime().Format(time.RFC3339),
+				Readable:     h.isFileReadable(path),
+			}
+			logFiles = append(logFiles, logFile)
+			count++
+		}
+
+		return nil
+	}
+
+	err := filepath.Walk(directory, walkFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	return logFiles, nil
+}
+
+// isLogFile determines if a file is likely a log file
+func (h *HTTPServer) isLogFile(path, name string) bool {
+	// Common log file extensions and patterns
+	logExtensions := []string{".log", ".txt", ".out", ".err"}
+	logPatterns := []string{"log", "syslog", "messages", "kern", "auth", "mail", "cron", "daemon"}
+
+	lowerName := strings.ToLower(name)
+
+	// Check extensions
+	for _, ext := range logExtensions {
+		if strings.HasSuffix(lowerName, ext) {
+			return true
+		}
+	}
+
+	// Check patterns
+	for _, pattern := range logPatterns {
+		if strings.Contains(lowerName, pattern) {
+			return true
+		}
+	}
+
+	// Check if it's a numbered log file (e.g., syslog.1, messages.2)
+	if strings.Contains(lowerName, ".") {
+		parts := strings.Split(lowerName, ".")
+		if len(parts) >= 2 {
+			// Check if last part is a number
+			if _, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// isFileReadable checks if a file is readable
+func (h *HTTPServer) isFileReadable(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	return true
+}
+
+// handleParityDisk handles GET /api/v1/system/parity/disk
+func (h *HTTPServer) handleParityDisk(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	parityDisk, err := h.api.system.GetParityDiskInfo()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get parity disk information: %v", err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, parityDisk)
+}
+
+// handleParityCheck handles GET /api/v1/system/parity/check
+func (h *HTTPServer) handleParityCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	parityCheck, err := h.api.system.GetParityCheckInfo()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get parity check information: %v", err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, parityCheck)
+}
+
+// getUserScripts returns a list of available user scripts
+func (h *HTTPServer) getUserScripts() ([]UserScript, error) {
+	scriptsDir := "/boot/config/plugins/user.scripts/scripts"
+	scripts := []UserScript{}
+
+	// Check if scripts directory exists
+	if _, err := os.Stat(scriptsDir); os.IsNotExist(err) {
+		return scripts, nil // Return empty list if directory doesn't exist
+	}
+
+	entries, err := os.ReadDir(scriptsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read scripts directory: %v", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			scriptName := entry.Name()
+			scriptPath := filepath.Join(scriptsDir, scriptName, "script")
+
+			// Check if script file exists
+			if _, err := os.Stat(scriptPath); err == nil {
+				script := UserScript{
+					Name:        scriptName,
+					Description: fmt.Sprintf("User script: %s", scriptName),
+					Path:        scriptPath,
+					Status:      "idle",
+					LastRun:     "",
+					LastResult:  "unknown",
+				}
+
+				// Try to get script status from running processes
+				if pid := h.getScriptPID(scriptName); pid > 0 {
+					script.Status = "running"
+					script.PID = pid
+				}
+
+				scripts = append(scripts, script)
+			}
+		}
+	}
+
+	return scripts, nil
+}
+
+// executeUserScript executes a user script
+func (h *HTTPServer) executeUserScript(scriptName string, req ScriptExecuteRequest) (*ScriptExecuteResponse, error) {
+	scriptsDir := "/boot/config/plugins/user.scripts/scripts"
+	scriptPath := filepath.Join(scriptsDir, scriptName, "script")
+
+	// Verify script exists
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("script not found: %s", scriptName)
+	}
+
+	// Prepare command
+	args := []string{scriptPath}
+	if len(req.Arguments) > 0 {
+		args = append(args, req.Arguments...)
+	}
+
+	cmd := exec.Command("/bin/bash", args...)
+
+	if req.Background {
+		// Start in background
+		err := cmd.Start()
+		if err != nil {
+			return nil, fmt.Errorf("failed to start script: %v", err)
+		}
+
+		return &ScriptExecuteResponse{
+			Success:     true,
+			Message:     fmt.Sprintf("Script %s started in background", scriptName),
+			ExecutionID: fmt.Sprintf("script_%s_%d", scriptName, time.Now().Unix()),
+			PID:         cmd.Process.Pid,
+		}, nil
+	} else {
+		// Run synchronously
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return &ScriptExecuteResponse{
+				Success: false,
+				Message: fmt.Sprintf("Script failed: %v\nOutput: %s", err, string(output)),
+			}, nil
+		}
+
+		return &ScriptExecuteResponse{
+			Success: true,
+			Message: fmt.Sprintf("Script completed successfully\nOutput: %s", string(output)),
+		}, nil
+	}
+}
+
+// getScriptPID checks if a script is currently running and returns its PID
+func (h *HTTPServer) getScriptPID(scriptName string) int {
+	cmd := exec.Command("pgrep", "-f", fmt.Sprintf("scripts/%s/script", scriptName))
+	output, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+
+	pidStr := strings.TrimSpace(string(output))
+	if pid, err := strconv.Atoi(pidStr); err == nil {
+		return pid
+	}
+
+	return 0
+}
+
+// getSystemLogs retrieves system logs based on type and parameters
+func (h *HTTPServer) getSystemLogs(logType string, lines int, follow bool, since string) ([]string, error) {
+	var logFile string
+
+	// Determine log file based on type
+	switch logType {
+	case "system", "syslog":
+		logFile = "/var/log/syslog"
+	case "kernel", "dmesg":
+		// Use dmesg for kernel logs
+		cmd := exec.Command("dmesg")
+		if since != "" {
+			cmd.Args = append(cmd.Args, "--since", since)
+		}
+		output, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get kernel logs: %v", err)
+		}
+
+		logLines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		if len(logLines) > lines {
+			logLines = logLines[len(logLines)-lines:]
+		}
+		return logLines, nil
+
+	case "docker":
+		logFile = "/var/log/docker.log"
+	case "nginx":
+		logFile = "/var/log/nginx/error.log"
+	case "unraid":
+		logFile = "/var/log/unraid.log"
+	default:
+		return nil, fmt.Errorf("unsupported log type: %s", logType)
+	}
+
+	// Check if log file exists
+	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+		return []string{}, nil // Return empty if log file doesn't exist
+	}
+
+	// Use tail command to get logs
+	args := []string{"-n", strconv.Itoa(lines)}
+	if follow {
+		args = append(args, "-f")
+	}
+	args = append(args, logFile)
+
+	cmd := exec.Command("tail", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read log file: %v", err)
+	}
+
+	logLines := strings.Split(strings.TrimSpace(string(output)), "\n")
+
+	// Filter by since time if provided
+	if since != "" {
+		filteredLines := []string{}
+		sinceTime, err := time.Parse(time.RFC3339, since)
+		if err == nil {
+			for _, line := range logLines {
+				// Simple time parsing - this could be improved based on log format
+				if strings.Contains(line, sinceTime.Format("2006-01-02")) {
+					filteredLines = append(filteredLines, line)
+				}
+			}
+			logLines = filteredLines
+		}
+	}
+
+	return logLines, nil
+}
+
+// handleDockerContainerPause handles pausing an individual Docker container
+func (h *HTTPServer) handleDockerContainerPause(w http.ResponseWriter, r *http.Request, containerID string) {
+	err := h.api.docker.PauseContainer(containerID)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to pause container %s: %v", containerID, err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "Container paused successfully",
+		"container_id": containerID,
+		"operation":    "pause",
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// handleDockerContainerResume handles resuming an individual Docker container
+func (h *HTTPServer) handleDockerContainerResume(w http.ResponseWriter, r *http.Request, containerID string) {
+	err := h.api.docker.UnpauseContainer(containerID)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to resume container %s: %v", containerID, err))
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "Container resumed successfully",
+		"container_id": containerID,
+		"operation":    "resume",
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
 // getCPUData returns CPU data in standard format
 func (h *HTTPServer) getCPUData() map[string]interface{} {
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
 	cpuInfo, err := h.api.system.GetCPUInfo()
 	if err != nil {
 		return nil
 	}
 
-	return map[string]interface{}{
-		"usage":       cpuInfo.Usage,
-		"cores":       cpuInfo.Cores,
-		"threads":     cpuInfo.Threads,
-		"temperature": cpuInfo.Temperature,
-		"frequency":   cpuInfo.Frequency,
-		"model":       cpuInfo.Model,
+	response := map[string]interface{}{
+		"usage_percent":     cpuInfo.Usage,
+		"cores":             cpuInfo.Cores,
+		"threads":           cpuInfo.Threads,
+		"threads_per_core":  cpuInfo.ThreadsPerCore,
+		"sockets":           cpuInfo.Sockets,
+		"model":             cpuInfo.Model,
+		"frequency_mhz":     cpuInfo.Frequency,
+		"max_frequency_mhz": cpuInfo.MaxFrequency,
+		"min_frequency_mhz": cpuInfo.MinFrequency,
+		"temperature":       cpuInfo.Temperature,
+		"last_updated":      timestamp,
 	}
+
+	// Get CPU load averages
+	if loadInfo, err := h.api.system.GetLoadInfo(); err == nil {
+		response["load_1min"] = loadInfo.Load1
+		response["load_5min"] = loadInfo.Load5
+		response["load_15min"] = loadInfo.Load15
+	}
+
+	return response
 }
 
 // getMemoryData returns memory data in standard format
 func (h *HTTPServer) getMemoryData() map[string]interface{} {
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
 	memInfo, err := h.api.system.GetMemoryInfo()
 	if err != nil {
 		return nil
 	}
 
-	return map[string]interface{}{
-		"total":      memInfo.Total,
-		"used":       memInfo.Used,
-		"free":       memInfo.Free,
-		"available":  memInfo.Available,
-		"buffers":    memInfo.Buffers,
-		"cached":     memInfo.Cached,
-		"percentage": memInfo.UsedPercent,
+	response := map[string]interface{}{
+		"usage_percent":       memInfo.UsedPercent,
+		"total_bytes":         memInfo.Total,
+		"used_bytes":          memInfo.Used,
+		"free_bytes":          memInfo.Free,
+		"available_bytes":     memInfo.Available,
+		"buffers_bytes":       memInfo.Buffers,
+		"cached_bytes":        memInfo.Cached,
+		"total_formatted":     memInfo.TotalFormatted,
+		"used_formatted":      memInfo.UsedFormatted,
+		"free_formatted":      memInfo.FreeFormatted,
+		"available_formatted": memInfo.AvailableFormatted,
+		"buffers_formatted":   memInfo.BuffersFormatted,
+		"cached_formatted":    memInfo.CachedFormatted,
+		"last_updated":        timestamp,
 	}
+
+	// Add memory breakdown if available
+	if memInfo.Breakdown != nil {
+		response["breakdown"] = map[string]interface{}{
+			"system_bytes":        memInfo.Breakdown.System,
+			"system_formatted":    memInfo.Breakdown.SystemFormatted,
+			"system_percent":      memInfo.Breakdown.SystemPercent,
+			"vm_bytes":            memInfo.Breakdown.VM,
+			"vm_formatted":        memInfo.Breakdown.VMFormatted,
+			"vm_percent":          memInfo.Breakdown.VMPercent,
+			"docker_bytes":        memInfo.Breakdown.Docker,
+			"docker_formatted":    memInfo.Breakdown.DockerFormatted,
+			"docker_percent":      memInfo.Breakdown.DockerPercent,
+			"zfs_cache_bytes":     memInfo.Breakdown.ZFSCache,
+			"zfs_cache_formatted": memInfo.Breakdown.ZFSCacheFormatted,
+			"zfs_cache_percent":   memInfo.Breakdown.ZFSCachePercent,
+			"other_bytes":         memInfo.Breakdown.Other,
+			"other_formatted":     memInfo.Breakdown.OtherFormatted,
+			"other_percent":       memInfo.Breakdown.OtherPercent,
+		}
+	}
+
+	return response
 }
 
 // getTemperatureData returns temperature sensor data in standard format
@@ -1510,7 +2490,7 @@ func (h *HTTPServer) getNetworkData() map[string]interface{} {
 
 	interfaces := make([]map[string]interface{}, 0)
 	for _, netInfo := range networkInfo {
-		interfaces = append(interfaces, map[string]interface{}{
+		interfaceData := map[string]interface{}{
 			"name":       netInfo.Interface,
 			"rx_bytes":   netInfo.BytesRecv,
 			"tx_bytes":   netInfo.BytesSent,
@@ -1518,49 +2498,333 @@ func (h *HTTPServer) getNetworkData() map[string]interface{} {
 			"tx_packets": netInfo.PacketsSent,
 			"rx_errors":  netInfo.ErrorsRecv,
 			"tx_errors":  netInfo.ErrorsSent,
-		})
+			"connected":  netInfo.Connected,
+		}
+
+		// Add speed and duplex if available
+		if netInfo.SpeedMbps > 0 {
+			interfaceData["speed_mbps"] = netInfo.SpeedMbps
+		}
+		if netInfo.Duplex != "" {
+			interfaceData["duplex"] = netInfo.Duplex
+		}
+
+		interfaces = append(interfaces, interfaceData)
 	}
 
 	return map[string]interface{}{
-		"interfaces": interfaces,
+		"interfaces":   interfaces,
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
 	}
 }
 
 // getUPSData returns UPS information in standard format
 func (h *HTTPServer) getUPSData() map[string]interface{} {
-	if h.api.ups == nil {
-		return map[string]interface{}{
-			"status":         "not_available",
-			"battery_charge": 0,
-			"runtime":        0,
-		}
-	}
-
-	samples := h.api.ups.GetStatus()
+	// Default UPS data structure
 	upsData := map[string]interface{}{
 		"status":         "unknown",
 		"battery_charge": 0,
 		"runtime":        0,
+		"load_percent":   0,
+		"input_voltage":  0,
+		"output_voltage": 0,
+		"model":          "unknown",
+		"connected":      false,
+		"last_updated":   time.Now().UTC().Format(time.RFC3339),
 	}
 
-	for _, sample := range samples {
-		switch sample.Key {
-		case "UPS STATUS":
-			if sample.Condition == "green" {
-				upsData["status"] = "online"
-			} else if sample.Condition == "red" {
-				upsData["status"] = "offline"
-			} else {
-				upsData["status"] = "unknown"
+	// Always check for UPS hardware regardless of config setting
+	// Check for APC UPS daemon first (most common)
+	if _, err := os.Stat("/var/run/apcupsd.pid"); err == nil {
+		// apcupsd is running, try to get UPS data
+		if apcData := h.getAPCUPSData(); apcData != nil {
+			return apcData
+		}
+	}
+
+	// Check for NUT (Network UPS Tools) as fallback
+	if _, err := os.Stat("/var/run/nut/upsmon.pid"); err == nil {
+		// NUT is running, try to get UPS data
+		if nutData := h.getNUTUPSData(); nutData != nil {
+			return nutData
+		}
+	}
+
+	// Fallback to legacy UPS API if available
+	if h.api.ups != nil {
+		samples := h.api.ups.GetStatus()
+		for _, sample := range samples {
+			switch sample.Key {
+			case "UPS STATUS":
+				if sample.Condition == "green" {
+					upsData["status"] = "online"
+				} else if sample.Condition == "red" {
+					upsData["status"] = "offline"
+				} else {
+					upsData["status"] = "unknown"
+				}
+			case "UPS CHARGE":
+				if charge, err := strconv.ParseFloat(sample.Value, 64); err == nil {
+					upsData["battery_charge"] = charge
+				}
+			case "UPS RUNTIME":
+				if runtime, err := strconv.ParseFloat(sample.Value, 64); err == nil {
+					upsData["runtime"] = runtime
+				}
 			}
-		case "UPS CHARGE":
-			if charge, err := strconv.ParseFloat(sample.Value, 64); err == nil {
+		}
+		upsData["connected"] = true
+	}
+
+	return upsData
+}
+
+// isCommandBlacklisted checks if a command is blacklisted for security
+func (h *HTTPServer) isCommandBlacklisted(command string) bool {
+	// List of dangerous commands that should not be allowed
+	blacklistedCommands := []string{
+		"rm -rf /",
+		"dd if=/dev/zero",
+		":(){ :|:& };:", // Fork bomb
+		"mkfs",
+		"fdisk",
+		"parted",
+		"format",
+		"shutdown",
+		"reboot",
+		"halt",
+		"poweroff",
+		"init 0",
+		"init 6",
+		"telinit",
+		"systemctl poweroff",
+		"systemctl reboot",
+		"systemctl halt",
+	}
+
+	// Convert command to lowercase for comparison
+	lowerCommand := strings.ToLower(strings.TrimSpace(command))
+
+	// Check against blacklisted commands
+	for _, blacklisted := range blacklistedCommands {
+		if strings.Contains(lowerCommand, strings.ToLower(blacklisted)) {
+			return true
+		}
+	}
+
+	// Additional security checks
+	if strings.Contains(lowerCommand, ">/dev/") ||
+		strings.Contains(lowerCommand, "rm -rf") ||
+		strings.Contains(lowerCommand, "chmod 777") ||
+		strings.Contains(lowerCommand, "chown root") ||
+		strings.Contains(lowerCommand, "sudo su") ||
+		strings.Contains(lowerCommand, "su -") {
+		return true
+	}
+
+	return false
+}
+
+// executeCommand executes a system command with timeout and returns the result
+func (h *HTTPServer) executeCommand(request CommandExecuteRequest) CommandExecuteResponse {
+	startTime := time.Now()
+
+	// Prepare command
+	cmd := exec.Command("/bin/bash", "-c", request.Command)
+
+	// Set working directory if specified
+	if request.WorkingDirectory != "" {
+		if _, err := os.Stat(request.WorkingDirectory); err == nil {
+			cmd.Dir = request.WorkingDirectory
+		}
+	}
+
+	// Set timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(request.Timeout)*time.Second)
+	defer cancel()
+	cmd = exec.CommandContext(ctx, "/bin/bash", "-c", request.Command)
+
+	// Capture stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// Execute command
+	err := cmd.Run()
+	executionTime := time.Since(startTime)
+
+	// Prepare response
+	response := CommandExecuteResponse{
+		Command:         request.Command,
+		Stdout:          stdout.String(),
+		Stderr:          stderr.String(),
+		ExecutionTimeMs: executionTime.Milliseconds(),
+		WorkingDir:      request.WorkingDirectory,
+	}
+
+	// Set exit code
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			response.ExitCode = exitError.ExitCode()
+		} else {
+			response.ExitCode = -1
+		}
+	} else {
+		response.ExitCode = 0
+	}
+
+	return response
+}
+
+// getAPCUPSData retrieves UPS data from apcupsd daemon
+func (h *HTTPServer) getAPCUPSData() map[string]interface{} {
+	// Execute apcaccess command to get UPS status
+	cmd := exec.Command("apcaccess")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	// Parse apcaccess output
+	upsData := map[string]interface{}{
+		"status":         "unknown",
+		"battery_charge": 0.0,
+		"runtime":        0.0,
+		"load_percent":   0.0,
+		"input_voltage":  0.0,
+		"output_voltage": 0.0,
+		"model":          "unknown",
+		"connected":      true,
+		"ups_type":       "apc",
+		"last_updated":   time.Now().UTC().Format(time.RFC3339),
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Split on colon and spaces
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		switch key {
+		case "STATUS":
+			upsData["status"] = strings.ToLower(value)
+		case "BCHARGE":
+			if charge, err := strconv.ParseFloat(strings.TrimSuffix(value, " Percent"), 64); err == nil {
 				upsData["battery_charge"] = charge
 			}
-		case "UPS RUNTIME":
-			if runtime, err := strconv.ParseFloat(sample.Value, 64); err == nil {
+		case "TIMELEFT":
+			if runtime, err := strconv.ParseFloat(strings.TrimSuffix(value, " Minutes"), 64); err == nil {
 				upsData["runtime"] = runtime
 			}
+		case "LOADPCT":
+			if load, err := strconv.ParseFloat(strings.TrimSuffix(value, " Percent"), 64); err == nil {
+				upsData["load_percent"] = load
+			}
+		case "LINEV":
+			if voltage, err := strconv.ParseFloat(strings.TrimSuffix(value, " Volts"), 64); err == nil {
+				upsData["input_voltage"] = voltage
+			}
+		case "OUTPUTV":
+			if voltage, err := strconv.ParseFloat(strings.TrimSuffix(value, " Volts"), 64); err == nil {
+				upsData["output_voltage"] = voltage
+			}
+		case "MODEL":
+			upsData["model"] = value
+		case "UPSNAME":
+			upsData["name"] = value
+		case "SERIALNO":
+			upsData["serial_number"] = value
+		case "NOMPOWER":
+			if power, err := strconv.ParseFloat(strings.TrimSuffix(value, " Watts"), 64); err == nil {
+				upsData["nominal_power"] = power
+			}
+		}
+	}
+
+	return upsData
+}
+
+// getNUTUPSData retrieves UPS data from NUT (Network UPS Tools)
+func (h *HTTPServer) getNUTUPSData() map[string]interface{} {
+	// Execute upsc command to get UPS status
+	cmd := exec.Command("upsc", "ups")
+	output, err := cmd.Output()
+	if err != nil {
+		// Try with different UPS name
+		cmd = exec.Command("upsc", "ups@localhost")
+		output, err = cmd.Output()
+		if err != nil {
+			return nil
+		}
+	}
+
+	// Parse upsc output
+	upsData := map[string]interface{}{
+		"status":         "unknown",
+		"battery_charge": 0.0,
+		"runtime":        0.0,
+		"load_percent":   0.0,
+		"input_voltage":  0.0,
+		"output_voltage": 0.0,
+		"model":          "unknown",
+		"connected":      true,
+		"ups_type":       "nut",
+		"last_updated":   time.Now().UTC().Format(time.RFC3339),
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Split on colon and spaces
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		switch key {
+		case "ups.status":
+			upsData["status"] = strings.ToLower(value)
+		case "battery.charge":
+			if charge, err := strconv.ParseFloat(value, 64); err == nil {
+				upsData["battery_charge"] = charge
+			}
+		case "battery.runtime":
+			if runtime, err := strconv.ParseFloat(value, 64); err == nil {
+				upsData["runtime"] = runtime / 60 // Convert seconds to minutes
+			}
+		case "ups.load":
+			if load, err := strconv.ParseFloat(value, 64); err == nil {
+				upsData["load_percent"] = load
+			}
+		case "input.voltage":
+			if voltage, err := strconv.ParseFloat(value, 64); err == nil {
+				upsData["input_voltage"] = voltage
+			}
+		case "output.voltage":
+			if voltage, err := strconv.ParseFloat(value, 64); err == nil {
+				upsData["output_voltage"] = voltage
+			}
+		case "ups.model":
+			upsData["model"] = value
+		case "ups.serial":
+			upsData["serial_number"] = value
 		}
 	}
 
@@ -1780,131 +3044,6 @@ func (h *HTTPServer) handleDockerContainers(w http.ResponseWriter, r *http.Reque
 	} else {
 		// Return original format for backward compatibility
 		h.writeJSON(w, http.StatusOK, containers)
-	}
-}
-
-// handleDockerContainer handles Docker container operations
-func (h *HTTPServer) handleDockerContainer(w http.ResponseWriter, r *http.Request) {
-	// Extract container name/ID from URL path
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/docker/container/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 || parts[0] == "" {
-		h.writeError(w, http.StatusBadRequest, "Container name/ID required")
-		return
-	}
-
-	containerID := parts[0]
-	action := ""
-	if len(parts) > 1 {
-		action = parts[1]
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		if action == "logs" {
-			lines := 100
-			if linesParam := r.URL.Query().Get("lines"); linesParam != "" {
-				if l, err := strconv.Atoi(linesParam); err == nil {
-					lines = l
-				}
-			}
-
-			logs, err := h.api.docker.GetContainerLogs(containerID, lines, false)
-			if err != nil {
-				h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get logs: %v", err))
-				return
-			}
-
-			h.writeJSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
-		} else if action == "stats" {
-			stats, err := h.api.docker.GetContainerStats(containerID)
-			if err != nil {
-				h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get stats: %v", err))
-				return
-			}
-
-			h.writeJSON(w, http.StatusOK, stats)
-		} else {
-			container, err := h.api.docker.GetContainer(containerID)
-			if err != nil {
-				h.writeError(w, http.StatusNotFound, fmt.Sprintf("Container not found: %v", err))
-				return
-			}
-
-			h.writeJSON(w, http.StatusOK, container)
-		}
-
-	case http.MethodPost:
-		switch action {
-		case "start":
-			err := h.api.docker.StartContainer(containerID)
-			if err != nil {
-				h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to start container: %v", err))
-				return
-			}
-			h.writeJSON(w, http.StatusOK, map[string]string{"message": "Container started"})
-
-		case "stop":
-			timeout := 10
-			if timeoutParam := r.URL.Query().Get("timeout"); timeoutParam != "" {
-				if t, err := strconv.Atoi(timeoutParam); err == nil {
-					timeout = t
-				}
-			}
-
-			err := h.api.docker.StopContainer(containerID, timeout)
-			if err != nil {
-				h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to stop container: %v", err))
-				return
-			}
-			h.writeJSON(w, http.StatusOK, map[string]string{"message": "Container stopped"})
-
-		case "restart":
-			timeout := 10
-			if timeoutParam := r.URL.Query().Get("timeout"); timeoutParam != "" {
-				if t, err := strconv.Atoi(timeoutParam); err == nil {
-					timeout = t
-				}
-			}
-
-			err := h.api.docker.RestartContainer(containerID, timeout)
-			if err != nil {
-				h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to restart container: %v", err))
-				return
-			}
-			h.writeJSON(w, http.StatusOK, map[string]string{"message": "Container restarted"})
-
-		case "pause":
-			err := h.api.docker.PauseContainer(containerID)
-			if err != nil {
-				h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to pause container: %v", err))
-				return
-			}
-			h.writeJSON(w, http.StatusOK, map[string]string{"message": "Container paused"})
-
-		case "unpause", "resume":
-			err := h.api.docker.UnpauseContainer(containerID)
-			if err != nil {
-				h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to unpause container: %v", err))
-				return
-			}
-			h.writeJSON(w, http.StatusOK, map[string]string{"message": "Container unpaused"})
-
-		default:
-			h.writeError(w, http.StatusBadRequest, "Invalid action")
-		}
-
-	case http.MethodDelete:
-		force := r.URL.Query().Get("force") == "true"
-		err := h.api.docker.RemoveContainer(containerID, force)
-		if err != nil {
-			h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to remove container: %v", err))
-			return
-		}
-		h.writeJSON(w, http.StatusOK, map[string]string{"message": "Container removed"})
-
-	default:
-		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }
 
@@ -2230,8 +3369,8 @@ func (h *HTTPServer) handleArrayStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Stop the array
-	err = h.api.storage.StopArray(req.Force, req.UnmountShares)
+	// Stop the array with enhanced orchestration
+	err = h.api.storage.StopArray(req.Force, req.UnmountShares, req.StopContainers, req.StopVMs)
 	if err != nil {
 		response := ArrayOperationResponse{
 			Success: false,
@@ -2394,88 +3533,6 @@ func (h *HTTPServer) handleArrayDiskRemove(w http.ResponseWriter, r *http.Reques
 		Message:       fmt.Sprintf("Disk removed from position %s", req.Position),
 		OperationID:   fmt.Sprintf("disk_remove_%d", time.Now().Unix()),
 		EstimatedTime: 10, // seconds
-	}
-	h.writeJSON(w, http.StatusOK, response)
-}
-
-// System Power Management Handlers
-
-// handleSystemShutdown handles POST /api/v1/system/shutdown
-func (h *HTTPServer) handleSystemShutdown(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	var req SystemShutdownRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid JSON request")
-		return
-	}
-
-	// Validate delay (0-300 seconds)
-	if req.DelaySeconds < 0 || req.DelaySeconds > 300 {
-		h.writeError(w, http.StatusBadRequest, "Delay must be between 0 and 300 seconds")
-		return
-	}
-
-	// Execute shutdown
-	err := h.executeSystemShutdown(req.DelaySeconds, req.Message, req.Force)
-	if err != nil {
-		response := PowerOperationResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to schedule shutdown: %v", err),
-		}
-		h.writeJSON(w, http.StatusInternalServerError, response)
-		return
-	}
-
-	scheduledTime := time.Now().Add(time.Duration(req.DelaySeconds) * time.Second)
-	response := PowerOperationResponse{
-		Success:       true,
-		Message:       fmt.Sprintf("System shutdown scheduled in %d seconds", req.DelaySeconds),
-		OperationID:   fmt.Sprintf("shutdown_%d", time.Now().Unix()),
-		ScheduledTime: scheduledTime.Format(time.RFC3339),
-	}
-	h.writeJSON(w, http.StatusOK, response)
-}
-
-// handleSystemReboot handles POST /api/v1/system/reboot
-func (h *HTTPServer) handleSystemReboot(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	var req SystemRebootRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid JSON request")
-		return
-	}
-
-	// Validate delay (0-300 seconds)
-	if req.DelaySeconds < 0 || req.DelaySeconds > 300 {
-		h.writeError(w, http.StatusBadRequest, "Delay must be between 0 and 300 seconds")
-		return
-	}
-
-	// Execute reboot
-	err := h.executeSystemReboot(req.DelaySeconds, req.Message, req.Force)
-	if err != nil {
-		response := PowerOperationResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to schedule reboot: %v", err),
-		}
-		h.writeJSON(w, http.StatusInternalServerError, response)
-		return
-	}
-
-	scheduledTime := time.Now().Add(time.Duration(req.DelaySeconds) * time.Second)
-	response := PowerOperationResponse{
-		Success:       true,
-		Message:       fmt.Sprintf("System reboot scheduled in %d seconds", req.DelaySeconds),
-		OperationID:   fmt.Sprintf("reboot_%d", time.Now().Unix()),
-		ScheduledTime: scheduledTime.Format(time.RFC3339),
 	}
 	h.writeJSON(w, http.StatusOK, response)
 }
@@ -2994,62 +4051,6 @@ func (h *HTTPServer) handleShare(w http.ResponseWriter, r *http.Request) {
 	default:
 		h.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
-}
-
-// User Script Management Implementation Functions
-
-// getUserScripts returns a list of available user scripts
-func (h *HTTPServer) getUserScripts() ([]UserScript, error) {
-	var scripts []UserScript
-
-	// Check if User Scripts plugin is installed
-	userScriptsPath := "/boot/config/plugins/user.scripts/scripts"
-	if _, err := os.Stat(userScriptsPath); os.IsNotExist(err) {
-		// Return empty list if User Scripts plugin is not installed
-		return scripts, nil
-	}
-
-	// Read script directories
-	entries, err := os.ReadDir(userScriptsPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read user scripts directory: %v", err)
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		scriptName := entry.Name()
-		scriptPath := filepath.Join(userScriptsPath, scriptName, "script")
-
-		// Check if script file exists
-		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-			continue
-		}
-
-		// Get script description from description file
-		description := h.getScriptDescription(scriptName)
-
-		// Get script status
-		status := h.getScriptCurrentStatus(scriptName)
-
-		// Get last run information
-		lastRun, lastResult := h.getScriptLastRun(scriptName)
-
-		script := UserScript{
-			Name:        scriptName,
-			Description: description,
-			Path:        scriptPath,
-			Status:      status,
-			LastRun:     lastRun,
-			LastResult:  lastResult,
-		}
-
-		scripts = append(scripts, script)
-	}
-
-	return scripts, nil
 }
 
 // getScriptDescription reads the script description from the description file
@@ -4036,7 +5037,7 @@ func (h *HTTPServer) requestIDMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Request-ID", requestID)
 
 		// Add request ID to request context for use in handlers
-		ctx := context.WithValue(r.Context(), "request_id", requestID)
+		ctx := context.WithValue(r.Context(), requestIDKey, requestID)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
@@ -4089,6 +5090,7 @@ func (h *HTTPServer) shouldCompressResponse(r *http.Request) bool {
 	// Compress responses for endpoints that typically return large data
 	compressiblePaths := []string{
 		"/api/v1/storage/disks",
+		"/api/v1/storage/zfs",
 		"/api/v1/docker/containers",
 		"/api/v1/notifications",
 		"/api/v1/openapi.json",
@@ -4122,7 +5124,7 @@ func (h *HTTPServer) versioningMiddleware(next http.Handler) http.Handler {
 		apiVersion := h.parseAPIVersion(acceptHeader)
 
 		// Set the negotiated version in request context
-		ctx := context.WithValue(r.Context(), "api_version", apiVersion)
+		ctx := context.WithValue(r.Context(), apiVersionKey, apiVersion)
 		r = r.WithContext(ctx)
 
 		// Set version information in response headers
@@ -4164,7 +5166,7 @@ func (h *HTTPServer) parseAPIVersion(acceptHeader string) string {
 
 // getAPIVersionFromContext retrieves the API version from request context
 func (h *HTTPServer) getAPIVersionFromContext(r *http.Request) string {
-	if version, ok := r.Context().Value("api_version").(string); ok {
+	if version, ok := r.Context().Value(apiVersionKey).(string); ok {
 		return version
 	}
 	return "v1" // Default fallback

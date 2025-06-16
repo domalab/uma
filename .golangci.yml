@@ -1,0 +1,58 @@
+# golangci-lint configuration for UMA REST API
+run:
+  timeout: 5m
+  tests: true
+
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+
+  funlen:
+    lines: 150
+    statements: 80
+
+  gocognit:
+    min-complexity: 30
+
+  goconst:
+    min-len: 3
+    min-occurrences: 5
+
+  gocyclo:
+    min-complexity: 20
+
+  misspell:
+    locale: US
+
+  nakedret:
+    max-func-lines: 50
+
+  nestif:
+    min-complexity: 8
+
+  unparam:
+    check-exported: false
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - gosec
+    - bodyclose
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - funlen
+    - gocognit
+    - gocyclo
+    - nestif
+    - goconst
+    - nakedret
+    - unparam

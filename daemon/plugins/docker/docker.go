@@ -129,7 +129,7 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 	containers := make([]ContainerInfo, 0)
 
 	if !d.IsDockerAvailable() {
-		return containers, fmt.Errorf("Docker is not available")
+		return containers, fmt.Errorf("docker is not available")
 	}
 
 	args := []string{"ps", "--format", "json", "--no-trunc"}
@@ -156,10 +156,7 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 
 		// Convert to our ContainerInfo format
 		container := ContainerInfo{}
-		if err := d.parseDockerPsData(&container, dockerPsData); err != nil {
-			logger.Yellow("Failed to parse docker ps data: %v", err)
-			continue
-		}
+		d.parseDockerPsData(&container, dockerPsData)
 
 		// Get detailed information
 		if err := d.getContainerDetails(&container); err != nil {
@@ -174,7 +171,7 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 }
 
 // parseDockerPsData parses docker ps JSON output into ContainerInfo
-func (d *DockerManager) parseDockerPsData(container *ContainerInfo, data map[string]interface{}) error {
+func (d *DockerManager) parseDockerPsData(container *ContainerInfo, data map[string]interface{}) {
 	if id, ok := data["ID"].(string); ok {
 		container.ID = id
 	}
@@ -202,7 +199,6 @@ func (d *DockerManager) parseDockerPsData(container *ContainerInfo, data map[str
 		}
 	}
 
-	return nil
 }
 
 // min helper function
@@ -216,7 +212,7 @@ func min(a, b int) int {
 // GetContainer returns information about a specific container
 func (d *DockerManager) GetContainer(nameOrID string) (*ContainerInfo, error) {
 	if !d.IsDockerAvailable() {
-		return nil, fmt.Errorf("Docker is not available")
+		return nil, fmt.Errorf("docker is not available")
 	}
 
 	output := lib.GetCmdOutput("docker", "inspect", nameOrID)
@@ -246,7 +242,7 @@ func (d *DockerManager) GetContainer(nameOrID string) (*ContainerInfo, error) {
 // StartContainer starts a container
 func (d *DockerManager) StartContainer(nameOrID string) error {
 	if !d.IsDockerAvailable() {
-		return fmt.Errorf("Docker is not available")
+		return fmt.Errorf("docker is not available")
 	}
 
 	output := lib.GetCmdOutput("docker", "start", nameOrID)
@@ -268,7 +264,7 @@ func (d *DockerManager) StartContainer(nameOrID string) error {
 // StopContainer stops a container
 func (d *DockerManager) StopContainer(nameOrID string, timeout int) error {
 	if !d.IsDockerAvailable() {
-		return fmt.Errorf("Docker is not available")
+		return fmt.Errorf("docker is not available")
 	}
 
 	args := []string{"stop"}
@@ -293,7 +289,7 @@ func (d *DockerManager) StopContainer(nameOrID string, timeout int) error {
 // RestartContainer restarts a container
 func (d *DockerManager) RestartContainer(nameOrID string, timeout int) error {
 	if !d.IsDockerAvailable() {
-		return fmt.Errorf("Docker is not available")
+		return fmt.Errorf("docker is not available")
 	}
 
 	args := []string{"restart"}
@@ -318,7 +314,7 @@ func (d *DockerManager) RestartContainer(nameOrID string, timeout int) error {
 // GetContainerLogs returns logs for a container
 func (d *DockerManager) GetContainerLogs(nameOrID string, lines int, follow bool) ([]string, error) {
 	if !d.IsDockerAvailable() {
-		return nil, fmt.Errorf("Docker is not available")
+		return nil, fmt.Errorf("docker is not available")
 	}
 
 	args := []string{"logs"}
@@ -337,7 +333,7 @@ func (d *DockerManager) GetContainerLogs(nameOrID string, lines int, follow bool
 // GetContainerStats returns real-time statistics for containers
 func (d *DockerManager) GetContainerStats(nameOrID string) (*DockerStats, error) {
 	if !d.IsDockerAvailable() {
-		return nil, fmt.Errorf("Docker is not available")
+		return nil, fmt.Errorf("docker is not available")
 	}
 
 	args := []string{"stats", "--no-stream", "--format", "json"}
@@ -361,7 +357,7 @@ func (d *DockerManager) GetContainerStats(nameOrID string) (*DockerStats, error)
 // PauseContainer pauses a container
 func (d *DockerManager) PauseContainer(nameOrID string) error {
 	if !d.IsDockerAvailable() {
-		return fmt.Errorf("Docker is not available")
+		return fmt.Errorf("docker is not available")
 	}
 
 	output := lib.GetCmdOutput("docker", "pause", nameOrID)
@@ -380,7 +376,7 @@ func (d *DockerManager) PauseContainer(nameOrID string) error {
 // UnpauseContainer unpauses a container
 func (d *DockerManager) UnpauseContainer(nameOrID string) error {
 	if !d.IsDockerAvailable() {
-		return fmt.Errorf("Docker is not available")
+		return fmt.Errorf("docker is not available")
 	}
 
 	output := lib.GetCmdOutput("docker", "unpause", nameOrID)
@@ -399,7 +395,7 @@ func (d *DockerManager) UnpauseContainer(nameOrID string) error {
 // RemoveContainer removes a container
 func (d *DockerManager) RemoveContainer(nameOrID string, force bool) error {
 	if !d.IsDockerAvailable() {
-		return fmt.Errorf("Docker is not available")
+		return fmt.Errorf("docker is not available")
 	}
 
 	args := []string{"rm"}
@@ -424,7 +420,7 @@ func (d *DockerManager) RemoveContainer(nameOrID string, force bool) error {
 // GetDockerInfo returns Docker system information
 func (d *DockerManager) GetDockerInfo() (map[string]interface{}, error) {
 	if !d.IsDockerAvailable() {
-		return nil, fmt.Errorf("Docker is not available")
+		return nil, fmt.Errorf("docker is not available")
 	}
 
 	output := lib.GetCmdOutput("docker", "info", "--format", "json")
@@ -446,7 +442,7 @@ func (d *DockerManager) ListNetworks() ([]DockerNetwork, error) {
 	networks := make([]DockerNetwork, 0)
 
 	if !d.IsDockerAvailable() {
-		return networks, fmt.Errorf("Docker is not available")
+		return networks, fmt.Errorf("docker is not available")
 	}
 
 	output := lib.GetCmdOutput("docker", "network", "ls", "--format", "json", "--no-trunc")
@@ -468,10 +464,7 @@ func (d *DockerManager) ListNetworks() ([]DockerNetwork, error) {
 
 		// Convert to our DockerNetwork format
 		network := DockerNetwork{}
-		if err := d.parseNetworkData(&network, networkData); err != nil {
-			logger.Yellow("Failed to parse network data: %v", err)
-			continue
-		}
+		d.parseNetworkData(&network, networkData)
 
 		// Get detailed network information
 		if err := d.getNetworkDetails(&network); err != nil {
@@ -489,7 +482,7 @@ func (d *DockerManager) ListImages() ([]DockerImage, error) {
 	images := make([]DockerImage, 0)
 
 	if !d.IsDockerAvailable() {
-		return images, fmt.Errorf("Docker is not available")
+		return images, fmt.Errorf("docker is not available")
 	}
 
 	output := lib.GetCmdOutput("docker", "images", "--format", "json", "--no-trunc")
@@ -511,10 +504,7 @@ func (d *DockerManager) ListImages() ([]DockerImage, error) {
 
 		// Convert to our DockerImage format
 		image := DockerImage{}
-		if err := d.parseImageData(&image, imageData); err != nil {
-			logger.Yellow("Failed to parse image data: %v", err)
-			continue
-		}
+		d.parseImageData(&image, imageData)
 
 		// Get detailed image information
 		if err := d.getImageDetails(&image); err != nil {
@@ -528,7 +518,7 @@ func (d *DockerManager) ListImages() ([]DockerImage, error) {
 }
 
 // parseImageData parses docker images JSON output into DockerImage
-func (d *DockerManager) parseImageData(image *DockerImage, data map[string]interface{}) error {
+func (d *DockerManager) parseImageData(image *DockerImage, data map[string]interface{}) {
 	if id, ok := data["ID"].(string); ok {
 		image.ID = id
 	}
@@ -559,7 +549,6 @@ func (d *DockerManager) parseImageData(image *DockerImage, data map[string]inter
 		}
 	}
 
-	return nil
 }
 
 // getImageDetails gets detailed information about an image using docker image inspect
@@ -684,7 +673,7 @@ func (d *DockerManager) parseSizeString(sizeStr string) (int64, error) {
 }
 
 // parseNetworkData parses docker network ls JSON output into DockerNetwork
-func (d *DockerManager) parseNetworkData(network *DockerNetwork, data map[string]interface{}) error {
+func (d *DockerManager) parseNetworkData(network *DockerNetwork, data map[string]interface{}) {
 	if id, ok := data["ID"].(string); ok {
 		network.ID = id
 	}
@@ -708,7 +697,6 @@ func (d *DockerManager) parseNetworkData(network *DockerNetwork, data map[string
 		}
 	}
 
-	return nil
 }
 
 // getNetworkDetails gets detailed information about a network using docker network inspect
