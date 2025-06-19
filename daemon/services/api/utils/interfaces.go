@@ -10,6 +10,7 @@ type APIInterface interface {
 	GetVM() VMInterface
 	GetAuth() AuthInterface
 	GetNotifications() NotificationInterface
+	GetUPSDetector() UPSDetectorInterface
 }
 
 // SystemInterface defines the interface for system operations
@@ -79,4 +80,10 @@ type NotificationInterface interface {
 	MarkAllAsRead() error
 	GetNotificationStats() (interface{}, error)
 	GetNotificationCount(level, category string, unreadOnly bool) (int, error)
+}
+
+// UPSDetectorInterface defines the interface for UPS detection operations
+type UPSDetectorInterface interface {
+	IsAvailable() bool
+	GetStatus() interface{}
 }

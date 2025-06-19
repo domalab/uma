@@ -65,7 +65,6 @@ Get the UMA bundle.
 <![CDATA[
 SERVICE="enable"
 PORT="34600"
-UPS="enable"
 ]]>
 </INLINE>
 </FILE>
@@ -74,7 +73,7 @@ UPS="enable"
 <FILE Name="/boot/config/plugins/&name;/&name;.env">
 <INLINE>
 <![CDATA[
-SHOW_UPS=true
+
 ]]>
 </INLINE>
 </FILE>
@@ -140,7 +139,6 @@ echo ""
 CFGFILE=/boot/config/plugins/uma/uma.cfg
 [ ! `cat "$CFGFILE" | grep SERVICE` ] && echo "SERVICE=\"enable\"" >> "$CFGFILE"
 [ ! `cat "$CFGFILE" | grep ^PORT` ] && echo "PORT=\"34600\"" >> "$CFGFILE"
-[ ! `cat "$CFGFILE" | grep ^UPS` ] && echo "UPS=\"enable\"" >> "$CFGFILE"
 rm /tmp/uma-chkconf
 ]]>
 </INLINE>

@@ -10,9 +10,9 @@ import (
 
 // ConfigCmd handles configuration management commands
 type ConfigCmd struct {
-	Show      ConfigShowCmd      `cmd:"" help:"Show current configuration"`
-	Set       ConfigSetCmd       `cmd:"" help:"Set configuration values"`
-	Generate  ConfigGenerateCmd  `cmd:"" help:"Generate configuration values"`
+	Show     ConfigShowCmd     `cmd:"" help:"Show current configuration"`
+	Set      ConfigSetCmd      `cmd:"" help:"Set configuration values"`
+	Generate ConfigGenerateCmd `cmd:"" help:"Generate configuration values"`
 }
 
 // ConfigShowCmd shows the current configuration
@@ -25,10 +25,9 @@ func (c *ConfigShowCmd) Run(ctx *domain.Context) error {
 	}
 
 	cfg := manager.GetConfig()
-	
+
 	fmt.Printf("UMA Configuration:\n")
 	fmt.Printf("  Version: %s\n", cfg.Version)
-	fmt.Printf("  Show UPS: %t\n", cfg.ShowUps)
 	fmt.Printf("\n")
 	fmt.Printf("HTTP Server:\n")
 	fmt.Printf("  Enabled: %t\n", cfg.HTTPServer.Enabled)
@@ -54,12 +53,11 @@ func (c *ConfigShowCmd) Run(ctx *domain.Context) error {
 
 // ConfigSetCmd sets configuration values
 type ConfigSetCmd struct {
-	HTTPEnabled  *bool   `help:"Enable/disable HTTP server"`
-	Port         *int    `name:"port" help:"Set HTTP server port"`
-	AuthEnabled  *bool   `help:"Enable/disable authentication"`
-	APIKey       *string `help:"Set API key"`
-	LogLevel     *string `help:"Set log level"`
-	UpsMonitor   *bool   `name:"ups" help:"Enable/disable UPS monitoring"`
+	HTTPEnabled *bool   `help:"Enable/disable HTTP server"`
+	Port        *int    `name:"port" help:"Set HTTP server port"`
+	AuthEnabled *bool   `help:"Enable/disable authentication"`
+	APIKey      *string `help:"Set API key"`
+	LogLevel    *string `help:"Set log level"`
 }
 
 func (c *ConfigSetCmd) Run(ctx *domain.Context) error {
@@ -104,12 +102,6 @@ func (c *ConfigSetCmd) Run(ctx *domain.Context) error {
 		fmt.Printf("Log level: %s\n", *c.LogLevel)
 	}
 
-	if c.UpsMonitor != nil {
-		cfg.ShowUps = *c.UpsMonitor
-		changed = true
-		fmt.Printf("UPS monitoring: %t\n", *c.UpsMonitor)
-	}
-
 	if !changed {
 		return fmt.Errorf("no configuration changes specified")
 	}
@@ -135,7 +127,7 @@ func (c *ConfigGenerateCmd) Run(ctx *domain.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to generate API key: %w", err)
 		}
-		
+
 		fmt.Printf("Generated API key: %s\n", apiKey)
 		fmt.Printf("\nTo set this as the active API key, run:\n")
 		fmt.Printf("  uma config set --api-key=%s\n", apiKey)

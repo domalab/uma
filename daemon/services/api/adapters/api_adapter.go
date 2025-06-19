@@ -3,6 +3,7 @@ package adapters
 import (
 	"github.com/domalab/uma/daemon/plugins/docker"
 	"github.com/domalab/uma/daemon/services/api/utils"
+	upsDetector "github.com/domalab/uma/daemon/services/ups"
 )
 
 // APIAdapter adapts the existing API to our new interface structure
@@ -54,6 +55,11 @@ func (a *APIAdapter) GetAuth() utils.AuthInterface {
 // GetNotifications returns the notification interface
 func (a *APIAdapter) GetNotifications() utils.NotificationInterface {
 	return &NotificationAdapter{api: a.api}
+}
+
+// GetUPSDetector returns the UPS detector interface
+func (a *APIAdapter) GetUPSDetector() utils.UPSDetectorInterface {
+	return &UPSDetectorAdapter{api: a.api}
 }
 
 // SystemAdapter adapts system operations
@@ -486,4 +492,36 @@ func (n *NotificationAdapter) GetNotificationStats() (interface{}, error) {
 
 func (n *NotificationAdapter) GetNotificationCount(level, category string, unreadOnly bool) (int, error) {
 	return 0, nil
+}
+
+// UPSDetectorAdapter adapts UPS detector operations
+type UPSDetectorAdapter struct {
+	api interface{}
+}
+
+func (u *UPSDetectorAdapter) IsAvailable() bool {
+	// Try to get the UPS detector from the API using the correct interface
+	if apiInstance, ok := u.api.(interface{ GetUPSDetector() *upsDetector.Detector }); ok {
+		if detector := apiInstance.GetUPSDetector(); detector != nil {
+			return detector.IsAvailable()
+		}
+	}
+	return false
+}
+
+func (u *UPSDetectorAdapter) GetStatus() interface{} {
+	// Try to get the UPS detector from the API using the correct interface
+	if apiInstance, ok := u.api.(interface{ GetUPSDetector() *upsDetector.Detector }); ok {
+		if detector := apiInstance.GetUPSDetector(); detector != nil {
+			return detector.GetStatus()
+		}
+	}
+
+	// Return default status when UPS is not available
+	return map[string]interface{}{
+		"available":  false,
+		"type":       "none",
+		"last_check": "",
+		"error":      "UPS detector not available",
+	}
 }

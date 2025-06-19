@@ -25,6 +25,11 @@ func (m *MockAPIInterface) GetStorage() utils.StorageInterface {
 	return &MockStorageInterface{}
 }
 
+// GetUPSDetector returns a mock UPS detector interface
+func (m *MockAPIInterface) GetUPSDetector() utils.UPSDetectorInterface {
+	return &MockUPSDetectorInterface{}
+}
+
 // GetDocker returns a mock Docker interface
 func (m *MockAPIInterface) GetDocker() utils.DockerInterface {
 	return &MockDockerInterface{}
@@ -285,4 +290,20 @@ func (m *MockNotificationInterface) GetNotificationStats() (interface{}, error) 
 
 func (m *MockNotificationInterface) GetNotificationCount(level, category string, unreadOnly bool) (int, error) {
 	return 0, nil
+}
+
+// MockUPSDetectorInterface provides mock UPS detector functionality
+type MockUPSDetectorInterface struct{}
+
+func (m *MockUPSDetectorInterface) IsAvailable() bool {
+	return false // Mock UPS as not available by default
+}
+
+func (m *MockUPSDetectorInterface) GetStatus() interface{} {
+	return map[string]interface{}{
+		"available":  false,
+		"type":       "none",
+		"last_check": "2024-01-01T00:00:00Z",
+		"error":      "No UPS detected (mock)",
+	}
 }

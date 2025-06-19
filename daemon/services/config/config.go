@@ -119,9 +119,6 @@ func (m *Manager) loadLegacyINI() error {
 	service := cfg.Section("").Key("SERVICE").MustString("disable")
 	m.config.HTTPServer.Enabled = (service == "enable")
 
-	ups := cfg.Section("").Key("UPS").MustString("enable")
-	m.config.ShowUps = (ups == "enable")
-
 	return nil
 }
 

@@ -24,6 +24,7 @@ import (
 	"github.com/domalab/uma/daemon/services/auth"
 	"github.com/domalab/uma/daemon/services/cache"
 	"github.com/domalab/uma/daemon/services/config"
+	upsDetector "github.com/domalab/uma/daemon/services/ups"
 )
 
 type Api struct {
@@ -46,6 +47,7 @@ type Api struct {
 	origin        *dto.Origin
 	sensor        sensor.Sensor
 	ups           ups.Ups
+	upsDetector   *upsDetector.Detector
 	storage       *storage.StorageMonitor
 	system        *system.SystemMonitor
 	gpu           *gpu.GPUMonitor
@@ -101,7 +103,19 @@ func Create(ctx *domain.Context) *Api {
 func (a *Api) Run() error {
 	// Initialize all monitoring plugins
 	a.sensor = a.createSensor()
+
+	// Initialize UPS detector and start automatic detection
+	a.upsDetector = upsDetector.NewDetector()
+
+	// Add callback to refresh UPS instance when detection status changes
+	a.upsDetector.AddStatusChangeCallback(func(available bool, upsType ups.Kind) {
+		logger.Blue("UPS detection status changed, refreshing UPS instance...")
+		a.RefreshUPS()
+	})
+
+	a.upsDetector.Start()
 	a.ups = a.createUps()
+
 	a.storage = storage.NewStorageMonitor()
 	a.system = system.NewSystemMonitor()
 	a.gpu = gpu.NewGPUMonitor()
@@ -160,6 +174,11 @@ func (a *Api) startUnixSocketServer() {
 // Stop gracefully stops all API servers
 func (a *Api) Stop() error {
 	logger.Blue("Stopping API services...")
+
+	// Stop UPS detector
+	if a.upsDetector != nil {
+		a.upsDetector.Stop()
+	}
 
 	// Stop HTTP server
 	if a.httpServer != nil {
@@ -246,25 +265,20 @@ func (a *Api) createSensor() sensor.Sensor {
 }
 
 func (a *Api) createUps() ups.Ups {
-	logger.Blue("showing ups %t ...", a.ctx.Config.ShowUps)
-	if a.ctx.Config.ShowUps {
-		u, err := ups.IdentifyUps()
-		if err != nil {
-			logger.Yellow("error identifying ups: %s", err)
-		} else {
-			switch u {
-			case ups.APC:
-				logger.Blue("created apc ups ...")
-				return ups.NewApc()
-			case ups.NUT:
-				logger.Blue("created nut ups ...")
-				return ups.NewNut()
-			}
+	// Use automatic UPS detection instead of configuration flag
+	if a.upsDetector != nil && a.upsDetector.IsAvailable() {
+		upsType := a.upsDetector.GetUPSType()
+		switch upsType {
+		case ups.APC:
+			logger.Blue("created apc ups (auto-detected)...")
+			return ups.NewApc()
+		case ups.NUT:
+			logger.Blue("created nut ups (auto-detected)...")
+			return ups.NewNut()
 		}
 	}
 
-	logger.Blue("no ups detected ...")
-
+	logger.Blue("no ups detected or available...")
 	return ups.NewNoUps()
 }
 
@@ -314,4 +328,14 @@ func (a *Api) GetSystemMonitor() *system.SystemMonitor {
 // GetVMManager returns the VM manager instance
 func (a *Api) GetVMManager() *vm.VMManager {
 	return a.vm
+}
+
+// GetUPSDetector returns the UPS detector instance
+func (a *Api) GetUPSDetector() *upsDetector.Detector {
+	return a.upsDetector
+}
+
+// RefreshUPS recreates the UPS instance based on current detection status
+func (a *Api) RefreshUPS() {
+	a.ups = a.createUps()
 }

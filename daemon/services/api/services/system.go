@@ -186,27 +186,50 @@ func (s *SystemService) GetNetworkData() map[string]interface{} {
 
 // GetUPSData retrieves UPS status information
 func (s *SystemService) GetUPSData() map[string]interface{} {
-	// Default UPS data structure
-	upsData := map[string]interface{}{
-		"status":         "unknown",
-		"battery_charge": 0,
-		"runtime":        0,
-		"load":           0,
-		"voltage":        0,
-		"last_updated":   time.Now().UTC().Format(time.RFC3339),
+	// Check if UPS is available through auto-detection
+	upsDetector := s.api.GetUPSDetector()
+	if upsDetector == nil || !upsDetector.IsAvailable() {
+		// Return "not available" response when UPS is not detected
+		return map[string]interface{}{
+			"available":      false,
+			"status":         "not_detected",
+			"battery_charge": 0,
+			"runtime":        0,
+			"load":           0,
+			"voltage":        0,
+			"detection":      upsDetector.GetStatus(),
+			"last_updated":   time.Now().UTC().Format(time.RFC3339),
+		}
 	}
 
+	// UPS is available, try to get real data
 	// Try to get real UPS data from apcupsd first
 	if apcData := s.GetAPCUPSData(); apcData != nil {
+		// Add detection info to the response
+		apcData["available"] = true
+		apcData["detection"] = upsDetector.GetStatus()
 		return apcData
 	}
 
 	// Try NUT (Network UPS Tools) as fallback
 	if nutData := s.GetNUTUPSData(); nutData != nil {
+		// Add detection info to the response
+		nutData["available"] = true
+		nutData["detection"] = upsDetector.GetStatus()
 		return nutData
 	}
 
-	return upsData
+	// UPS detected but communication failed
+	return map[string]interface{}{
+		"available":      true,
+		"status":         "communication_error",
+		"battery_charge": 0,
+		"runtime":        0,
+		"load":           0,
+		"voltage":        0,
+		"detection":      upsDetector.GetStatus(),
+		"last_updated":   time.Now().UTC().Format(time.RFC3339),
+	}
 }
 
 // GetAPCUPSData retrieves UPS data from apcupsd daemon

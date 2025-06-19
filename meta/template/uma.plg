@@ -38,7 +38,6 @@ Get the UMA bundle.
 <INLINE>
 <![CDATA[
 SERVICE="disable"
-UPS="enable"
 ]]>
 </INLINE>
 </FILE>
@@ -47,7 +46,7 @@ UPS="enable"
 <FILE Name="/boot/config/plugins/&name;/&name;.env">
 <INLINE>
 <![CDATA[
-SHOW_UPS=true
+
 ]]>
 </INLINE>
 </FILE>
@@ -112,7 +111,6 @@ echo ""
 # This will check each entry in the config so nothing is missing, and if missing, sets to default
 CFGFILE=/boot/config/plugins/uma/uma.cfg
 [ ! `cat "$CFGFILE" | grep SERVICE` ] && echo "SERVICE=\"disable\"" >> "$CFGFILE"
-[ ! `cat "$CFGFILE" | grep ^UPS` ] && echo "UPS=\"enable\"" >> "$CFGFILE"
 rm /tmp/uma-chkconf
 ]]>
 </INLINE>

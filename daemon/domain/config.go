@@ -3,7 +3,6 @@ package domain
 // Config holds the application configuration
 type Config struct {
 	Version    string     `json:"version"`
-	ShowUps    bool       `json:"showups"`
 	HTTPServer HTTPConfig `json:"http_server"`
 	Auth       AuthConfig `json:"auth"`
 	Logging    LogConfig  `json:"logging"`
@@ -35,7 +34,6 @@ type LogConfig struct {
 func DefaultConfig() Config {
 	return Config{
 		Version: "unknown",
-		ShowUps: false,
 		HTTPServer: HTTPConfig{
 			Enabled: true,
 			Port:    34600,

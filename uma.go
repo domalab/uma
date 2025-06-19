@@ -20,7 +20,6 @@ var cli struct {
 	LogsDir    string `default:"/var/log" help:"directory to store logs"`
 	ConfigPath string `default:"" help:"path to configuration file"`
 	HTTPPort   int    `default:"34600" help:"HTTP API server port"`
-	ShowUps    bool   `env:"SHOW_UPS" default:"false" help:"whether to provide ups status or not"`
 
 	Boot   cmd.Boot      `cmd:"" default:"1" help:"start processing"`
 	Config cmd.ConfigCmd `cmd:"" help:"manage configuration"`
@@ -44,7 +43,6 @@ func main() {
 	// Create base configuration
 	config := domain.DefaultConfig()
 	config.Version = Version
-	config.ShowUps = cli.ShowUps
 
 	// Override HTTP port if specified
 	if cli.HTTPPort != 34600 {

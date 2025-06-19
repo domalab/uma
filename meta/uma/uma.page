@@ -79,7 +79,7 @@ $sName = "uma";
 $uma_cfg = parse_plugin_cfg("uma");
 $uma_service = isset($uma_cfg['SERVICE']) ? $uma_cfg['SERVICE'] : "enable";
 $uma_port = isset($uma_cfg['PORT']) ? $uma_cfg['PORT'] : "34600";
-$uma_ups = isset($uma_cfg['UPS']) ? $uma_cfg['UPS'] : "enable";
+
 $uma_running = shell_exec("pidof uma | wc -w");
 $uma_version = shell_exec("cat /usr/local/emhttp/plugins/uma/VERSION | tr '\n' ' '");
 $server_ip = $_SERVER['SERVER_ADDR'];
@@ -121,13 +121,7 @@ $server_ip = $_SERVER['SERVER_ADDR'];
 			<small style="margin-left: 10px; color: #666;">Port range: 1024-65535 (default: 34600)</small>
 		</div>
 
-		<div class="uma-form-group">
-			<label for="UPS">Provide UPS status:</label>
-			<select id="UPS" name="UPS" size="1" onChange="checkRUNNING(this.form);">
-				<?=mk_option($uma_ups, "enable", "Yes");?>
-				<?=mk_option($uma_ups, "disable", "No");?>
-			</select>
-		</div>
+
 
 		<?php if ($uma_running == 1): ?>
 		<div class="uma-form-group">
@@ -159,7 +153,6 @@ function isNumber(value) {
 function resetDATA(form) {
 	form.SERVICE.value = "enable";
 	form.PORT.value = "34600";
-	form.UPS.value = "enable";
 }
 
 function checkRUNNING(form) {
@@ -196,6 +189,5 @@ function verifyDATA(form) {
 
 	form.SERVICE.value = form.SERVICE.value.replace(/ /g,"_");
 	form.PORT.value = port.toString();
-	form.UPS.value = form.UPS.value.replace(/ /g,"_");
 }
 </script>
