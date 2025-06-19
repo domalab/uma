@@ -44,8 +44,6 @@ http://your-unraid-ip:34600/api/v1
 
 **Interactive Documentation**: `http://your-unraid-ip:34600/api/v1/docs`
 
-**Interactive Documentation**: `http://your-unraid-ip:34600/api/v1/docs`
-
 ## API Documentation
 
 UMA provides a comprehensive REST API with OpenAPI 3.0.3 specification for integration with Home Assistant, Prometheus, and other automation platforms.
