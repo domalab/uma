@@ -9,7 +9,7 @@ _tl;dr_ **UMA** is a comprehensive monitoring and control system for Unraid serv
 - **System Monitoring**: CPU, RAM, storage, and boot disk status with real-time metrics
 - **Hardware Sensors**: Temperature monitoring, fan speeds, and system health via IPMI
 - **Storage Management**: Array disk health, cache disk status, SMART data, and usage statistics
-- **Power Management**: Real UPS monitoring with APC and NUT integration, system power control (reboot/shutdown)
+- **Power Management**: Automatic UPS detection and monitoring with APC and NUT integration, system power control (reboot/shutdown)
 - **GPU Monitoring**: GPU usage, temperature, and status
 - **Docker Management**: Complete container control with individual and bulk operations (start, stop, restart, pause, resume)
 - **VM Control**: Virtual machine management and status monitoring
@@ -24,7 +24,6 @@ _tl;dr_ **UMA** is a comprehensive monitoring and control system for Unraid serv
 
 ### Security & Production Features
 
-- **JWT Authentication**: Role-based access control with API key and JWT token support
 - **Optimized HTTP Mux**: Clean HTTP multiplexer with organized route groups and efficient middleware
 - **Configuration Management**: Viper-based configuration with hot reload and environment variables
 - **Enhanced Security**: Modern dependency management with security vulnerability elimination
@@ -105,15 +104,7 @@ UMA provides a comprehensive REST API with OpenAPI 3.0.3 specification for integ
 - `POST /api/v1/docker/containers/bulk/stop` - Stop multiple containers
 - `POST /api/v1/docker/containers/bulk/restart` - Restart multiple containers
 
-#### Authentication Management (Phase 3)
-- `POST /api/v1/auth/login` - Authenticate with API key and get JWT token
-- `GET /api/v1/auth/users` - List all users (Admin only)
-- `POST /api/v1/auth/users` - Create new user (Admin only)
-- `GET /api/v1/auth/users/{id}` - Get user details
-- `PUT /api/v1/auth/users/{id}` - Update user (Admin only)
-- `DELETE /api/v1/auth/users/{id}` - Delete user (Admin only)
-- `POST /api/v1/auth/users/{id}/regenerate-key` - Regenerate API key
-- `GET /api/v1/auth/stats` - Authentication statistics
+
 
 ### WebSocket Endpoints
 
@@ -185,9 +176,7 @@ UMA supports multiple configuration methods with the following priority order:
 export UMA_HTTP_PORT=34600
 export UMA_HTTP_HOST="0.0.0.0"
 
-# Authentication
-export UMA_AUTH_ENABLED=false
-export UMA_AUTH_JWT_SECRET="your-secret-key"
+
 
 # Logging
 export UMA_LOGGING_LEVEL=info
@@ -208,10 +197,7 @@ http:
   host: "0.0.0.0"
   timeout: "60s"
 
-auth:
-  enabled: false
-  jwt_secret: "your-secret-key"
-  token_expiry: "24h"
+
 
 logging:
   level: "info"
@@ -240,21 +226,19 @@ monitoring:
 - ✅ **Enhanced Test Coverage**: Comprehensive test suite with >75% coverage
 - ✅ **Ultra-Optimized Binary**: 1.9MB binary (90.5% under 20MB constraint)
 - ✅ **Zero Compilation Errors**: Clean, maintainable codebase following Go best practices
-- ✅ **Middleware Chain**: Proper ordering with CORS → RequestID → Versioning → Compression → Metrics → Logging → Sentry → Auth
+- ✅ **Middleware Chain**: Proper ordering with CORS → RequestID → Versioning → Compression → Metrics → Logging → Sentry
 
 ### Phase 3: Enhanced Features
 
-- ✅ **JWT Authentication**: Role-based access control with Admin, Operator, and Viewer roles
 - ✅ **Optimized HTTP Mux**: Clean HTTP multiplexer with organized route groups and improved performance
 - ✅ **Configuration Management**: Viper integration with hot reload and environment variables
-- ✅ **Authentication API**: Complete user management with API key generation and JWT tokens
 - ✅ **Backward Compatibility**: 100% API compatibility maintained with existing integrations
 
 ### Enhanced Functionality: 100% Coverage Achieved
 
 - ✅ **Docker Individual Container Control**: Complete individual container management (start, stop, restart, pause, resume)
 - ✅ **System Control Endpoints**: User script execution, system logs access, power management (reboot/shutdown)
-- ✅ **Enhanced UPS Integration**: Real hardware integration with APC and NUT systems, comprehensive monitoring data
+- ✅ **Enhanced UPS Integration**: Automatic UPS detection with APC and NUT systems, comprehensive monitoring data
 - ✅ **38+ API Endpoints**: Complete coverage of all Unraid management operations
 - ✅ **OpenAPI 3.1.1 Documentation**: Comprehensive API documentation with all new endpoints
 - ✅ **Production Deployment**: Single binary deployment with clean architecture and optimized performance
@@ -299,8 +283,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Go](https://golang.org/) - Programming language
 - [Go HTTP Mux](https://pkg.go.dev/net/http#ServeMux) - Optimized HTTP multiplexer with custom middleware
-- [Viper](https://github.com/spf13/viper) - Configuration management (Phase 3)
-- [JWT-Go](https://github.com/golang-jwt/jwt) - JWT authentication (Phase 3)
+- [Viper](https://github.com/spf13/viper) - Configuration management
 - [Validator](https://github.com/go-playground/validator) - Input validation
 - [Zerolog](https://github.com/rs/zerolog) - Structured logging
 - [Prometheus](https://github.com/prometheus/client_golang) - Metrics collection
