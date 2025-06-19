@@ -175,8 +175,7 @@ UMA supports multiple configuration methods with the following priority order:
 # HTTP Server
 export UMA_HTTP_PORT=34600
 export UMA_HTTP_HOST="0.0.0.0"
-
-
+export UMA_HTTP_TIMEOUT="60s"
 
 # Logging
 export UMA_LOGGING_LEVEL=info
@@ -184,6 +183,10 @@ export UMA_LOGGING_FORMAT=console
 
 # Monitoring
 export UMA_MONITORING_INTERVAL=30s
+export UMA_MONITORING_UPS_ENABLED=true
+
+# Metrics
+export UMA_METRICS_ENABLED=true
 ```
 
 #### Configuration File Example
@@ -191,72 +194,78 @@ export UMA_MONITORING_INTERVAL=30s
 Create `uma.yaml` in the working directory:
 
 ```yaml
-# UMA Configuration
+# UMA Configuration File
+# Complete example with all available options
+
+# HTTP Server Configuration
 http:
   port: 34600
   host: "0.0.0.0"
   timeout: "60s"
+  read_timeout: "30s"
+  write_timeout: "30s"
 
+# Authentication Configuration (disabled by default for internal use)
+auth:
+  enabled: false
+  api_key: ""
+  jwt_secret: ""
+  token_expiry: "24h"
 
-
+# Logging Configuration
 logging:
   level: "info"
   format: "console"
+  file: ""
+  max_size: 100
+  max_backups: 3
+  max_age: 28
 
+# Metrics Configuration
 metrics:
   enabled: true
   path: "/metrics"
 
+# WebSocket Configuration
+websocket:
+  enabled: true
+  max_connections: 100
+  ping_interval: "30s"
+  pong_timeout: "60s"
+
+# Monitoring Configuration
 monitoring:
   interval: "30s"
   docker:
     enabled: true
   storage:
     enabled: true
+  system:
+    enabled: true
+  ups:
+    enabled: true  # Auto-detects APC/NUT daemons
+  gpu:
+    enabled: true
+
+# Cache Configuration
+cache:
+  enabled: true
+  ttl: "5m"
+  cleanup_interval: "10m"
+
+# Rate Limiting Configuration
+rate_limit:
+  enabled: false
+  requests_per_minute: 60
+  burst: 10
+
+# CORS Configuration
+cors:
+  enabled: true
+  allowed_origins: ["*"]
+  allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  allowed_headers: ["*"]
 ```
-
-## Recent Updates
-
-### Phase 4: Systematic Refactoring & Production Optimization (Latest)
-
-- ✅ **Modular Architecture**: Complete systematic refactoring with 13 focused handler files
-- ✅ **85.5% Code Reduction**: Core server file reduced from 2,138 to 311 lines
-- ✅ **Legacy Code Cleanup**: Removed 2,400+ lines of unused legacy code
-- ✅ **Sentry Integration**: Production-ready error monitoring and tracking
-- ✅ **Enhanced Test Coverage**: Comprehensive test suite with >75% coverage
-- ✅ **Ultra-Optimized Binary**: 1.9MB binary (90.5% under 20MB constraint)
-- ✅ **Zero Compilation Errors**: Clean, maintainable codebase following Go best practices
-- ✅ **Middleware Chain**: Proper ordering with CORS → RequestID → Versioning → Compression → Metrics → Logging → Sentry
-
-### Phase 3: Enhanced Features
-
-- ✅ **Optimized HTTP Mux**: Clean HTTP multiplexer with organized route groups and improved performance
-- ✅ **Configuration Management**: Viper integration with hot reload and environment variables
-- ✅ **Backward Compatibility**: 100% API compatibility maintained with existing integrations
-
-### Enhanced Functionality: 100% Coverage Achieved
-
-- ✅ **Docker Individual Container Control**: Complete individual container management (start, stop, restart, pause, resume)
-- ✅ **System Control Endpoints**: User script execution, system logs access, power management (reboot/shutdown)
-- ✅ **Enhanced UPS Integration**: Automatic UPS detection with APC and NUT systems, comprehensive monitoring data
-- ✅ **38+ API Endpoints**: Complete coverage of all Unraid management operations
-- ✅ **OpenAPI 3.1.1 Documentation**: Comprehensive API documentation with all new endpoints
-- ✅ **Production Deployment**: Single binary deployment with clean architecture and optimized performance
-
-### Phase 2: Production Readiness
-
-- ✅ **Structured Logging**: Implemented Zerolog with contextual fields and JSON output
-- ✅ **Prometheus Metrics**: Comprehensive metrics collection for monitoring and alerting
-- ✅ **Testing Framework**: Added Testify with comprehensive unit tests and benchmarks
-- ✅ **Enhanced Observability**: Full production-grade monitoring and logging stack
-- ✅ **Performance Tracking**: Request duration, success rates, and operation metrics
-
-### Phase 1: Security Updates
-
-- ✅ **Dependency Security**: Replaced 11-year-old INI library with modern alternative
-- ✅ **Enhanced Validation**: Comprehensive input validation with user-friendly errors
-- ✅ **Updated Dependencies**: Kong CLI framework updated to latest stable version
-- ✅ **Backward Compatibility**: All existing functionality preserved during updates
 
 ## Documentation
 
