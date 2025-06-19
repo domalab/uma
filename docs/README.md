@@ -5,29 +5,30 @@ Welcome to the UMA (Unraid Management Agent) documentation. This comprehensive g
 ## Quick Start
 
 - **[Installation Guide](deployment/installation.md)** - Get UMA up and running
+- **[Configuration Guide](deployment/configuration.md)** - Complete configuration reference
 - **[API Quick Start](api/quick-start.md)** - Start using the API immediately
 - **[WebSocket Guide](api/websockets.md)** - Real-time monitoring setup
 
 ## Documentation Structure
 
 ### 📚 API Documentation
+
 - **[API Overview](api/README.md)** - Complete API reference
+- **[Quick Start Guide](api/quick-start.md)** - Essential endpoints and usage patterns
 - **[Endpoints Reference](api/endpoints.md)** - All available endpoints with examples
 - **[OpenAPI Guide](api/openapi-guide.md)** - Using Swagger UI and OpenAPI spec
 - **[WebSocket Guide](api/websockets.md)** - Real-time monitoring via WebSockets
-- **[Bulk Operations](api/bulk-operations.md)** - Efficient multi-container management
 
 ### 🔧 Development
-- **[Development Guide](development/README.md)** - Developer documentation
+
+- **[Development Guide](development/README.md)** - Complete developer documentation
 - **[Metrics Guide](development/metrics.md)** - Prometheus metrics and monitoring
 - **[Logging Guide](development/logging.md)** - Structured logging documentation
-- **[Testing Guide](development/testing.md)** - Running and writing tests
-- **[Contributing](development/contributing.md)** - Contribution guidelines
 
 ### 🚀 Deployment
+
 - **[Installation](deployment/installation.md)** - Installation methods and requirements
-- **[Configuration](deployment/configuration.md)** - Configuration options and settings
-- **[Monitoring Setup](deployment/monitoring.md)** - Setting up Prometheus monitoring
+- **[Configuration Guide](deployment/configuration.md)** - Complete configuration reference
 - **[Troubleshooting](deployment/troubleshooting.md)** - Common issues and solutions
 
 ## Recent Updates

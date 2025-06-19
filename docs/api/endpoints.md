@@ -564,7 +564,7 @@ curl http://your-unraid-ip:34600/api/v1/docs
 **Response:** HTML page with Swagger UI interface
 
 ### GET /openapi.json
-OpenAPI 3.1.1 specification in JSON format.
+OpenAPI 3.0.3 specification in JSON format.
 
 **Example Request:**
 ```bash
@@ -574,11 +574,11 @@ curl http://your-unraid-ip:34600/api/v1/openapi.json
 **Response:**
 ```json
 {
-  "openapi": "3.1.1",
+  "openapi": "3.0.3",
   "info": {
-    "title": "UMA API",
-    "version": "1.0.0",
-    "description": "Unraid Management Agent API"
+    "title": "Unraid Management Agent REST API",
+    "version": "2025.06.16",
+    "description": "Comprehensive REST API for Unraid server management"
   },
   "paths": {
     "/api/v1/health": {
