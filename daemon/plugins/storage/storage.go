@@ -1574,48 +1574,6 @@ func (s *StorageMonitor) resolveMDToPhysical(mdDevice string) string {
 	return ""
 }
 
-// hasRecentIOActivity checks if a disk has recent I/O activity by examining /proc/diskstats
-func (s *StorageMonitor) hasRecentIOActivity(devicePath string) bool {
-	// Extract device name from path (e.g., /dev/sdc -> sdc)
-	deviceName := strings.TrimPrefix(devicePath, "/dev/")
-
-	// Read /proc/diskstats
-	content, err := os.ReadFile("/proc/diskstats")
-	if err != nil {
-		return false
-	}
-
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) < 14 {
-			continue
-		}
-
-		// Field 2 is the device name
-		if fields[2] == deviceName {
-			// Fields 3 and 7 are read and write I/O counts
-			// If either is > 0, the disk has had I/O activity
-			readIOs, _ := strconv.ParseUint(fields[3], 10, 64)
-			writeIOs, _ := strconv.ParseUint(fields[7], 10, 64)
-
-			// Consider disk active if it has significant I/O activity
-			// This is a simple heuristic - in practice, you might want to
-			// track I/O over time to detect recent activity
-			return readIOs > 100 || writeIOs > 10
-		}
-	}
-
-	return false
-}
-
-// isArrayDisk checks if a disk is part of the Unraid array
-func (s *StorageMonitor) isArrayDisk(diskName string) bool {
-	// Array disks follow the pattern: disk0, disk1, disk2, etc.
-	// Parity disks are also part of the array
-	return strings.HasPrefix(diskName, "disk") || diskName == "parity" || diskName == "parity2"
-}
-
 // calculateArrayTotals calculates total sizes for the array
 func (s *StorageMonitor) calculateArrayTotals(arrayInfo *ArrayInfo) {
 	for _, disk := range arrayInfo.Disks {

@@ -5,11 +5,16 @@ import (
 	"log"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gookit/color"
 )
 
 func Red(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
 	printer(color.Red, format, args...)
+
+	// Capture error messages in Sentry for production monitoring
+	sentry.CaptureMessage(message)
 }
 
 func Blue(format string, args ...interface{}) {

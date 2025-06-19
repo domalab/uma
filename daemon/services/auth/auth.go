@@ -370,8 +370,8 @@ func (a *AuthService) CreateUser(username string, role Role) (*User, error) {
 		}
 	}
 
-	// Generate user ID
-	userID := fmt.Sprintf("user-%d", time.Now().Unix())
+	// Generate user ID using nanoseconds to avoid collisions
+	userID := fmt.Sprintf("user-%d", time.Now().UnixNano())
 
 	// Generate API key
 	apiKey, err := a.GenerateAPIKey()

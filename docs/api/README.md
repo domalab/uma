@@ -1,6 +1,6 @@
 # UMA API Documentation
 
-The UMA API provides comprehensive access to Unraid system monitoring, management, and control capabilities through a RESTful interface with OpenAPI 3.1.1 specification.
+The UMA API provides comprehensive access to Unraid system monitoring, management, and control capabilities through a RESTful interface with OpenAPI 3.0.3 specification.
 
 ## API Overview
 

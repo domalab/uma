@@ -1,0 +1,351 @@
+openapi: 3.1.1
+info:
+  title: UMA Rate Limiting API
+  version: 1.0.0
+  description: Rate limiting management and monitoring endpoints
+
+paths:
+  /api/v1/rate-limits/stats:
+    get:
+      tags:
+        - Rate Limiting
+      summary: Get rate limiting statistics
+      description: Retrieve current rate limiting statistics for all operation types and clients
+      responses:
+        '200':
+          description: Rate limiting statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitStatsResponse'
+              examples:
+                example_stats:
+                  summary: Example rate limiting statistics
+                  value:
+                    data:
+                      general_rate_limiter:
+                        type: "general"
+                      operation_rate_limiter:
+                        type: "operation_specific"
+                        total_clients: 3
+                        operation_limits:
+                          smart_data:
+                            requests: 1
+                            window: "1m0s"
+                          parity_check:
+                            requests: 1
+                            window: "1h0m0s"
+                          docker_bulk:
+                            requests: 5
+                            window: "1m0s"
+                        client_stats:
+                          "192.168.1.100":
+                            smart_data:
+                              tokens_remaining: 0
+                              max_tokens: 1
+                            general:
+                              tokens_remaining: 45
+                              max_tokens: 60
+                    meta:
+                      timestamp: 1640995200
+                      api_version: "v1"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+  /api/v1/rate-limits/config:
+    get:
+      tags:
+        - Rate Limiting
+      summary: Get rate limiting configuration
+      description: Retrieve current rate limiting configuration for all operation types
+      responses:
+        '200':
+          description: Rate limiting configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitConfigResponse'
+              examples:
+                example_config:
+                  summary: Example rate limiting configuration
+                  value:
+                    data:
+                      general:
+                        requests: 60
+                        window: "1m0s"
+                      smart_data:
+                        requests: 1
+                        window: "1m0s"
+                      parity_check:
+                        requests: 1
+                        window: "1h0m0s"
+                      array_control:
+                        requests: 2
+                        window: "1m0s"
+                      docker_bulk:
+                        requests: 5
+                        window: "1m0s"
+                      vm_bulk:
+                        requests: 3
+                        window: "1m0s"
+                    meta:
+                      timestamp: 1640995200
+                      api_version: "v1"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+    put:
+      tags:
+        - Rate Limiting
+      summary: Update rate limiting configuration
+      description: Update rate limiting configuration for operation types (requires admin privileges)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitConfigUpdate'
+            examples:
+              update_smart_data:
+                summary: Update SMART data rate limit
+                value:
+                  smart_data:
+                    requests: 2
+                    window: "2m0s"
+              update_multiple:
+                summary: Update multiple operation limits
+                value:
+                  smart_data:
+                    requests: 2
+                    window: "2m0s"
+                  docker_bulk:
+                    requests: 10
+                    window: "1m0s"
+      responses:
+        '200':
+          description: Rate limiting configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitConfigUpdateResponse'
+        '400':
+          description: Invalid configuration values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Admin privileges required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '501':
+          description: Configuration update not implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+components:
+  schemas:
+    OperationType:
+      type: string
+      enum:
+        - general
+        - health_check
+        - smart_data
+        - parity_check
+        - array_control
+        - disk_info
+        - docker_list
+        - docker_control
+        - docker_bulk
+        - vm_list
+        - vm_control
+        - vm_bulk
+        - system_info
+        - system_control
+        - sensor_data
+        - async_create
+        - async_list
+        - async_cancel
+      description: Type of operation for rate limiting
+
+    RateLimit:
+      type: object
+      properties:
+        requests:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          description: Number of requests allowed
+          example: 60
+        window:
+          type: string
+          pattern: '^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$'
+          description: Time window for the rate limit (Go duration format)
+          example: "1m0s"
+      required:
+        - requests
+        - window
+
+    ClientStats:
+      type: object
+      properties:
+        tokens_remaining:
+          type: integer
+          minimum: 0
+          description: Number of tokens remaining for this client
+        max_tokens:
+          type: integer
+          minimum: 1
+          description: Maximum number of tokens for this operation type
+      required:
+        - tokens_remaining
+        - max_tokens
+
+    RateLimitStatsResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                general_rate_limiter:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      example: "general"
+                  description: General rate limiter statistics
+                operation_rate_limiter:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      example: "operation_specific"
+                    total_clients:
+                      type: integer
+                      description: Total number of tracked clients
+                    operation_limits:
+                      type: object
+                      additionalProperties:
+                        $ref: '#/components/schemas/RateLimit'
+                      description: Current rate limits by operation type
+                    client_stats:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        additionalProperties:
+                          $ref: '#/components/schemas/ClientStats'
+                      description: Per-client rate limiting statistics
+
+    RateLimitConfigResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties:
+                $ref: '#/components/schemas/RateLimit'
+              description: Rate limiting configuration by operation type
+
+    RateLimitConfigUpdate:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/RateLimit'
+      description: Rate limiting configuration updates by operation type
+      minProperties: 1
+      example:
+        smart_data:
+          requests: 2
+          window: "2m0s"
+        docker_bulk:
+          requests: 10
+          window: "1m0s"
+
+    RateLimitConfigUpdateResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "Rate limit configuration update not implemented yet"
+                note:
+                  type: string
+                  example: "This endpoint would require admin authentication"
+                updated_operations:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/OperationType'
+                  description: List of operation types that were updated
+
+    StandardResponse:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: integer
+              format: int64
+              description: Unix timestamp of the response
+            request_id:
+              type: string
+              description: Unique request identifier for tracing
+            api_version:
+              type: string
+              example: "v1"
+              description: API version
+
+    APIError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Standardized error code
+              example: "RATE_LIMIT_EXCEEDED"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Rate limit exceeded"
+            details:
+              type: object
+              nullable: true
+              description: Additional error context
+              additionalProperties: true
+              properties:
+                operation_type:
+                  type: string
+                  description: The operation type that was rate limited
+                client_ip:
+                  type: string
+                  description: The client IP that was rate limited
+                limit:
+                  $ref: '#/components/schemas/RateLimit'
+        meta:
+          $ref: '#/components/schemas/StandardResponse/properties/meta'

@@ -20,7 +20,9 @@ import (
 	"github.com/domalab/uma/daemon/plugins/system"
 	"github.com/domalab/uma/daemon/plugins/ups"
 	"github.com/domalab/uma/daemon/plugins/vm"
+	"github.com/domalab/uma/daemon/services/async"
 	"github.com/domalab/uma/daemon/services/auth"
+	"github.com/domalab/uma/daemon/services/cache"
 	"github.com/domalab/uma/daemon/services/config"
 )
 
@@ -34,9 +36,11 @@ type Api struct {
 	httpServer *HTTPServer
 
 	// Services
-	configManager *config.Manager
-	authService   *auth.AuthService
-	rateLimiter   *auth.RateLimiter
+	configManager        *config.Manager
+	authService          *auth.AuthService
+	rateLimiter          *auth.RateLimiter
+	operationRateLimiter *auth.OperationRateLimiter
+	asyncManager         *async.AsyncManager
 
 	// Data providers
 	origin        *dto.Origin
@@ -71,11 +75,19 @@ func Create(ctx *domain.Context) *Api {
 	// Initialize rate limiter (100 requests per minute)
 	rateLimiter := auth.NewRateLimiter(100, time.Minute)
 
+	// Initialize operation-specific rate limiter
+	operationRateLimiter := auth.NewOperationRateLimiter()
+
+	// Initialize async manager
+	asyncManager := async.NewAsyncManager()
+
 	api := &Api{
-		ctx:           ctx,
-		configManager: configManager,
-		authService:   authService,
-		rateLimiter:   rateLimiter,
+		ctx:                  ctx,
+		configManager:        configManager,
+		authService:          authService,
+		rateLimiter:          rateLimiter,
+		operationRateLimiter: operationRateLimiter,
+		asyncManager:         asyncManager,
 	}
 
 	// Initialize HTTP server if enabled
@@ -97,6 +109,12 @@ func (a *Api) Run() error {
 	a.vm = vm.NewVMManager()
 	a.diagnostics = diagnostics.NewDiagnosticsManager()
 	a.notifications = notifications.NewNotificationManager()
+
+	// Initialize cache system
+	cache.InitializeGlobalInvalidator()
+
+	// Register async operation executors
+	a.registerAsyncExecutors()
 
 	// Start HTTP server if configured
 	if a.httpServer != nil {
@@ -149,6 +167,14 @@ func (a *Api) Stop() error {
 			logger.Yellow("Error stopping HTTP server: %v", err)
 		}
 	}
+
+	// Stop async manager
+	if a.asyncManager != nil {
+		a.asyncManager.Stop()
+	}
+
+	// Stop cache system
+	cache.GetGlobalCacheManager().Stop()
 
 	// Stop Unix socket server
 	if a.listener != nil {
@@ -240,4 +266,52 @@ func (a *Api) createUps() ups.Ups {
 	logger.Blue("no ups detected ...")
 
 	return ups.NewNoUps()
+}
+
+// registerAsyncExecutors registers all async operation executors
+func (a *Api) registerAsyncExecutors() {
+	// Create adapters for existing services
+	storageAdapter := async.NewStorageMonitorAdapter(a.storage)
+	dockerAdapter := async.NewDockerManagerAdapter(a.docker)
+
+	// Register parity check executor
+	parityExecutor := async.NewParityCheckExecutor(storageAdapter)
+	a.asyncManager.RegisterExecutor(parityExecutor)
+
+	// Register array operation executors
+	arrayStartExecutor := async.NewArrayStartExecutor(storageAdapter)
+	a.asyncManager.RegisterExecutor(arrayStartExecutor)
+
+	arrayStopExecutor := async.NewArrayStopExecutor(storageAdapter)
+	a.asyncManager.RegisterExecutor(arrayStopExecutor)
+
+	// Register SMART scan executor
+	smartExecutor := async.NewSMARTScanExecutor(storageAdapter)
+	a.asyncManager.RegisterExecutor(smartExecutor)
+
+	// Register bulk container executor
+	bulkContainerExecutor := async.NewBulkContainerExecutor(dockerAdapter)
+	a.asyncManager.RegisterExecutor(bulkContainerExecutor)
+
+	logger.Blue("Registered %d async operation executors", 5)
+}
+
+// GetDockerManager returns the Docker manager instance
+func (a *Api) GetDockerManager() *docker.DockerManager {
+	return a.docker
+}
+
+// GetStorageMonitor returns the storage monitor instance
+func (a *Api) GetStorageMonitor() *storage.StorageMonitor {
+	return a.storage
+}
+
+// GetSystemMonitor returns the system monitor instance
+func (a *Api) GetSystemMonitor() *system.SystemMonitor {
+	return a.system
+}
+
+// GetVMManager returns the VM manager instance
+func (a *Api) GetVMManager() *vm.VMManager {
+	return a.vm
 }

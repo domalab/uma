@@ -1,0 +1,432 @@
+openapi: 3.1.1
+info:
+  title: UMA Async Operations API
+  version: 1.0.0
+  description: Asynchronous operation management endpoints for long-running tasks
+
+paths:
+  /api/v1/operations:
+    get:
+      tags:
+        - Async Operations
+      summary: List async operations
+      description: Retrieve a list of asynchronous operations with optional filtering
+      parameters:
+        - name: status
+          in: query
+          description: Filter operations by status
+          required: false
+          schema:
+            $ref: '#/components/schemas/OperationStatus'
+        - name: type
+          in: query
+          description: Filter operations by operation type
+          required: false
+          schema:
+            $ref: '#/components/schemas/OperationType'
+      responses:
+        '200':
+          description: List of operations retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationListResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+    post:
+      tags:
+        - Async Operations
+      summary: Start async operation
+      description: Start a new asynchronous operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationRequest'
+            examples:
+              smart_scan:
+                summary: SMART data collection
+                value:
+                  type: "smart_scan"
+                  description: "Comprehensive SMART data collection for all disks"
+                  cancellable: true
+              parity_check:
+                summary: Parity check operation
+                value:
+                  type: "parity_check"
+                  description: "Full parity check of the array"
+                  cancellable: true
+                  parameters:
+                    type: "check"
+                    priority: "normal"
+              bulk_container:
+                summary: Bulk container operation
+                value:
+                  type: "bulk_container"
+                  description: "Start multiple Docker containers"
+                  cancellable: false
+                  parameters:
+                    container_ids: ["container1", "container2"]
+                    operation: "start"
+      responses:
+        '201':
+          description: Operation started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '400':
+          description: Invalid request or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicting operation already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+  /api/v1/operations/{operationId}:
+    get:
+      tags:
+        - Async Operations
+      summary: Get operation details
+      description: Retrieve detailed information about a specific operation
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          description: Unique identifier of the operation
+          schema:
+            type: string
+            format: uuid
+            example: "4a799a05-bb59-42a1-ab3b-d4ccbfdc623f"
+      responses:
+        '200':
+          description: Operation details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncOperationResponse'
+        '404':
+          description: Operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+    delete:
+      tags:
+        - Async Operations
+      summary: Cancel operation
+      description: Cancel a running or pending operation (if cancellable)
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          description: Unique identifier of the operation to cancel
+          schema:
+            type: string
+            format: uuid
+            example: "4a799a05-bb59-42a1-ab3b-d4ccbfdc623f"
+      responses:
+        '200':
+          description: Operation cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelOperationResponse'
+        '400':
+          description: Operation cannot be cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: Operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+  /api/v1/operations/stats:
+    get:
+      tags:
+        - Async Operations
+      summary: Get operation statistics
+      description: Retrieve statistics about async operations
+      responses:
+        '200':
+          description: Operation statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationStatsResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+components:
+  schemas:
+    OperationType:
+      type: string
+      enum:
+        - parity_check
+        - parity_correct
+        - array_start
+        - array_stop
+        - disk_scan
+        - smart_scan
+        - system_reboot
+        - system_shutdown
+        - bulk_container
+        - bulk_vm
+      description: Type of asynchronous operation
+
+    OperationStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - completed
+        - failed
+        - cancelled
+      description: Current status of the operation
+
+    OperationRequest:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          $ref: '#/components/schemas/OperationType'
+        description:
+          type: string
+          maxLength: 500
+          description: Human-readable description of the operation
+          example: "Comprehensive SMART data collection for all disks"
+        cancellable:
+          type: boolean
+          default: true
+          description: Whether the operation can be cancelled
+        parameters:
+          type: object
+          description: Operation-specific parameters
+          additionalProperties: true
+          examples:
+            - type: "check"
+              priority: "normal"
+
+    OperationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the operation
+        type:
+          $ref: '#/components/schemas/OperationType'
+        status:
+          $ref: '#/components/schemas/OperationStatus'
+        description:
+          type: string
+          description: Human-readable description
+        cancellable:
+          type: boolean
+          description: Whether the operation can be cancelled
+        started:
+          type: string
+          format: date-time
+          description: When the operation was started
+
+    AsyncOperation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the operation
+        type:
+          $ref: '#/components/schemas/OperationType'
+        status:
+          $ref: '#/components/schemas/OperationStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Progress percentage (0-100)
+        started:
+          type: string
+          format: date-time
+          description: When the operation was started
+        completed:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the operation completed (if finished)
+        error:
+          type: string
+          nullable: true
+          description: Error message if operation failed
+        result:
+          type: object
+          nullable: true
+          description: Operation result data
+          additionalProperties: true
+        cancellable:
+          type: boolean
+          description: Whether the operation can be cancelled
+        description:
+          type: string
+          description: Human-readable description
+        created_by:
+          type: string
+          description: User or system that created the operation
+
+    AsyncOperationResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AsyncOperation'
+
+    OperationListResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                operations:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AsyncOperation'
+                total:
+                  type: integer
+                  description: Total number of operations
+                active:
+                  type: integer
+                  description: Number of active operations
+                completed:
+                  type: integer
+                  description: Number of completed operations
+                failed:
+                  type: integer
+                  description: Number of failed operations
+
+    CancelOperationResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Operation cancelled successfully"
+
+    OperationStatsResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total_operations:
+                  type: integer
+                  description: Total number of operations
+                max_operations:
+                  type: integer
+                  description: Maximum concurrent operations allowed
+                by_status:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                  description: Count of operations by status
+                by_type:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                  description: Count of operations by type
+
+    StandardResponse:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: integer
+              format: int64
+              description: Unix timestamp of the response
+            request_id:
+              type: string
+              description: Unique request identifier for tracing
+            api_version:
+              type: string
+              example: "v1"
+              description: API version
+
+    APIError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Standardized error code
+              example: "OPERATION_NOT_FOUND"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Operation not found"
+            details:
+              type: object
+              nullable: true
+              description: Additional error context
+              additionalProperties: true
+        meta:
+          $ref: '#/components/schemas/StandardResponse/properties/meta'

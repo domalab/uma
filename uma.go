@@ -14,6 +14,8 @@ import (
 
 var Version string
 
+// Sentry functions temporarily disabled for testing
+
 var cli struct {
 	LogsDir    string `default:"/var/log" help:"directory to store logs"`
 	ConfigPath string `default:"" help:"path to configuration file"`
@@ -27,12 +29,16 @@ var cli struct {
 func main() {
 	ctx := kong.Parse(&cli)
 
+	// Initialize Sentry for production error monitoring
+	// initializeSentry()
+	// defer sentry.Flush(2 * time.Second)
+
 	log.SetOutput(&lumberjack.Logger{
 		Filename:   filepath.Join(cli.LogsDir, "uma.log"),
-		MaxSize:    10, // megabytes
-		MaxBackups: 10,
-		MaxAge:     28, // days
-		// Compress:   true, // disabled by default
+		MaxSize:    1,    // megabytes (reduced from 10MB to 1MB)
+		MaxBackups: 3,    // reduced from 10 to 3 backups
+		MaxAge:     7,    // days (reduced from 28 to 7 days)
+		Compress:   true, // enabled to save space
 	})
 
 	// Create base configuration
