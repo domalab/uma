@@ -147,6 +147,14 @@ func (m *Manager) validateAndSetDefaults() {
 	if m.config.Logging.MaxAge < 0 {
 		m.config.Logging.MaxAge = defaults.Logging.MaxAge
 	}
+
+	// Validate MCP config
+	if m.config.MCP.Port <= 0 || m.config.MCP.Port > 65535 {
+		m.config.MCP.Port = defaults.MCP.Port
+	}
+	if m.config.MCP.MaxConnections <= 0 {
+		m.config.MCP.MaxConnections = defaults.MCP.MaxConnections
+	}
 }
 
 // SetHTTPEnabled enables or disables the HTTP server
@@ -189,4 +197,43 @@ func (m *Manager) IsHTTPEnabled() bool {
 // IsAuthEnabled returns whether authentication is enabled
 func (m *Manager) IsAuthEnabled() bool {
 	return m.config.Auth.Enabled
+}
+
+// SetMCPEnabled enables or disables the MCP server
+func (m *Manager) SetMCPEnabled(enabled bool) error {
+	m.config.MCP.Enabled = enabled
+	return m.Save()
+}
+
+// SetMCPPort sets the MCP server port
+func (m *Manager) SetMCPPort(port int) error {
+	if port <= 0 || port > 65535 {
+		return fmt.Errorf("invalid MCP port number: %d", port)
+	}
+	m.config.MCP.Port = port
+	return m.Save()
+}
+
+// SetMCPMaxConnections sets the maximum number of MCP connections
+func (m *Manager) SetMCPMaxConnections(maxConnections int) error {
+	if maxConnections <= 0 {
+		return fmt.Errorf("invalid MCP max connections: %d", maxConnections)
+	}
+	m.config.MCP.MaxConnections = maxConnections
+	return m.Save()
+}
+
+// GetMCPPort returns the configured MCP port
+func (m *Manager) GetMCPPort() int {
+	return m.config.MCP.Port
+}
+
+// IsMCPEnabled returns whether MCP server is enabled
+func (m *Manager) IsMCPEnabled() bool {
+	return m.config.MCP.Enabled
+}
+
+// GetMCPMaxConnections returns the maximum number of MCP connections
+func (m *Manager) GetMCPMaxConnections() int {
+	return m.config.MCP.MaxConnections
 }

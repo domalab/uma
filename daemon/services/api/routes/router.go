@@ -26,6 +26,7 @@ type Router struct {
 	shareHandler             *handlers.ShareHandler
 	scriptHandler            *handlers.ScriptHandler
 	diagnosticsHandler       *handlers.DiagnosticsHandler
+	mcpHandler               *handlers.MCPHandler
 
 	// Legacy handlers for gradual migration
 	httpServer interface{} // Will be *HTTPServer during transition
@@ -47,6 +48,7 @@ func NewRouter(
 	shareHandler *handlers.ShareHandler,
 	scriptHandler *handlers.ScriptHandler,
 	diagnosticsHandler *handlers.DiagnosticsHandler,
+	mcpHandler *handlers.MCPHandler,
 	httpServer interface{}, // Legacy server for transition
 ) *Router {
 	return &Router{
@@ -65,6 +67,7 @@ func NewRouter(
 		shareHandler:             shareHandler,
 		scriptHandler:            scriptHandler,
 		diagnosticsHandler:       diagnosticsHandler,
+		mcpHandler:               mcpHandler,
 		httpServer:               httpServer,
 	}
 }
@@ -86,6 +89,7 @@ func (r *Router) RegisterRoutes() {
 	r.registerShareRoutes()
 	r.registerScriptRoutes()
 	r.registerDiagnosticsRoutes()
+	r.registerMCPRoutes()
 }
 
 // GetHandler returns the configured handler with middleware chain
@@ -179,4 +183,17 @@ func (r *Router) registerDiagnosticsRoutes() {
 	r.mux.HandleFunc("/api/v1/diagnostics/health", r.diagnosticsHandler.HandleDiagnosticsHealth)
 	r.mux.HandleFunc("/api/v1/diagnostics/info", r.diagnosticsHandler.HandleDiagnosticsInfo)
 	r.mux.HandleFunc("/api/v1/diagnostics/repair", r.diagnosticsHandler.HandleDiagnosticsRepair)
+}
+
+// registerMCPRoutes registers MCP (Model Context Protocol) endpoints
+func (r *Router) registerMCPRoutes() {
+	// MCP server status and management
+	r.mux.HandleFunc("GET /api/v1/mcp/status", r.mcpHandler.GetMCPStatus)
+	r.mux.HandleFunc("GET /api/v1/mcp/config", r.mcpHandler.GetMCPConfig)
+	r.mux.HandleFunc("PUT /api/v1/mcp/config", r.mcpHandler.UpdateMCPConfig)
+
+	// MCP tools management
+	r.mux.HandleFunc("GET /api/v1/mcp/tools", r.mcpHandler.GetMCPTools)
+	r.mux.HandleFunc("GET /api/v1/mcp/tools/categories", r.mcpHandler.GetMCPToolsByCategory)
+	r.mux.HandleFunc("POST /api/v1/mcp/tools/refresh", r.mcpHandler.RefreshMCPTools)
 }

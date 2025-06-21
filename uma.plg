@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "uma">
 <!ENTITY author      "Ruaan Deysel">
-<!ENTITY version     "2025.06.16">
+<!ENTITY version     "2025.06.21">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY pluginURL   "https://github.com/domalab/uma/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
@@ -18,6 +18,15 @@
 >
 
 <CHANGES>
+
+###2025.06.21
+- Added Model Context Protocol (MCP) Server Support
+- 50+ auto-discovered MCP tools from REST API endpoints
+- JSON-RPC 2.0 over WebSocket on configurable port (default: 34800)
+- AI assistant integration with Claude Desktop, Python, and JavaScript examples
+- Comprehensive MCP documentation and troubleshooting guide
+- Zero conflicts with existing REST API and WebSocket functionality
+- Production-tested on real Unraid hardware with full validation
 
 ###2025.06.16
 - Phase 3 Enhanced Features: JWT Authentication, Chi Router, Viper Configuration

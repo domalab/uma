@@ -63,6 +63,7 @@ type HTTPServer struct {
 	shareHandler       *handlers.ShareHandler
 	scriptHandler      *handlers.ScriptHandler
 	diagnosticsHandler *handlers.DiagnosticsHandler
+	mcpHandler         *handlers.MCPHandler
 }
 
 // NewHTTPServer creates a new HTTP server instance
@@ -88,6 +89,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 	httpServer.shareHandler = handlers.NewShareHandler(httpServer.apiAdapter)
 	httpServer.scriptHandler = handlers.NewScriptHandler(httpServer.apiAdapter)
 	httpServer.diagnosticsHandler = handlers.NewDiagnosticsHandler(httpServer.apiAdapter)
+	httpServer.mcpHandler = handlers.NewMCPHandler(httpServer.apiAdapter)
 
 	// Initialize handlers
 	httpServer.systemHandler = handlers.NewSystemHandler(httpServer.apiAdapter)
@@ -121,6 +123,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 		httpServer.shareHandler,
 		httpServer.scriptHandler,
 		httpServer.diagnosticsHandler,
+		httpServer.mcpHandler,
 		httpServer, // Pass HTTPServer for legacy handlers during transition
 	)
 

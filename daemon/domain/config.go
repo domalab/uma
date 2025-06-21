@@ -6,6 +6,7 @@ type Config struct {
 	HTTPServer HTTPConfig `json:"http_server"`
 	Auth       AuthConfig `json:"auth"`
 	Logging    LogConfig  `json:"logging"`
+	MCP        MCPConfig  `json:"mcp"`
 }
 
 // HTTPConfig holds HTTP server configuration
@@ -30,6 +31,13 @@ type LogConfig struct {
 	MaxAge     int    `json:"max_age"`
 }
 
+// MCPConfig holds MCP (Model Context Protocol) server configuration
+type MCPConfig struct {
+	Enabled        bool `json:"enabled"`
+	Port           int  `json:"port"`
+	MaxConnections int  `json:"max_connections"`
+}
+
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() Config {
 	return Config{
@@ -47,6 +55,11 @@ func DefaultConfig() Config {
 			MaxSize:    10,
 			MaxBackups: 10,
 			MaxAge:     28,
+		},
+		MCP: MCPConfig{
+			Enabled:        false,
+			Port:           34800,
+			MaxConnections: 100,
 		},
 	}
 }

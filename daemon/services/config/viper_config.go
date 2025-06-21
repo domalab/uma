@@ -133,6 +133,11 @@ func (c *ViperConfigService) setDefaults() {
 	c.viper.SetDefault("cors.allowed_origins", []string{"*"})
 	c.viper.SetDefault("cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
 	c.viper.SetDefault("cors.allowed_headers", []string{"*"})
+
+	// MCP (Model Context Protocol) defaults
+	c.viper.SetDefault("mcp.enabled", false)
+	c.viper.SetDefault("mcp.port", 34800)
+	c.viper.SetDefault("mcp.max_connections", 100)
 }
 
 // onConfigChange handles configuration file changes
@@ -259,6 +264,15 @@ func (c *ViperConfigService) GetMonitoringConfig() MonitoringConfig {
 	}
 }
 
+// GetMCPConfig returns MCP (Model Context Protocol) configuration
+func (c *ViperConfigService) GetMCPConfig() MCPConfig {
+	return MCPConfig{
+		Enabled:        c.GetBool("mcp.enabled"),
+		Port:           c.GetInt("mcp.port"),
+		MaxConnections: c.GetInt("mcp.max_connections"),
+	}
+}
+
 // Configuration structs
 type HTTPConfig struct {
 	Port         int
@@ -293,6 +307,12 @@ type MonitoringConfig struct {
 	GPU      bool
 }
 
+type MCPConfig struct {
+	Enabled        bool
+	Port           int
+	MaxConnections int
+}
+
 // ValidateConfig validates the configuration
 func (c *ViperConfigService) ValidateConfig() error {
 	// Validate HTTP port
@@ -319,6 +339,18 @@ func (c *ViperConfigService) ValidateConfig() error {
 	interval := c.GetDuration("monitoring.interval")
 	if interval < time.Second {
 		return fmt.Errorf("monitoring interval too short: %v", interval)
+	}
+
+	// Validate MCP port
+	mcpPort := c.GetInt("mcp.port")
+	if mcpPort < 1024 || mcpPort > 65535 {
+		return fmt.Errorf("invalid MCP port: %d", mcpPort)
+	}
+
+	// Validate MCP max connections
+	maxConnections := c.GetInt("mcp.max_connections")
+	if maxConnections < 1 || maxConnections > 10000 {
+		return fmt.Errorf("invalid MCP max connections: %d", maxConnections)
 	}
 
 	return nil
@@ -404,6 +436,12 @@ cors:
   allowed_origins: ["*"]
   allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
   allowed_headers: ["*"]
+
+# MCP (Model Context Protocol) Configuration
+mcp:
+  enabled: false
+  port: 34800
+  max_connections: 100
 `
 
 	return os.WriteFile(filename, []byte(sampleConfig), 0644)

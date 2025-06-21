@@ -11,6 +11,7 @@
 - **Hardware Sensors**: Temperature, fan speeds, and UPS monitoring via IPMI/apcupsd
 - **WebSocket Streaming**: Real-time event streams for live monitoring
 - **REST API**: OpenAPI 3.0.3 documented API with comprehensive endpoint coverage
+- **MCP Server**: Model Context Protocol support with 50+ auto-discovered tools
 - **Prometheus Integration**: Native metrics export for monitoring and alerting
 
 ## Quick Start
@@ -54,6 +55,7 @@ UMA provides a comprehensive REST API with OpenAPI 3.0.3 specification for integ
 - **Storage Management**: `/api/v1/storage/*` - Array, cache, and disk information
 - **Docker Control**: `/api/v1/docker/*` - Container management and bulk operations
 - **VM Management**: `/api/v1/vm/*` - Virtual machine control and monitoring
+- **MCP Server**: `/api/v1/mcp/*` - Model Context Protocol configuration and tools
 - **WebSocket Streams**: `/api/v1/ws/*` - Real-time monitoring endpoints
 - **Prometheus Metrics**: `/metrics` - Metrics export for monitoring systems
 
@@ -75,6 +77,7 @@ UMA supports flexible configuration via:
 ### Key Settings
 
 - **HTTP Port**: Default 34600 (configurable 1024-65535)
+- **MCP Server**: Model Context Protocol on port 34800 (configurable, disabled by default)
 - **Monitoring**: Auto-detection of UPS, GPU, and sensor hardware
 - **WebSocket**: Real-time streaming (enabled by default)
 - **Metrics**: Prometheus export (enabled by default)
