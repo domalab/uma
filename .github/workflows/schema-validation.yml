@@ -1,0 +1,298 @@
+name: API Schema Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'daemon/services/api/**'
+      - 'daemon/services/api/openapi/**'
+      - 'daemon/services/api/handlers/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'daemon/services/api/**'
+      - 'daemon/services/api/openapi/**'
+      - 'daemon/services/api/handlers/**'
+  schedule:
+    # Run daily at 2 AM UTC to catch drift
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      target_host:
+        description: 'Target UMA host for validation'
+        required: false
+        default: '192.168.20.21'
+      target_port:
+        description: 'Target UMA port for validation'
+        required: false
+        default: '34600'
+
+jobs:
+  schema-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install OpenAPI tools
+      run: |
+        echo "Installing modern OpenAPI validation tools..."
+        npm install -g @redocly/cli @pb33f/openapi-changes
+        echo "✅ Installed @redocly/cli (provides 'openapi' command)"
+        echo "✅ Installed @pb33f/openapi-changes (provides 'openapi-changes' command)"
+        
+    - name: Build UMA binary
+      run: |
+        go mod download
+        GOOS=linux GOARCH=amd64 go build -v -o uma
+        
+    - name: Build schema validator
+      run: |
+        cd tools/schema-validator
+        go build -o schema-validator main.go
+        cd ../..
+        
+    - name: Make validation script executable
+      run: chmod +x tools/validate-schemas.sh
+      
+    - name: Start UMA for testing (if not external)
+      if: github.event.inputs.target_host == '' || github.event.inputs.target_host == 'localhost'
+      run: |
+        # Start UMA in background for testing
+        ./uma &
+        UMA_PID=$!
+        echo "UMA_PID=$UMA_PID" >> $GITHUB_ENV
+        
+        # Wait for UMA to start
+        timeout 30 bash -c 'until curl -s http://localhost:34600/api/v1/health; do sleep 1; done'
+        
+    - name: Run schema validation (localhost)
+      if: github.event.inputs.target_host == '' || github.event.inputs.target_host == 'localhost'
+      env:
+        UMA_HOST: localhost
+        UMA_PORT: 34600
+      run: |
+        ./tools/validate-schemas.sh
+        
+    - name: Run schema validation (external)
+      if: github.event.inputs.target_host != '' && github.event.inputs.target_host != 'localhost'
+      env:
+        UMA_HOST: ${{ github.event.inputs.target_host }}
+        UMA_PORT: ${{ github.event.inputs.target_port }}
+      run: |
+        ./tools/validate-schemas.sh
+        
+    - name: Stop UMA (if started locally)
+      if: env.UMA_PID != ''
+      run: |
+        kill $UMA_PID || true
+        
+    - name: Upload validation reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: schema-validation-reports-${{ github.run_number }}
+        path: |
+          reports/
+          !reports/baseline_openapi_spec.json
+        retention-days: 30
+        
+    - name: Comment PR with validation results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Find the latest validation report
+          const reportsDir = './reports';
+          const files = fs.readdirSync(reportsDir);
+          const validationFile = files.find(f => f.startsWith('schema_validation_') && f.endsWith('.json'));
+          
+          if (!validationFile) {
+            console.log('No validation report found');
+            return;
+          }
+          
+          const reportPath = path.join(reportsDir, validationFile);
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          
+          const summary = report.summary || {};
+          const violations = report.violations || [];
+          
+          const critical = violations.filter(v => v.severity === 'CRITICAL').length;
+          const warnings = violations.filter(v => v.severity === 'WARNING').length;
+          const info = violations.filter(v => v.severity === 'INFO').length;
+          
+          let status = '✅';
+          let statusText = 'All schemas valid';
+          
+          if (critical > 0) {
+            status = '❌';
+            statusText = `${critical} critical issue(s) found`;
+          } else if (warnings > 0) {
+            status = '⚠️';
+            statusText = `${warnings} warning(s) found`;
+          }
+          
+          const comment = `## ${status} API Schema Validation Results
+          
+          **Status**: ${statusText}
+          
+          ### Summary
+          - 🚨 **Critical Issues**: ${critical}
+          - ⚠️ **Warnings**: ${warnings}  
+          - ℹ️ **Info**: ${info}
+          - 📊 **Total Violations**: ${violations.length}
+          
+          ${critical > 0 ? `
+          ### 🚨 Critical Issues
+          ${violations.filter(v => v.severity === 'CRITICAL').slice(0, 5).map(v => 
+            `- **${v.endpoint}** [${v.field}]: ${v.message}`
+          ).join('\n')}
+          ${violations.filter(v => v.severity === 'CRITICAL').length > 5 ? '\n*...and more*' : ''}
+          ` : ''}
+          
+          ### 📋 Validation Details
+          - **Timestamp**: ${report.timestamp}
+          - **Endpoints Tested**: ${new Set(violations.map(v => v.endpoint)).size} unique endpoints
+          - **Fields Validated**: ${violations.length} total field checks
+          
+          ${critical > 0 ? '**❌ This PR introduces schema validation failures. Please review and fix before merging.**' : '**✅ All schema validations passed. Safe to merge.**'}
+          
+          <details>
+          <summary>View detailed validation report</summary>
+          
+          \`\`\`json
+          ${JSON.stringify(report, null, 2)}
+          \`\`\`
+          
+          </details>`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+          
+    - name: Fail job if critical issues found
+      run: |
+        if [ -f "reports/schema_validation_"*".json" ]; then
+          if grep -q '"severity":"CRITICAL"' reports/schema_validation_*.json; then
+            echo "❌ Critical schema validation issues found"
+            exit 1
+          fi
+        fi
+        echo "✅ Schema validation passed"
+
+  schema-drift-detection:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install OpenAPI tools
+      run: |
+        echo "Installing OpenAPI diff tool..."
+        npm install -g @pb33f/openapi-changes
+        echo "✅ Installed @pb33f/openapi-changes"
+      
+    - name: Download current OpenAPI spec
+      env:
+        UMA_HOST: ${{ github.event.inputs.target_host || '192.168.20.21' }}
+        UMA_PORT: ${{ github.event.inputs.target_port || '34600' }}
+      run: |
+        mkdir -p reports
+        curl -s "http://${UMA_HOST}:${UMA_PORT}/api/v1/openapi.json" > reports/current_spec.json
+        
+    - name: Download baseline spec from artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: baseline-openapi-spec
+        path: reports/
+      continue-on-error: true
+      
+    - name: Compare specs for drift
+      run: |
+        if [ -f "reports/baseline_openapi_spec.json" ]; then
+          openapi-changes summary reports/baseline_openapi_spec.json reports/current_spec.json --no-logo > reports/schema_drift_report.txt || true
+          echo "Schema drift analysis completed"
+        else
+          echo "No baseline spec found, creating new baseline"
+          cp reports/current_spec.json reports/baseline_openapi_spec.json
+        fi
+        
+    - name: Upload baseline spec
+      uses: actions/upload-artifact@v4
+      with:
+        name: baseline-openapi-spec
+        path: reports/baseline_openapi_spec.json
+        retention-days: 90
+        
+    - name: Create issue for significant drift
+      if: hashFiles('reports/schema_drift_report.txt') != ''
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          if (!fs.existsSync('reports/schema_drift_report.txt')) {
+            console.log('No drift report found');
+            return;
+          }
+
+          const driftReport = fs.readFileSync('reports/schema_drift_report.txt', 'utf8');
+
+          // Check if there are changes (not "No changes found")
+          if (!driftReport.includes('No changes found')) {
+            const issueBody = `## 🚨 API Schema Drift Detected
+
+            Automated schema drift detection has found changes in the OpenAPI specification.
+
+            ### Drift Report
+            \`\`\`
+            ${driftReport}
+            \`\`\`
+            
+            ### Action Required
+            - Review the changes to ensure they are intentional
+            - Update API documentation if needed
+            - Consider API versioning for breaking changes
+            - Update integration tests
+            
+            ### Next Steps
+            1. Review the drift report above
+            2. If changes are intentional, update the baseline spec
+            3. If changes are unintentional, investigate and fix
+            4. Close this issue once resolved
+            
+            **Auto-generated by schema drift detection workflow**`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 API Schema Drift Detected - ${new Date().toISOString().split('T')[0]}`,
+              body: issueBody,
+              labels: ['api', 'schema-drift', 'needs-review']
+            });
+          }

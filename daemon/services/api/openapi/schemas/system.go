@@ -9,6 +9,11 @@ func GetSystemSchemas() map[string]interface{} {
 		"TemperatureData":   getTemperatureDataSchema(),
 		"FanData":           getFanDataSchema(),
 		"GPUInfo":           getGPUInfoSchema(),
+		"GPU":               getGPUSchema(),
+		"GPUMemory":         getGPUMemorySchema(),
+		"GPUPower":          getGPUPowerSchema(),
+		"GPUClocks":         getGPUClocksSchema(),
+		"GPUEngines":        getGPUEnginesSchema(),
 		"UPSInfo":           getUPSInfoSchema(),
 		"NetworkInfo":       getNetworkInfoSchema(),
 		"SystemResources":   getSystemResourcesSchema(),
@@ -22,6 +27,7 @@ func GetSystemSchemas() map[string]interface{} {
 		"TemperatureInput":  getTemperatureInputSchema(),
 		"FanInfo":           getFanInfoSchema(),
 		"SystemLogs":        getSystemLogsSchema(),
+		"SystemLogsAll":     getSystemLogsAllSchema(),
 		"ParityCheckStatus": getParityCheckStatusSchema(),
 		"ParityDiskInfo":    getParityDiskInfoSchema(),
 		"TemperatureInfo":   getTemperatureInfoSchema(),
@@ -78,17 +84,17 @@ func getCPUInfoSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"usage_percent": map[string]interface{}{
+			"usage": map[string]interface{}{
 				"type":        "number",
 				"description": "CPU usage percentage",
-				"example":     25.5,
+				"example":     12.7,
 				"minimum":     0,
 				"maximum":     100,
 			},
 			"cores": map[string]interface{}{
 				"type":        "integer",
 				"description": "Number of CPU cores",
-				"example":     8,
+				"example":     6,
 				"minimum":     1,
 			},
 			"threads": map[string]interface{}{
@@ -111,7 +117,30 @@ func getCPUInfoSchema() map[string]interface{} {
 			"temperature": map[string]interface{}{
 				"type":        "number",
 				"description": "CPU temperature in Celsius",
-				"example":     45.5,
+				"example":     41.0,
+			},
+			"architecture": map[string]interface{}{
+				"type":        "string",
+				"description": "CPU architecture",
+				"example":     "x86_64",
+			},
+			"load1": map[string]interface{}{
+				"type":        "number",
+				"description": "1-minute load average",
+				"example":     0.39,
+				"minimum":     0,
+			},
+			"load5": map[string]interface{}{
+				"type":        "number",
+				"description": "5-minute load average",
+				"example":     0.38,
+				"minimum":     0,
+			},
+			"load15": map[string]interface{}{
+				"type":        "number",
+				"description": "15-minute load average",
+				"example":     0.43,
+				"minimum":     0,
 			},
 			"last_updated": map[string]interface{}{
 				"type":        "string",
@@ -120,7 +149,7 @@ func getCPUInfoSchema() map[string]interface{} {
 				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
-		"required": []string{"usage_percent", "cores", "last_updated"},
+		"required": []string{"usage", "cores", "last_updated"},
 	}
 }
 
@@ -131,25 +160,25 @@ func getMemoryInfoSchema() map[string]interface{} {
 			"total": map[string]interface{}{
 				"type":        "integer",
 				"description": "Total memory in bytes",
-				"example":     34359738368,
+				"example":     33328439296,
 				"minimum":     0,
 			},
 			"available": map[string]interface{}{
 				"type":        "integer",
 				"description": "Available memory in bytes",
-				"example":     17179869184,
+				"example":     26384523264,
 				"minimum":     0,
 			},
 			"used": map[string]interface{}{
 				"type":        "integer",
 				"description": "Used memory in bytes",
-				"example":     17179869184,
+				"example":     6943916032,
 				"minimum":     0,
 			},
-			"usage_percent": map[string]interface{}{
+			"usage": map[string]interface{}{
 				"type":        "number",
 				"description": "Memory usage percentage",
-				"example":     50.0,
+				"example":     20.8,
 				"minimum":     0,
 				"maximum":     100,
 			},
@@ -165,16 +194,10 @@ func getMemoryInfoSchema() map[string]interface{} {
 				"example":     2147483648,
 				"minimum":     0,
 			},
-			"swap_total": map[string]interface{}{
+			"free": map[string]interface{}{
 				"type":        "integer",
-				"description": "Total swap in bytes",
-				"example":     4294967296,
-				"minimum":     0,
-			},
-			"swap_used": map[string]interface{}{
-				"type":        "integer",
-				"description": "Used swap in bytes",
-				"example":     0,
+				"description": "Free memory in bytes",
+				"example":     826167296,
 				"minimum":     0,
 			},
 			"last_updated": map[string]interface{}{
@@ -184,7 +207,7 @@ func getMemoryInfoSchema() map[string]interface{} {
 				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
-		"required": []string{"total", "available", "used", "usage_percent", "last_updated"},
+		"required": []string{"total", "available", "used", "usage", "last_updated"},
 	}
 }
 
@@ -356,6 +379,52 @@ func getUPSInfoSchema() map[string]interface{} {
 				"description": "UPS model",
 				"example":     "APC Smart-UPS 1500",
 			},
+			"voltage": map[string]interface{}{
+				"type":        "integer",
+				"description": "UPS voltage",
+				"example":     240,
+				"minimum":     0,
+			},
+			"available": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Whether UPS is available",
+				"example":     true,
+			},
+			"detection": map[string]interface{}{
+				"type":        "object",
+				"description": "UPS detection information",
+				"properties": map[string]interface{}{
+					"available": map[string]interface{}{
+						"type":        "boolean",
+						"description": "Whether UPS detection is available",
+						"example":     true,
+					},
+					"last_check": map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "Last detection check timestamp",
+						"example":     "2025-06-20T10:56:38Z",
+					},
+					"type": map[string]interface{}{
+						"type":        "number",
+						"description": "Detection type",
+						"example":     1,
+					},
+				},
+				"required": []string{"available", "last_check", "type"},
+			},
+			"load": map[string]interface{}{
+				"type":        "integer",
+				"description": "UPS load",
+				"example":     0,
+				"minimum":     0,
+			},
+			"runtime": map[string]interface{}{
+				"type":        "integer",
+				"description": "UPS runtime",
+				"example":     220,
+				"minimum":     0,
+			},
 			"last_updated": map[string]interface{}{
 				"type":        "string",
 				"format":      "date-time",
@@ -363,7 +432,7 @@ func getUPSInfoSchema() map[string]interface{} {
 				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
-		"required": []string{"status", "last_updated"},
+		"required": []string{"status", "available", "detection", "voltage", "load", "runtime", "last_updated"},
 	}
 }
 
@@ -374,50 +443,15 @@ func getGPUInfoSchema() map[string]interface{} {
 			"gpus": map[string]interface{}{
 				"type": "array",
 				"items": map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"id": map[string]interface{}{
-							"type":        "string",
-							"description": "GPU ID",
-							"example":     "0",
-						},
-						"name": map[string]interface{}{
-							"type":        "string",
-							"description": "GPU name",
-							"example":     "NVIDIA GeForce RTX 3080",
-						},
-						"utilization": map[string]interface{}{
-							"type":        "number",
-							"description": "GPU utilization percentage",
-							"example":     15.5,
-							"minimum":     0,
-							"maximum":     100,
-						},
-						"memory_used": map[string]interface{}{
-							"type":        "integer",
-							"description": "Used GPU memory in bytes",
-							"example":     2147483648,
-							"minimum":     0,
-						},
-						"memory_total": map[string]interface{}{
-							"type":        "integer",
-							"description": "Total GPU memory in bytes",
-							"example":     10737418240,
-							"minimum":     0,
-						},
-						"temperature": map[string]interface{}{
-							"type":        "number",
-							"description": "GPU temperature in Celsius",
-							"example":     65.0,
-						},
-					},
+					"$ref": "#/components/schemas/GPU",
 				},
+				"description": "List of detected GPUs with comprehensive monitoring data",
 			},
 			"last_updated": map[string]interface{}{
 				"type":        "string",
 				"format":      "date-time",
 				"description": "Last update timestamp",
-				"example":     "2025-06-16T14:30:00Z",
+				"example":     "2025-06-19T02:53:23Z",
 			},
 		},
 		"required": []string{"gpus", "last_updated"},
@@ -483,6 +517,117 @@ func getSystemResourcesSchema() map[string]interface{} {
 			"memory": map[string]interface{}{
 				"$ref": "#/components/schemas/MemoryInfo",
 			},
+			"network": map[string]interface{}{
+				"type":        "object",
+				"description": "Network interface information",
+				"properties": map[string]interface{}{
+					"interfaces": map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"name": map[string]interface{}{
+									"type":        "string",
+									"description": "Interface name",
+									"example":     "eth0",
+								},
+								"ip_address": map[string]interface{}{
+									"type":        "string",
+									"description": "IP address",
+									"example":     "192.168.20.21",
+								},
+								"status": map[string]interface{}{
+									"type":        "string",
+									"description": "Interface status",
+									"enum":        []string{"up", "down"},
+									"example":     "up",
+								},
+								"rx_bytes": map[string]interface{}{
+									"type":        "number",
+									"description": "Received bytes",
+									"example":     1820920544100,
+									"minimum":     0,
+								},
+								"tx_bytes": map[string]interface{}{
+									"type":        "number",
+									"description": "Transmitted bytes",
+									"example":     1199805033,
+									"minimum":     0,
+								},
+							},
+							"required": []string{"name", "status", "rx_bytes", "tx_bytes"},
+						},
+					},
+				},
+				"required": []string{"interfaces"},
+			},
+			"uptime": map[string]interface{}{
+				"type":        "object",
+				"description": "System uptime information",
+				"properties": map[string]interface{}{
+					"uptime": map[string]interface{}{
+						"type":        "string",
+						"description": "Human readable uptime",
+						"example":     "3d 20h 14m 31s",
+					},
+					"uptime_seconds": map[string]interface{}{
+						"type":        "number",
+						"description": "Uptime in seconds",
+						"example":     332071,
+						"minimum":     0,
+					},
+					"days": map[string]interface{}{
+						"type":        "number",
+						"description": "Days component",
+						"example":     3,
+						"minimum":     0,
+					},
+					"hours": map[string]interface{}{
+						"type":        "number",
+						"description": "Hours component",
+						"example":     20,
+						"minimum":     0,
+					},
+					"minutes": map[string]interface{}{
+						"type":        "number",
+						"description": "Minutes component",
+						"example":     14,
+						"minimum":     0,
+					},
+					"seconds": map[string]interface{}{
+						"type":        "number",
+						"description": "Seconds component",
+						"example":     31,
+						"minimum":     0,
+					},
+				},
+				"required": []string{"uptime", "uptime_seconds"},
+			},
+			"load": map[string]interface{}{
+				"type":        "object",
+				"description": "System load averages",
+				"properties": map[string]interface{}{
+					"load1": map[string]interface{}{
+						"type":        "number",
+						"description": "1-minute load average",
+						"example":     0.51,
+						"minimum":     0,
+					},
+					"load5": map[string]interface{}{
+						"type":        "number",
+						"description": "5-minute load average",
+						"example":     0.54,
+						"minimum":     0,
+					},
+					"load15": map[string]interface{}{
+						"type":        "number",
+						"description": "15-minute load average",
+						"example":     0.59,
+						"minimum":     0,
+					},
+				},
+				"required": []string{"load1", "load5", "load15"},
+			},
 			"load_average": map[string]interface{}{
 				"type": "array",
 				"items": map[string]interface{}{
@@ -504,7 +649,7 @@ func getSystemResourcesSchema() map[string]interface{} {
 				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
-		"required": []string{"cpu", "memory", "last_updated"},
+		"required": []string{"cpu", "memory", "network", "uptime", "load", "last_updated"},
 	}
 }
 
@@ -840,8 +985,14 @@ func getParityCheckStatusSchema() map[string]interface{} {
 				"enum":        []string{"check", "correct"},
 				"example":     "check",
 			},
+			"last_updated": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "Last update timestamp",
+				"example":     "2025-06-20T00:56:56Z",
+			},
 		},
-		"required": []string{"status", "progress", "errors"},
+		"required": []string{"status", "progress", "errors", "last_updated"},
 	}
 }
 
@@ -981,6 +1132,43 @@ func getTemperatureInfoSchema() map[string]interface{} {
 					"required": []string{"name", "current", "status"},
 				},
 			},
+			"fans": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"name": map[string]interface{}{
+							"type":        "string",
+							"description": "Fan name",
+							"example":     "nct6793 - fan1",
+						},
+						"source": map[string]interface{}{
+							"type":        "string",
+							"description": "Fan source chip",
+							"example":     "nct6793",
+						},
+						"speed": map[string]interface{}{
+							"type":        "number",
+							"description": "Fan speed in RPM",
+							"example":     790,
+							"minimum":     0,
+						},
+						"status": map[string]interface{}{
+							"type":        "string",
+							"description": "Fan status",
+							"enum":        []string{"normal", "warning", "critical"},
+							"example":     "normal",
+						},
+						"unit": map[string]interface{}{
+							"type":        "string",
+							"description": "Speed unit",
+							"example":     "RPM",
+						},
+					},
+					"required": []string{"name", "speed", "status"},
+				},
+				"description": "Fan monitoring data",
+			},
 			"overall_status": map[string]interface{}{
 				"type":        "string",
 				"description": "Overall temperature status",
@@ -999,6 +1187,313 @@ func getTemperatureInfoSchema() map[string]interface{} {
 				"example":     "2024-01-01T12:00:00Z",
 			},
 		},
-		"required": []string{"sensors", "overall_status", "last_updated"},
+		"required": []string{"sensors", "fans", "overall_status", "last_updated"},
+	}
+}
+
+// Enhanced GPU schema definitions
+
+func getGPUSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"index": map[string]interface{}{
+				"type":        "integer",
+				"description": "GPU index/ID",
+				"example":     0,
+				"minimum":     0,
+			},
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "GPU name/model",
+				"example":     "Intel Corporation CoffeeLake-S GT2 [UHD Graphics 630]",
+			},
+			"uuid": map[string]interface{}{
+				"type":        "string",
+				"description": "GPU UUID (if available)",
+				"example":     "GPU-12345678-1234-1234-1234-123456789abc",
+			},
+			"vendor": map[string]interface{}{
+				"type":        "string",
+				"description": "GPU vendor",
+				"enum":        []string{"Intel", "NVIDIA", "AMD"},
+				"example":     "Intel",
+			},
+			"type": map[string]interface{}{
+				"type":        "string",
+				"description": "GPU type",
+				"enum":        []string{"integrated", "discrete"},
+				"example":     "integrated",
+			},
+			"driver": map[string]interface{}{
+				"type":        "string",
+				"description": "GPU driver name",
+				"example":     "iwlwifi",
+			},
+			"usage": map[string]interface{}{
+				"type":        "number",
+				"description": "Overall GPU utilization percentage",
+				"example":     0.0,
+				"minimum":     0,
+				"maximum":     100,
+			},
+			"temperature": map[string]interface{}{
+				"type":        "integer",
+				"description": "GPU temperature in Celsius",
+				"example":     40,
+			},
+			"memory": map[string]interface{}{
+				"$ref":        "#/components/schemas/GPUMemory",
+				"description": "GPU memory information",
+			},
+			"power": map[string]interface{}{
+				"$ref":        "#/components/schemas/GPUPower",
+				"description": "GPU power consumption information",
+			},
+			"clocks": map[string]interface{}{
+				"$ref":        "#/components/schemas/GPUClocks",
+				"description": "GPU clock frequencies",
+			},
+			"engines": map[string]interface{}{
+				"$ref":        "#/components/schemas/GPUEngines",
+				"description": "GPU engine utilization (Intel-specific)",
+			},
+			"status": map[string]interface{}{
+				"type":        "string",
+				"description": "GPU status",
+				"enum":        []string{"active", "idle", "error", "unknown"},
+				"example":     "active",
+			},
+			"last_updated": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "Last update timestamp",
+				"example":     "2025-06-19T02:53:23Z",
+			},
+		},
+		"required": []string{"index", "name", "vendor", "type", "driver", "usage", "temperature", "status", "last_updated"},
+	}
+}
+
+func getGPUMemorySchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"total_bytes": map[string]interface{}{
+				"type":        "integer",
+				"description": "Total GPU memory in bytes",
+				"example":     8589934592,
+				"minimum":     0,
+			},
+			"used_bytes": map[string]interface{}{
+				"type":        "integer",
+				"description": "Used GPU memory in bytes",
+				"example":     2147483648,
+				"minimum":     0,
+			},
+			"free_bytes": map[string]interface{}{
+				"type":        "integer",
+				"description": "Free GPU memory in bytes",
+				"example":     6442450944,
+				"minimum":     0,
+			},
+			"usage_percent": map[string]interface{}{
+				"type":        "number",
+				"description": "Memory usage percentage",
+				"example":     25.0,
+				"minimum":     0,
+				"maximum":     100,
+			},
+			"total_formatted": map[string]interface{}{
+				"type":        "string",
+				"description": "Human-readable total memory",
+				"example":     "8 GB",
+			},
+			"used_formatted": map[string]interface{}{
+				"type":        "string",
+				"description": "Human-readable used memory",
+				"example":     "2 GB",
+			},
+			"free_formatted": map[string]interface{}{
+				"type":        "string",
+				"description": "Human-readable free memory",
+				"example":     "6 GB",
+			},
+		},
+	}
+}
+
+func getGPUPowerSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"draw_watts": map[string]interface{}{
+				"type":        "number",
+				"description": "Current power draw in watts",
+				"example":     150.5,
+				"minimum":     0,
+			},
+			"limit_watts": map[string]interface{}{
+				"type":        "number",
+				"description": "Power limit in watts",
+				"example":     200.0,
+				"minimum":     0,
+			},
+			"usage_percent": map[string]interface{}{
+				"type":        "number",
+				"description": "Power usage percentage of limit",
+				"example":     75.25,
+				"minimum":     0,
+				"maximum":     100,
+			},
+			"draw_formatted": map[string]interface{}{
+				"type":        "string",
+				"description": "Human-readable power draw",
+				"example":     "150.5 W",
+			},
+			"limit_formatted": map[string]interface{}{
+				"type":        "string",
+				"description": "Human-readable power limit",
+				"example":     "200 W",
+			},
+		},
+	}
+}
+
+func getGPUClocksSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"core": map[string]interface{}{
+				"type":        "integer",
+				"description": "Core clock frequency in MHz",
+				"example":     1200,
+				"minimum":     0,
+			},
+			"memory": map[string]interface{}{
+				"type":        "integer",
+				"description": "Memory clock frequency in MHz",
+				"example":     1750,
+				"minimum":     0,
+			},
+			"shader": map[string]interface{}{
+				"type":        "integer",
+				"description": "Shader clock frequency in MHz",
+				"example":     1500,
+				"minimum":     0,
+			},
+		},
+	}
+}
+
+func getGPUEnginesSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type":        "object",
+		"description": "GPU engine utilization percentages (Intel-specific)",
+		"properties": map[string]interface{}{
+			"render": map[string]interface{}{
+				"type":        "number",
+				"description": "Render/3D engine utilization percentage",
+				"example":     0.0,
+				"minimum":     0,
+				"maximum":     100,
+			},
+			"video": map[string]interface{}{
+				"type":        "number",
+				"description": "Video decode engine utilization percentage",
+				"example":     0.0,
+				"minimum":     0,
+				"maximum":     100,
+			},
+			"video_enhance": map[string]interface{}{
+				"type":        "number",
+				"description": "Video enhancement engine utilization percentage",
+				"example":     0.0,
+				"minimum":     0,
+				"maximum":     100,
+			},
+			"blitter": map[string]interface{}{
+				"type":        "number",
+				"description": "Blitter engine utilization percentage",
+				"example":     0.0,
+				"minimum":     0,
+				"maximum":     100,
+			},
+		},
+	}
+}
+
+func getSystemLogsAllSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"logs": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"$ref": "#/components/schemas/LogEntry",
+				},
+				"description": "Array of log entries from all system sources",
+			},
+			"sources": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"description": "List of log sources included",
+				"example":     []string{"syslog", "kernel", "auth", "daemon"},
+			},
+			"total_entries": map[string]interface{}{
+				"type":        "integer",
+				"description": "Total number of log entries",
+				"example":     1500,
+				"minimum":     0,
+			},
+			"time_range": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"start": map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "Start time of log range",
+						"example":     "2025-06-20T00:00:00Z",
+					},
+					"end": map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "End time of log range",
+						"example":     "2025-06-20T23:59:59Z",
+					},
+				},
+				"required": []string{"start", "end"},
+			},
+			"filters_applied": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"level": map[string]interface{}{
+						"type":        "string",
+						"description": "Log level filter applied",
+						"example":     "info",
+					},
+					"lines": map[string]interface{}{
+						"type":        "integer",
+						"description": "Number of lines requested",
+						"example":     1000,
+					},
+					"since": map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "Since timestamp filter",
+						"example":     "2025-06-20T12:00:00Z",
+					},
+				},
+			},
+			"last_updated": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "Last update timestamp",
+				"example":     "2025-06-20T14:30:00Z",
+			},
+		},
+		"required": []string{"logs", "sources", "total_entries", "last_updated"},
 	}
 }

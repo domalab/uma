@@ -28,4 +28,8 @@ func (r *Router) registerSystemRoutes() {
 	r.mux.HandleFunc("/api/v1/system/shutdown", r.systemHandler.HandleSystemShutdown)
 	r.mux.HandleFunc("/api/v1/system/logs", r.systemHandler.HandleSystemLogs)
 	r.mux.HandleFunc("/api/v1/system/logs/all", r.systemHandler.HandleSystemLogsAll)
+
+	// Temperature monitoring endpoints
+	r.mux.HandleFunc("/api/v1/system/temperature/thresholds", r.systemHandler.HandleTemperatureThresholds)
+	r.mux.HandleFunc("/api/v1/system/temperature/alerts", r.systemHandler.HandleTemperatureAlerts)
 }

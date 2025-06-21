@@ -88,7 +88,22 @@ func (g *Generator) generatePaths() map[string]interface{} {
 	}
 
 	// Add rate limiting paths
-	for path, definition := range paths.RateLimitingPaths() {
+	for path, definition := range paths.GetRateLimitingPaths() {
+		allPaths[path] = definition
+	}
+
+	// Add scripts paths
+	for path, definition := range paths.GetScriptsPaths() {
+		allPaths[path] = definition
+	}
+
+	// Add shares paths
+	for path, definition := range paths.GetSharesPaths() {
+		allPaths[path] = definition
+	}
+
+	// Add documentation paths
+	for path, definition := range paths.GetDocumentationPaths() {
 		allPaths[path] = definition
 	}
 

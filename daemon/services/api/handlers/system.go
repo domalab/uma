@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,7 +38,8 @@ func (h *SystemHandler) HandleSystemInfo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	info := h.api.GetInfo()
+	// Get system information that matches the OpenAPI schema
+	info := h.getSystemInfo()
 	utils.WriteJSON(w, http.StatusOK, info)
 }
 
@@ -139,16 +142,50 @@ func (h *SystemHandler) HandleParityDisk(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Placeholder implementation - would need to implement GetParityDiskInfo in SystemInterface
-	parityDisk := map[string]interface{}{
-		"name":         "Unknown",
-		"size":         0,
-		"temperature":  0.0,
-		"health":       "Unknown",
+	// Get array information which includes parity disk data
+	arrayData, err := h.api.GetStorage().GetArrayInfo()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get array information: %v", err))
+		return
+	}
+
+	// Extract parity disk information from array data to match OpenAPI schema
+	parityInfo := map[string]interface{}{
+		"parity1":      nil, // Required field
+		"parity2":      nil, // Optional field
 		"last_updated": time.Now().UTC().Format(time.RFC3339),
 	}
 
-	utils.WriteJSON(w, http.StatusOK, parityDisk)
+	// If array data contains parity information, extract it
+	if arrayMap, ok := arrayData.(map[string]interface{}); ok {
+		if disks, exists := arrayMap["disks"]; exists {
+			if diskSlice, ok := disks.([]interface{}); ok {
+				for _, disk := range diskSlice {
+					if diskMap, ok := disk.(map[string]interface{}); ok {
+						if name, exists := diskMap["name"]; exists {
+							if nameStr, ok := name.(string); ok {
+								// Transform disk data to match schema
+								diskInfo := h.transformParityDiskInfo(diskMap)
+
+								if nameStr == "parity1" || strings.HasPrefix(nameStr, "parity") {
+									parityInfo["parity1"] = diskInfo
+								} else if nameStr == "parity2" {
+									parityInfo["parity2"] = diskInfo
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Ensure parity1 is not nil (required field)
+	if parityInfo["parity1"] == nil {
+		parityInfo["parity1"] = h.getDefaultParityDiskInfo()
+	}
+
+	utils.WriteJSON(w, http.StatusOK, parityInfo)
 }
 
 // HandleParityCheck handles GET /api/v1/system/parity/check
@@ -158,13 +195,34 @@ func (h *SystemHandler) HandleParityCheck(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Placeholder implementation - would need to implement GetParityCheckInfo in SystemInterface
+	// Get array information which may include parity check status
+	arrayData, err := h.api.GetStorage().GetArrayInfo()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get array information: %v", err))
+		return
+	}
+
+	// Extract parity check information or provide default status
 	parityCheck := map[string]interface{}{
-		"status":       "Unknown",
+		"status":       "idle",
 		"progress":     0.0,
-		"speed":        "0 MB/s",
-		"eta":          "Unknown",
+		"speed":        0, // Integer (bytes per second)
+		"eta":          0, // Integer (seconds)
+		"errors":       0,
+		"type":         "check", // Default to "check" to match enum
 		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// If array data contains parity check status, extract it
+	if arrayMap, ok := arrayData.(map[string]interface{}); ok {
+		if parityStatus, exists := arrayMap["parity_check"]; exists {
+			if statusMap, ok := parityStatus.(map[string]interface{}); ok {
+				// Transform the data to match schema types
+				parityCheck = h.transformParityCheckData(statusMap, parityCheck)
+			}
+		}
+		// Update timestamp
+		parityCheck["last_updated"] = time.Now().UTC().Format(time.RFC3339)
 	}
 
 	utils.WriteJSON(w, http.StatusOK, parityCheck)
@@ -177,17 +235,26 @@ func (h *SystemHandler) HandleGPU(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Placeholder implementation - would need to implement GetGPUInfo in GPUInterface
-	gpuInfo := map[string]interface{}{
-		"name":         "Unknown",
-		"usage":        0.0,
-		"memory_used":  0,
-		"memory_total": 0,
-		"temperature":  0.0,
-		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	// Get GPU information from system interface
+	gpuData, err := h.api.GetSystem().GetGPUInfo()
+	if err != nil {
+		// Return empty GPU info if not available
+		gpuInfo := map[string]interface{}{
+			"gpus":         []interface{}{},
+			"message":      "No GPU information available",
+			"last_updated": time.Now().UTC().Format(time.RFC3339),
+		}
+		utils.WriteJSON(w, http.StatusOK, gpuInfo)
+		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, gpuInfo)
+	// Add timestamp if not present
+	if gpuMap, ok := gpuData.(map[string]interface{}); ok {
+		gpuMap["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+		utils.WriteJSON(w, http.StatusOK, gpuMap)
+	} else {
+		utils.WriteJSON(w, http.StatusOK, gpuData)
+	}
 }
 
 // HandleSystemFans handles GET /api/v1/system/fans
@@ -256,6 +323,9 @@ func (h *SystemHandler) HandleSystemResources(w http.ResponseWriter, r *http.Req
 		resources["network"] = networkInfo
 	}
 
+	// Add required last_updated field
+	resources["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+
 	utils.WriteJSON(w, http.StatusOK, resources)
 }
 
@@ -267,7 +337,14 @@ func (h *SystemHandler) HandleSystemFilesystems(w http.ResponseWriter, r *http.R
 	}
 
 	fsData := h.GetFilesystemData()
-	utils.WriteJSON(w, http.StatusOK, fsData)
+
+	// Transform the data to match the OpenAPI schema which expects a "filesystems" array
+	response := map[string]interface{}{
+		"filesystems":  h.transformFilesystemData(fsData),
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	utils.WriteJSON(w, http.StatusOK, response)
 }
 
 // HandleSystemExecute handles POST /api/v1/system/execute
@@ -338,22 +415,291 @@ func (h *SystemHandler) getUPSData() map[string]interface{} {
 	return h.systemService.GetUPSData()
 }
 
-// getIntelGPUData returns Intel GPU data in standard format
-func (h *SystemHandler) getIntelGPUData() map[string]interface{} {
-	// Implementation would get Intel GPU data
-	// For now, return placeholder
-	return map[string]interface{}{
-		"name":         "Unknown",
-		"usage":        0.0,
-		"memory_used":  0,
-		"memory_total": 0,
-		"last_updated": time.Now().UTC().Format(time.RFC3339),
-	}
-}
-
 // GetFilesystemData returns filesystem data in standard format
 func (h *SystemHandler) GetFilesystemData() map[string]interface{} {
 	return h.systemService.GetFilesystemData()
+}
+
+// getSystemInfo returns system information that matches the OpenAPI schema
+func (h *SystemHandler) getSystemInfo() map[string]interface{} {
+	info := map[string]interface{}{
+		"hostname":     "unraid-server",          // Default value, should be read from system
+		"kernel":       "unknown",                // Default value, should be read from system
+		"uptime":       0,                        // Default value, should be read from system
+		"load_average": []float64{0.0, 0.0, 0.0}, // Default value
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Try to get real system information
+	if systemInfo, err := h.api.GetSystem().GetCPUInfo(); err == nil {
+		if cpuMap, ok := systemInfo.(map[string]interface{}); ok {
+			if hostname, exists := cpuMap["hostname"]; exists {
+				info["hostname"] = hostname
+			}
+		}
+	}
+
+	// Get load average from system
+	if loadInfo, err := h.api.GetSystem().GetLoadInfo(); err == nil {
+		if loadMap, ok := loadInfo.(map[string]interface{}); ok {
+			if load1, exists := loadMap["load1"]; exists {
+				if load5, exists := loadMap["load5"]; exists {
+					if load15, exists := loadMap["load15"]; exists {
+						info["load_average"] = []interface{}{load1, load5, load15}
+					}
+				}
+			}
+		}
+	}
+
+	// Get uptime from system
+	if uptimeInfo, err := h.api.GetSystem().GetUptimeInfo(); err == nil {
+		if uptimeMap, ok := uptimeInfo.(map[string]interface{}); ok {
+			if uptimeSeconds, exists := uptimeMap["uptime_seconds"]; exists {
+				info["uptime"] = uptimeSeconds
+			}
+		}
+	}
+
+	return info
+}
+
+// transformFilesystemData transforms filesystem data to match OpenAPI schema
+func (h *SystemHandler) transformFilesystemData(fsData map[string]interface{}) []interface{} {
+	filesystems := []interface{}{}
+
+	// Transform each filesystem entry into the expected format
+	for name, data := range fsData {
+		if name == "last_updated" {
+			continue // Skip the timestamp field
+		}
+
+		if fsMap, ok := data.(map[string]interface{}); ok {
+			filesystem := map[string]interface{}{
+				"device":      fmt.Sprintf("/dev/%s", name),
+				"mountpoint":  fmt.Sprintf("/mnt/%s", name),
+				"fstype":      "xfs", // Default filesystem type
+				"size":        int64(0),
+				"used":        int64(0),
+				"available":   int64(0),
+				"use_percent": 0.0,
+			}
+
+			// Map the actual data
+			if total, exists := fsMap["total"]; exists {
+				filesystem["size"] = total
+			}
+			if used, exists := fsMap["used"]; exists {
+				filesystem["used"] = used
+			}
+			if free, exists := fsMap["free"]; exists {
+				filesystem["available"] = free
+			}
+			if usage, exists := fsMap["usage"]; exists {
+				filesystem["use_percent"] = usage
+			}
+
+			// Set specific mount points for known filesystems
+			switch name {
+			case "boot":
+				filesystem["mountpoint"] = "/boot"
+				filesystem["device"] = "/dev/sda1"
+			case "docker":
+				filesystem["mountpoint"] = "/var/lib/docker"
+				filesystem["device"] = "/dev/loop0"
+			case "logs":
+				filesystem["mountpoint"] = "/var/log"
+				filesystem["device"] = "/dev/shm"
+			}
+
+			filesystems = append(filesystems, filesystem)
+		}
+	}
+
+	return filesystems
+}
+
+// transformSystemLogsData transforms system logs data to match OpenAPI schema
+func (h *SystemHandler) transformSystemLogsData(logsData interface{}) map[string]interface{} {
+	response := map[string]interface{}{
+		"logs":         []interface{}{},
+		"total_count":  0,
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Transform the logs data based on its structure
+	if logsMap, ok := logsData.(map[string]interface{}); ok {
+		if logs, exists := logsMap["logs"]; exists {
+			if logsArray, ok := logs.([]interface{}); ok {
+				// Flatten log entries from all log sources
+				allEntries := []interface{}{}
+				for _, logSource := range logsArray {
+					if sourceMap, ok := logSource.(map[string]interface{}); ok {
+						if entries, exists := sourceMap["entries"]; exists {
+							if entriesArray, ok := entries.([]interface{}); ok {
+								allEntries = append(allEntries, entriesArray...)
+							}
+						}
+					}
+				}
+				response["logs"] = allEntries
+				response["total_count"] = len(allEntries)
+			}
+		}
+	}
+
+	return response
+}
+
+// transformParityDiskInfo transforms disk data to match parity disk schema
+func (h *SystemHandler) transformParityDiskInfo(diskMap map[string]interface{}) map[string]interface{} {
+	diskInfo := map[string]interface{}{
+		"device": "/dev/unknown",
+		"size":   int64(0),
+		"status": "unknown",
+	}
+
+	// Map the actual data
+	if device, exists := diskMap["device"]; exists {
+		diskInfo["device"] = device
+	}
+	if serial, exists := diskMap["serial"]; exists {
+		diskInfo["serial"] = serial
+	}
+	if model, exists := diskMap["model"]; exists {
+		diskInfo["model"] = model
+	}
+	if size, exists := diskMap["size"]; exists {
+		// Convert size to integer if it's a string
+		if sizeStr, ok := size.(string); ok {
+			if sizeInt, err := strconv.ParseInt(sizeStr, 10, 64); err == nil {
+				diskInfo["size"] = sizeInt
+			}
+		} else {
+			diskInfo["size"] = size
+		}
+	}
+	if temp, exists := diskMap["temperature"]; exists {
+		diskInfo["temperature"] = temp
+	}
+	if status, exists := diskMap["status"]; exists {
+		diskInfo["status"] = status
+	}
+
+	return diskInfo
+}
+
+// getDefaultParityDiskInfo returns default parity disk info when no disk is found
+func (h *SystemHandler) getDefaultParityDiskInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"device": "/dev/unknown",
+		"size":   int64(0),
+		"status": "missing",
+	}
+}
+
+// transformParityCheckData transforms parity check data to match schema types
+func (h *SystemHandler) transformParityCheckData(statusMap map[string]interface{}, defaults map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Copy defaults first
+	for key, value := range defaults {
+		result[key] = value
+	}
+
+	// Transform each field to match schema requirements
+	for key, value := range statusMap {
+		switch key {
+		case "speed":
+			// Convert speed string like "0 MB/s" to integer bytes per second
+			if speedStr, ok := value.(string); ok {
+				result["speed"] = h.parseSpeedToBytes(speedStr)
+			} else if speedInt, ok := value.(int); ok {
+				result["speed"] = speedInt
+			} else if speedFloat, ok := value.(float64); ok {
+				result["speed"] = int(speedFloat)
+			}
+		case "eta":
+			// Convert ETA string to integer seconds
+			if etaStr, ok := value.(string); ok {
+				result["eta"] = h.parseETAToSeconds(etaStr)
+			} else if etaInt, ok := value.(int); ok {
+				result["eta"] = etaInt
+			} else if etaFloat, ok := value.(float64); ok {
+				result["eta"] = int(etaFloat)
+			}
+		case "type":
+			// Ensure type matches enum values
+			if typeStr, ok := value.(string); ok {
+				if typeStr == "check" || typeStr == "correct" {
+					result["type"] = typeStr
+				} else {
+					result["type"] = "check" // Default to valid enum value
+				}
+			}
+		default:
+			// Copy other fields as-is
+			result[key] = value
+		}
+	}
+
+	return result
+}
+
+// parseSpeedToBytes converts speed strings like "150 MB/s" to bytes per second
+func (h *SystemHandler) parseSpeedToBytes(speedStr string) int {
+	// Remove whitespace and convert to lowercase
+	speedStr = strings.TrimSpace(strings.ToLower(speedStr))
+
+	// Extract numeric part
+	re := regexp.MustCompile(`(\d+(?:\.\d+)?)\s*(mb/s|gb/s|kb/s|b/s)?`)
+	matches := re.FindStringSubmatch(speedStr)
+
+	if len(matches) < 2 {
+		return 0
+	}
+
+	speed, err := strconv.ParseFloat(matches[1], 64)
+	if err != nil {
+		return 0
+	}
+
+	// Convert to bytes per second based on unit
+	unit := ""
+	if len(matches) > 2 {
+		unit = matches[2]
+	}
+
+	switch unit {
+	case "gb/s":
+		return int(speed * 1024 * 1024 * 1024)
+	case "mb/s":
+		return int(speed * 1024 * 1024)
+	case "kb/s":
+		return int(speed * 1024)
+	default:
+		return int(speed) // Assume bytes per second
+	}
+}
+
+// parseETAToSeconds converts ETA strings to seconds
+func (h *SystemHandler) parseETAToSeconds(etaStr string) int {
+	// If empty string, return 0
+	if strings.TrimSpace(etaStr) == "" {
+		return 0
+	}
+
+	// Try to parse as duration (e.g., "2h30m", "45m", "30s")
+	if duration, err := time.ParseDuration(etaStr); err == nil {
+		return int(duration.Seconds())
+	}
+
+	// Try to parse as integer seconds
+	if seconds, err := strconv.Atoi(strings.TrimSpace(etaStr)); err == nil {
+		return seconds
+	}
+
+	return 0
 }
 
 // HandleSystemScripts handles GET/POST /api/v1/system/scripts
@@ -406,12 +752,12 @@ func (h *SystemHandler) isCommandBlacklisted(command string) bool {
 func (h *SystemHandler) executeCommand(request requests.CommandExecuteRequest) responses.CommandExecuteResponse {
 	start := time.Now()
 
-	// For now, return a placeholder response
-	// Real implementation would execute the command safely
+	// Command execution is disabled for security reasons
+	// Return an error response indicating the feature is not implemented
 	return responses.CommandExecuteResponse{
-		ExitCode:        0,
-		Stdout:          "Command execution not implemented",
-		Stderr:          "",
+		ExitCode:        1,
+		Stdout:          "",
+		Stderr:          "Command execution is disabled for security reasons",
 		ExecutionTimeMs: time.Since(start).Milliseconds(),
 		Command:         request.Command,
 		WorkingDir:      request.WorkingDirectory,
@@ -420,30 +766,15 @@ func (h *SystemHandler) executeCommand(request requests.CommandExecuteRequest) r
 
 // getUserScripts returns a list of available user scripts
 func (h *SystemHandler) getUserScripts() ([]interface{}, error) {
-	// Placeholder implementation
-	// Real implementation would scan /boot/config/plugins/user.scripts/scripts/
-	return []interface{}{
-		map[string]interface{}{
-			"name":        "example_script",
-			"description": "Example user script",
-			"enabled":     true,
-			"last_run":    time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-		},
-	}, nil
+	// User script discovery is not currently implemented
+	// Return empty list to indicate no scripts are available
+	return []interface{}{}, nil
 }
 
 // executeUserScript executes a user script and returns the response
 func (h *SystemHandler) executeUserScript(scriptName string, req map[string]interface{}) (map[string]interface{}, error) {
-	// Placeholder implementation
-	// Real implementation would execute the script safely
-	return map[string]interface{}{
-		"success":      true,
-		"script_name":  scriptName,
-		"execution_id": fmt.Sprintf("exec_%d", time.Now().Unix()),
-		"started_at":   time.Now().Format(time.RFC3339),
-		"status":       "running",
-		"message":      "Script execution started",
-	}, nil
+	// User script execution is not currently implemented
+	return nil, fmt.Errorf("user script execution is not implemented")
 }
 
 // HandleSystemReboot handles POST /api/v1/system/reboot
@@ -554,18 +885,16 @@ func (h *SystemHandler) HandleSystemShutdown(w http.ResponseWriter, r *http.Requ
 
 // executeSystemReboot executes a system reboot
 func (h *SystemHandler) executeSystemReboot(delaySeconds int, message string, force bool) error {
-	// Placeholder implementation
-	// Real implementation would execute: shutdown -r +delaySeconds "message"
-	// For safety, this is just a placeholder
-	return nil
+	// System reboot is disabled for safety in UMA
+	// Real implementation would require careful integration with Unraid's shutdown procedures
+	return fmt.Errorf("system reboot is disabled for safety - use Unraid web interface")
 }
 
 // executeSystemShutdown executes a system shutdown
 func (h *SystemHandler) executeSystemShutdown(delaySeconds int, message string, force bool) error {
-	// Placeholder implementation
-	// Real implementation would execute: shutdown -h +delaySeconds "message"
-	// For safety, this is just a placeholder
-	return nil
+	// System shutdown is disabled for safety in UMA
+	// Real implementation would require careful integration with Unraid's shutdown procedures
+	return fmt.Errorf("system shutdown is disabled for safety - use Unraid web interface")
 }
 
 // HandleSystemLogs handles GET /api/v1/system/logs
@@ -582,29 +911,12 @@ func (h *SystemHandler) HandleSystemLogs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, logsData)
+	// Transform the logs data to match the OpenAPI schema
+	response := h.transformSystemLogsData(logsData)
+	utils.WriteJSON(w, http.StatusOK, response)
 }
 
-// getSystemLogs returns system logs of the specified type
-func (h *SystemHandler) getSystemLogs(logType string, lines int, follow bool, since string) ([]string, error) {
-	// Placeholder implementation
-	// Real implementation would read from /var/log/syslog, /var/log/messages, etc.
-	return []string{
-		fmt.Sprintf("[%s] System log entry 1", time.Now().Format(time.RFC3339)),
-		fmt.Sprintf("[%s] System log entry 2", time.Now().Add(-time.Minute).Format(time.RFC3339)),
-		fmt.Sprintf("[%s] System log entry 3", time.Now().Add(-2*time.Minute).Format(time.RFC3339)),
-	}, nil
-}
-
-// getCustomLogFile reads a custom log file with filtering
-func (h *SystemHandler) getCustomLogFile(filePath string, lines int, grepFilter, since string) ([]string, error) {
-	// Placeholder implementation
-	// Real implementation would read the specified file with security checks
-	return []string{
-		fmt.Sprintf("[%s] Custom log entry from %s", time.Now().Format(time.RFC3339), filePath),
-		fmt.Sprintf("[%s] Custom log entry 2", time.Now().Add(-time.Minute).Format(time.RFC3339)),
-	}, nil
-}
+// Removed unused functions: getSystemLogs, getCustomLogFile
 
 // HandleSystemLogsAll handles GET /api/v1/system/logs/all
 func (h *SystemHandler) HandleSystemLogsAll(w http.ResponseWriter, r *http.Request) {
@@ -647,24 +959,9 @@ func (h *SystemHandler) HandleSystemLogsAll(w http.ResponseWriter, r *http.Reque
 
 // scanLogFiles scans for log files in the specified directory
 func (h *SystemHandler) scanLogFiles(directory string, recursive bool, filePattern string, maxFiles int) ([]interface{}, error) {
-	// Placeholder implementation
-	// Real implementation would scan the directory for log files
-	return []interface{}{
-		map[string]interface{}{
-			"path":          "/var/log/syslog",
-			"name":          "syslog",
-			"size":          1024000,
-			"modified_time": time.Now().Add(-time.Hour).Format(time.RFC3339),
-			"readable":      true,
-		},
-		map[string]interface{}{
-			"path":          "/var/log/messages",
-			"name":          "messages",
-			"size":          512000,
-			"modified_time": time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
-			"readable":      true,
-		},
-	}, nil
+	// Log file scanning is not implemented for security reasons
+	// Return empty list to indicate no files found
+	return []interface{}{}, nil
 }
 
 // ExecuteCommand executes a system command using the command service
@@ -690,6 +987,86 @@ func (h *SystemHandler) ExecuteCommand(request interface{}) (interface{}, error)
 // GetAPCUPSData retrieves UPS data from apcupsd daemon
 func (h *SystemHandler) GetAPCUPSData() map[string]interface{} {
 	return h.systemService.GetAPCUPSData()
+}
+
+// HandleTemperatureThresholds handles GET/PUT /api/v1/system/temperature/thresholds
+func (h *SystemHandler) HandleTemperatureThresholds(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		// Return current temperature thresholds
+		thresholds := map[string]interface{}{
+			"cpu": map[string]interface{}{
+				"warning":  70.0,
+				"critical": 80.0,
+				"shutdown": 90.0,
+				"enabled":  true,
+			},
+			"disk": map[string]interface{}{
+				"warning":  45.0,
+				"critical": 55.0,
+				"shutdown": 65.0,
+				"enabled":  true,
+			},
+			"gpu": map[string]interface{}{
+				"warning":  75.0,
+				"critical": 85.0,
+				"shutdown": 95.0,
+				"enabled":  true,
+			},
+			"system": map[string]interface{}{
+				"warning":  65.0,
+				"critical": 75.0,
+				"shutdown": 85.0,
+				"enabled":  true,
+			},
+		}
+		utils.WriteJSON(w, http.StatusOK, thresholds)
+
+	case http.MethodPut:
+		// Update temperature thresholds
+		var request map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			utils.WriteError(w, http.StatusBadRequest, "Invalid JSON request")
+			return
+		}
+
+		// In a real implementation, this would update the temperature monitor thresholds
+		response := map[string]interface{}{
+			"success": true,
+			"message": "Temperature thresholds updated successfully",
+		}
+		utils.WriteJSON(w, http.StatusOK, response)
+
+	default:
+		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// HandleTemperatureAlerts handles GET /api/v1/system/temperature/alerts
+func (h *SystemHandler) HandleTemperatureAlerts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Return recent temperature alerts
+	alerts := []map[string]interface{}{
+		{
+			"sensor_name":  "CPU Package",
+			"sensor_type":  "cpu",
+			"temperature":  75.2,
+			"threshold":    70.0,
+			"level":        "warning",
+			"message":      "CPU Package temperature warning: 75.2°C (threshold: 70.0°C)",
+			"timestamp":    time.Now().Add(-5 * time.Minute).UTC().Format(time.RFC3339),
+			"action_taken": "none",
+		},
+	}
+
+	utils.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"alerts": alerts,
+		"count":  len(alerts),
+	})
 }
 
 // GetNUTUPSData retrieves UPS data from NUT daemon

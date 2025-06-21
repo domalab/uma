@@ -13,6 +13,7 @@ func AsyncOperationsPaths() map[string]interface{} {
 				"tags":        []string{"Async Operations"},
 				"summary":     "List async operations",
 				"description": "Retrieve a list of asynchronous operations with optional filtering",
+				"operationId": "listAsyncOperations",
 				"parameters": []map[string]interface{}{
 					{
 						"name":        "status",
@@ -56,6 +57,7 @@ func AsyncOperationsPaths() map[string]interface{} {
 				"tags":        []string{"Async Operations"},
 				"summary":     "Start async operation",
 				"description": "Start a new asynchronous operation",
+				"operationId": "startAsyncOperation",
 				"requestBody": map[string]interface{}{
 					"required": true,
 					"content": map[string]interface{}{
@@ -118,6 +120,7 @@ func AsyncOperationsPaths() map[string]interface{} {
 				"tags":        []string{"Async Operations"},
 				"summary":     "Get operation details",
 				"description": "Retrieve detailed information about a specific operation",
+				"operationId": "getAsyncOperation",
 				"parameters": []map[string]interface{}{
 					{
 						"name":        "operationId",
@@ -148,6 +151,7 @@ func AsyncOperationsPaths() map[string]interface{} {
 				"tags":        []string{"Async Operations"},
 				"summary":     "Cancel operation",
 				"description": "Cancel a running or pending operation (if cancellable)",
+				"operationId": "cancelAsyncOperation",
 				"parameters": []map[string]interface{}{
 					{
 						"name":        "operationId",
@@ -181,6 +185,7 @@ func AsyncOperationsPaths() map[string]interface{} {
 				"tags":        []string{"Async Operations"},
 				"summary":     "Get operation statistics",
 				"description": "Retrieve statistics about async operations",
+				"operationId": "getAsyncOperationStats",
 				"responses": map[string]interface{}{
 					"200": map[string]interface{}{
 						"description": "Operation statistics retrieved successfully",

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,7 +42,9 @@ func (h *VMHandler) HandleVMList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, vms)
+	// Transform VMs to match OpenAPI schema requirements
+	transformedVMs := h.transformVMsData(vms)
+	utils.WriteJSON(w, http.StatusOK, transformedVMs)
 }
 
 // HandleVM handles VM operations
@@ -86,6 +90,11 @@ func (h *VMHandler) handleGetVM(w http.ResponseWriter, r *http.Request, vmName, 
 		}
 		utils.WriteJSON(w, http.StatusOK, stats)
 
+	case "snapshots":
+		// Handle VM snapshots - delegate to the snapshot handler
+		h.HandleVMSnapshot(w, r, vmName)
+		return
+
 	case "console":
 		console, err := h.api.GetVM().GetVMConsole(vmName)
 		if err != nil {
@@ -95,13 +104,20 @@ func (h *VMHandler) handleGetVM(w http.ResponseWriter, r *http.Request, vmName, 
 		utils.WriteJSON(w, http.StatusOK, map[string]interface{}{"console": console})
 
 	case "":
-		// Get VM info
+		// Get VM info - this handles /api/v1/vms/{name}
 		vm, err := h.api.GetVM().GetVM(vmName)
 		if err != nil {
 			utils.WriteError(w, http.StatusNotFound, fmt.Sprintf("VM not found: %v", err))
 			return
 		}
-		utils.WriteJSON(w, http.StatusOK, vm)
+
+		// Transform VM data to ensure schema compliance
+		if vmMap, ok := vm.(map[string]interface{}); ok {
+			transformedVM := h.transformSingleVM(vmMap)
+			utils.WriteJSON(w, http.StatusOK, transformedVM)
+		} else {
+			utils.WriteJSON(w, http.StatusOK, vm)
+		}
 
 	default:
 		utils.WriteError(w, http.StatusBadRequest, "Invalid action")
@@ -137,6 +153,11 @@ func (h *VMHandler) handleVMAction(w http.ResponseWriter, r *http.Request, vmNam
 	case "reset":
 		// Implementation would reset VM
 		message = "VM reset successfully"
+
+	case "snapshots":
+		// Handle VM snapshot creation - delegate to the snapshot handler
+		h.HandleVMSnapshot(w, r, vmName)
+		return
 
 	case "autostart":
 		autostart := r.URL.Query().Get("enable") == "true"
@@ -288,4 +309,161 @@ func (h *VMHandler) createVMSnapshot(vmName string, request requests.VMSnapshotR
 // GetVMDataOptimized returns optimized VM data using the VM service
 func (h *VMHandler) GetVMDataOptimized() interface{} {
 	return h.vmService.GetVMDataOptimized()
+}
+
+// transformVMsData transforms VM data to match OpenAPI schema requirements
+func (h *VMHandler) transformVMsData(vms interface{}) interface{} {
+	// Handle different possible return types from GetVMs()
+	switch v := vms.(type) {
+	case []interface{}:
+		// Transform array of VM objects
+		transformedVMs := make([]interface{}, 0, len(v))
+		for _, vm := range v {
+			if vmMap, ok := vm.(map[string]interface{}); ok {
+				transformedVM := h.transformSingleVM(vmMap)
+				transformedVMs = append(transformedVMs, transformedVM)
+			}
+		}
+		return transformedVMs
+	case map[string]interface{}:
+		// If it's a single VM object, transform it
+		return h.transformSingleVM(v)
+	default:
+		// Return empty array if unknown type
+		return []interface{}{}
+	}
+}
+
+// transformSingleVM transforms a single VM object to match schema
+func (h *VMHandler) transformSingleVM(vm map[string]interface{}) map[string]interface{} {
+	transformed := make(map[string]interface{})
+
+	// Copy all existing fields first
+	for key, value := range vm {
+		transformed[key] = value
+	}
+
+	// Ensure required fields are present
+	if _, exists := transformed["id"]; !exists {
+		// Use name as ID if ID is missing
+		if name, ok := transformed["name"].(string); ok {
+			transformed["id"] = name
+		} else {
+			transformed["id"] = "unknown"
+		}
+	}
+
+	// Add missing required fields
+	if _, exists := transformed["resources"]; !exists {
+		transformed["resources"] = h.createDefaultVMResources(vm)
+	}
+
+	if _, exists := transformed["created"]; !exists {
+		transformed["created"] = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	if _, exists := transformed["last_updated"]; !exists {
+		transformed["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	// Fix os_type enum violation
+	if osType, exists := transformed["os_type"]; exists {
+		if osTypeStr, ok := osType.(string); ok {
+			transformed["os_type"] = h.normalizeOSType(osTypeStr)
+		}
+	} else {
+		transformed["os_type"] = "other" // Default to "other"
+	}
+
+	return transformed
+}
+
+// createDefaultVMResources creates default VM resources from available data
+func (h *VMHandler) createDefaultVMResources(vm map[string]interface{}) map[string]interface{} {
+	resources := map[string]interface{}{
+		"cpu":    1,
+		"memory": 1024,
+	}
+
+	// Extract CPU information
+	if vcpus, exists := vm["vcpus"]; exists {
+		if vcpusStr, ok := vcpus.(string); ok {
+			if vcpusInt, err := strconv.Atoi(vcpusStr); err == nil {
+				resources["cpu"] = vcpusInt
+			}
+		} else if vcpusInt, ok := vcpus.(int); ok {
+			resources["cpu"] = vcpusInt
+		}
+	}
+
+	// Extract memory information
+	if maxMemory, exists := vm["max_memory"]; exists {
+		if memoryStr, ok := maxMemory.(string); ok {
+			// Parse memory strings like "4194304 KiB"
+			if memoryBytes := h.parseMemoryToMB(memoryStr); memoryBytes > 0 {
+				resources["memory"] = memoryBytes
+			}
+		}
+	}
+
+	return resources
+}
+
+// normalizeOSType converts various OS type values to schema-compliant enum values
+func (h *VMHandler) normalizeOSType(osType string) string {
+	osType = strings.ToLower(strings.TrimSpace(osType))
+
+	switch osType {
+	case "windows", "win", "microsoft":
+		return "windows"
+	case "linux", "ubuntu", "debian", "centos", "rhel", "fedora", "opensuse":
+		return "linux"
+	case "macos", "darwin", "osx":
+		return "macos"
+	case "hvm", "kvm", "xen", "vmware", "virtualbox":
+		// These are virtualization types, not OS types
+		// Default to "other" since we can't determine the actual OS
+		return "other"
+	default:
+		return "other"
+	}
+}
+
+// parseMemoryToMB converts memory strings to megabytes
+func (h *VMHandler) parseMemoryToMB(memoryStr string) int {
+	// Remove whitespace and convert to uppercase
+	memoryStr = strings.TrimSpace(strings.ToUpper(memoryStr))
+
+	// Extract numeric part and unit
+	re := regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*(KIB|MIB|GIB|TIB|KB|MB|GB|TB|K|M|G|T)?$`)
+	matches := re.FindStringSubmatch(memoryStr)
+
+	if len(matches) < 2 {
+		return 0
+	}
+
+	memory, err := strconv.ParseFloat(matches[1], 64)
+	if err != nil {
+		return 0
+	}
+
+	// Convert to MB based on unit
+	unit := ""
+	if len(matches) > 2 {
+		unit = matches[2]
+	}
+
+	switch unit {
+	case "TIB", "TB", "T":
+		return int(memory * 1024 * 1024)
+	case "GIB", "GB", "G":
+		return int(memory * 1024)
+	case "MIB", "MB", "M":
+		return int(memory)
+	case "KIB", "KB", "K":
+		return int(memory / 1024)
+	default:
+		// Assume bytes if no unit
+		return int(memory / 1024 / 1024)
+	}
 }

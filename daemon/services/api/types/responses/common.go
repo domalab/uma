@@ -65,7 +65,7 @@ type BulkOperationSummary struct {
 type HealthResponse struct {
 	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
 	Version   string                 `json:"version"`
-	Uptime    string                 `json:"uptime"`
+	Uptime    int                    `json:"uptime"` // uptime in seconds
 	Timestamp time.Time              `json:"timestamp"`
 	Checks    map[string]HealthCheck `json:"checks,omitempty"`
 }

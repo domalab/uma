@@ -1,0 +1,772 @@
+{
+  "summary": {
+    "critical": 1,
+    "info": 94,
+    "total": 95,
+    "warning": 0
+  },
+  "timestamp": "2025-06-21T04:09:24Z",
+  "violations": [
+    {
+      "endpoint": "/api/v1/system/temperature",
+      "field": "max_temperature",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'max_temperature' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/ups",
+      "field": "battery_runtime",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'battery_runtime' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/ups",
+      "field": "load_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'load_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/ups",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/ups",
+      "field": "output_voltage",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'output_voltage' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/ups",
+      "field": "input_voltage",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'input_voltage' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/resources",
+      "field": "processes",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'processes' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/resources",
+      "field": "load_average",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'load_average' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/info",
+      "field": "architecture",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'architecture' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/logs",
+      "field": "filtered_count",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filtered_count' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/logs",
+      "field": "log_sources",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'log_sources' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/parity/disk",
+      "field": "parity2",
+      "schema_type": "object",
+      "actual_type": "null",
+      "actual_value": "\u003cnil\u003e",
+      "severity": "CRITICAL",
+      "message": "Type mismatch: expected object, got null"
+    },
+    {
+      "endpoint": "/api/v1/system/parity/check",
+      "field": "last_check",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'last_check' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/system/parity/check",
+      "field": "duration",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'duration' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[0]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[0]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[0]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[0]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[0]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[0]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[0]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[1]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[1]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[1]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[1]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[1]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[1]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[1]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[2]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[2]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[2]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[2]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[2]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[2]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[2]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[3]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[3]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[3]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[3]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[3]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[3]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[3]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[4]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[4]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[4]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[4]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[4]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[4]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[4]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[5]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[5]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[5]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[5]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[5]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[5]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[5]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[6]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[6]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[6]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[6]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[6]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[6]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[6]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[7]",
+      "field": "filesystem",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'filesystem' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[7]",
+      "field": "serial",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'serial' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[7]",
+      "field": "smart",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'smart' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[7]",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[7]",
+      "field": "model",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'model' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[7]",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/disks[7]",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/boot",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/cache",
+      "field": "total_size",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'total_size' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/cache",
+      "field": "usage_percent",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'usage_percent' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/cache",
+      "field": "used",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'used' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/cache",
+      "field": "free",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'free' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/storage/general",
+      "field": "parity_valid",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'parity_valid' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[0]",
+      "field": "description",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'description' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[0]",
+      "field": "networks",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'networks' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[0]",
+      "field": "disks",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'disks' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[0]",
+      "field": "template",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'template' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[1]",
+      "field": "description",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'description' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[1]",
+      "field": "networks",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'networks' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[1]",
+      "field": "disks",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'disks' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/vms[1]",
+      "field": "template",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'template' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/diagnostics/info",
+      "field": "last_run",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'last_run' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/diagnostics/info",
+      "field": "capabilities",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'capabilities' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations[0]",
+      "field": "created_by",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'created_by' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations[0]",
+      "field": "error",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'error' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations[0]",
+      "field": "result",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'result' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations[1]",
+      "field": "created_by",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'created_by' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations[1]",
+      "field": "completed",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'completed' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations[1]",
+      "field": "error",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'error' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations[1]",
+      "field": "result",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'result' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations/stats",
+      "field": "by_type",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'by_type' defined in schema but not in API response"
+    },
+    {
+      "endpoint": "/api/v1/operations/stats",
+      "field": "last_updated",
+      "schema_type": "optional",
+      "actual_type": "missing",
+      "severity": "INFO",
+      "message": "Optional field 'last_updated' defined in schema but not in API response"
+    }
+  ]
+}

@@ -132,7 +132,7 @@ func WriteBulkOperationResponse(w http.ResponseWriter, status int, results []res
 }
 
 // WriteHealthResponse writes a health check response
-func WriteHealthResponse(w http.ResponseWriter, status string, version string, uptime string, checks map[string]responses.HealthCheck) {
+func WriteHealthResponse(w http.ResponseWriter, status string, version string, uptime int, checks map[string]responses.HealthCheck) {
 	response := responses.HealthResponse{
 		Status:    status,
 		Version:   version,

@@ -72,9 +72,9 @@ func TestGetConsolidatedDisksInfo(t *testing.T) {
 				t.Error("Expected non-empty disk device")
 			}
 
-			// Size should be non-negative
-			if disk.Size < 0 {
-				t.Errorf("Expected non-negative disk size, got %d", disk.Size)
+			// Size should be reasonable (uint64 is always non-negative)
+			if disk.Size == 0 {
+				t.Logf("Disk size is 0, which may indicate missing data: %s", disk.Device)
 			}
 
 			// Validate status is one of expected values
@@ -148,13 +148,13 @@ func TestGetCacheInfo(t *testing.T) {
 
 	// Validate cache structure if returned
 	for _, cacheInfo := range cacheInfos {
-		// Size should be non-negative
-		if cacheInfo.TotalSize < 0 {
-			t.Errorf("Expected non-negative cache total size, got %d", cacheInfo.TotalSize)
+		// Size should be reasonable (uint64 is always non-negative)
+		if cacheInfo.TotalSize == 0 {
+			t.Logf("Cache total size is 0, which may indicate missing data")
 		}
 
-		if cacheInfo.UsedSize < 0 {
-			t.Errorf("Expected non-negative cache used size, got %d", cacheInfo.UsedSize)
+		if cacheInfo.UsedSize == 0 {
+			t.Logf("Cache used size is 0, which may indicate empty cache")
 		}
 
 		// Used should not exceed total
@@ -186,9 +186,9 @@ func TestGetBootDiskInfo(t *testing.T) {
 			t.Errorf("Expected boot mount point '/boot', got '%s'", bootDisk.MountPoint)
 		}
 
-		// Size should be non-negative
-		if bootDisk.Size < 0 {
-			t.Errorf("Expected non-negative boot disk size, got %d", bootDisk.Size)
+		// Size should be reasonable (uint64 is always non-negative)
+		if bootDisk.Size == 0 {
+			t.Logf("Boot disk size is 0, which may indicate missing data")
 		}
 	}
 }

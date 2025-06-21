@@ -72,6 +72,82 @@ func getVMInfoSchema() map[string]interface{} {
 				},
 				"description": "VM network interfaces",
 			},
+			"type": map[string]interface{}{
+				"type":        "string",
+				"description": "VM type",
+				"enum":        []string{"kvm", "qemu", "xen", "vmware"},
+				"example":     "kvm",
+			},
+			"max_memory": map[string]interface{}{
+				"type":        "string",
+				"description": "Maximum memory with units",
+				"example":     "4194304 KiB",
+			},
+			"used_memory": map[string]interface{}{
+				"type":        "string",
+				"description": "Currently used memory with units",
+				"example":     "2097152 KiB",
+			},
+			"vcpus": map[string]interface{}{
+				"type":        "string",
+				"description": "Number of virtual CPUs",
+				"example":     "2",
+			},
+			"cpu_time": map[string]interface{}{
+				"type":        "string",
+				"description": "CPU time with units",
+				"example":     "14441.1s",
+			},
+			"detailed_state": map[string]interface{}{
+				"type":        "string",
+				"description": "Detailed VM state",
+				"enum":        []string{"running", "idle", "paused", "shutdown", "shut off", "crashed", "dying", "pmsuspended"},
+				"example":     "running",
+			},
+			"stats": map[string]interface{}{
+				"type":        "object",
+				"description": "VM runtime statistics",
+				"properties": map[string]interface{}{
+					"cpu_usage": map[string]interface{}{
+						"type":        "number",
+						"description": "CPU usage percentage",
+						"example":     25.5,
+						"minimum":     0,
+						"maximum":     100,
+					},
+					"memory_usage": map[string]interface{}{
+						"type":        "number",
+						"description": "Memory usage percentage",
+						"example":     45.2,
+						"minimum":     0,
+						"maximum":     100,
+					},
+					"disk_read": map[string]interface{}{
+						"type":        "integer",
+						"description": "Disk read bytes",
+						"example":     1048576000,
+						"minimum":     0,
+					},
+					"disk_write": map[string]interface{}{
+						"type":        "integer",
+						"description": "Disk write bytes",
+						"example":     524288000,
+						"minimum":     0,
+					},
+					"network_rx": map[string]interface{}{
+						"type":        "integer",
+						"description": "Network received bytes",
+						"example":     2097152000,
+						"minimum":     0,
+					},
+					"network_tx": map[string]interface{}{
+						"type":        "integer",
+						"description": "Network transmitted bytes",
+						"example":     1048576000,
+						"minimum":     0,
+					},
+				},
+			},
 			"created": map[string]interface{}{
 				"type":        "string",
 				"format":      "date-time",
@@ -85,7 +161,7 @@ func getVMInfoSchema() map[string]interface{} {
 				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
-		"required": []string{"id", "name", "state", "os_type", "resources", "created", "last_updated"},
+		"required": []string{"id", "name", "state", "os_type", "type", "max_memory", "used_memory", "vcpus", "cpu_time", "detailed_state", "stats", "resources", "created", "last_updated"},
 	}
 }
 

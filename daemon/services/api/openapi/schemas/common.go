@@ -125,24 +125,29 @@ func getHealthResponseSchema() map[string]interface{} {
 				"description": "Health check timestamp",
 				"example":     "2025-06-16T14:30:00Z",
 			},
-			"dependencies": map[string]interface{}{
+			"checks": map[string]interface{}{
 				"type":        "object",
-				"description": "Status of external dependencies",
+				"description": "Status of service health checks",
 				"properties": map[string]interface{}{
+					"auth": map[string]interface{}{
+						"type":    "string",
+						"enum":    []string{"healthy", "unhealthy"},
+						"example": "healthy",
+					},
 					"docker": map[string]interface{}{
 						"type":    "string",
-						"enum":    []string{"available", "unavailable"},
-						"example": "available",
+						"enum":    []string{"healthy", "unhealthy"},
+						"example": "healthy",
 					},
-					"unraid_api": map[string]interface{}{
+					"storage": map[string]interface{}{
 						"type":    "string",
-						"enum":    []string{"available", "unavailable"},
-						"example": "available",
+						"enum":    []string{"healthy", "unhealthy"},
+						"example": "healthy",
 					},
-					"apcupsd": map[string]interface{}{
+					"system": map[string]interface{}{
 						"type":    "string",
-						"enum":    []string{"available", "unavailable"},
-						"example": "available",
+						"enum":    []string{"healthy", "unhealthy"},
+						"example": "healthy",
 					},
 				},
 			},

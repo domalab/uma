@@ -37,17 +37,17 @@ type HTTPServer struct {
 	validator       *validator.Validate
 
 	// Handler instances
-	systemHandler       *handlers.SystemHandler
-	storageHandler      *handlers.StorageHandler
-	dockerHandler       *handlers.DockerHandler
-	vmHandler           *handlers.VMHandler
-	authHandler         *handlers.AuthHandler
-	healthHandler       *handlers.HealthHandler
-	docsHandler         *handlers.DocsHandler
-	websocketHandler    *handlers.WebSocketHandler
-	notificationHandler *handlers.NotificationHandler
-	asyncHandler        *handlers.AsyncHandler
-	rateLimitHandler    *handlers.RateLimitHandler
+	systemHandler            *handlers.SystemHandler
+	storageHandler           *handlers.StorageHandler
+	dockerHandler            *handlers.DockerHandler
+	vmHandler                *handlers.VMHandler
+	authHandler              *handlers.AuthHandler
+	healthHandler            *handlers.HealthHandler
+	docsHandler              *handlers.DocsHandler
+	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler
+	notificationHandler      *handlers.NotificationHandler
+	asyncHandler             *handlers.AsyncHandler
+	rateLimitHandler         *handlers.RateLimitHandler
 
 	// Router for modular route management
 	router *routes.Router
@@ -98,7 +98,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 	httpServer.healthHandler = handlers.NewHealthHandler(httpServer.apiAdapter, api.ctx.Config.Version)
 	// Use dynamic host detection for Swagger UI - this will be updated at runtime
 	httpServer.docsHandler = handlers.NewDocsHandler(api.ctx.Config.Version, "")
-	httpServer.websocketHandler = handlers.NewWebSocketHandler(httpServer.apiAdapter)
+	httpServer.enhancedWebSocketHandler = handlers.NewEnhancedWebSocketHandler(httpServer.apiAdapter, api.ctx.Hub)
 	httpServer.notificationHandler = handlers.NewNotificationHandler(httpServer.apiAdapter)
 	httpServer.asyncHandler = handlers.NewAsyncHandler(httpServer.apiAdapter)
 	httpServer.rateLimitHandler = handlers.NewRateLimitHandler(httpServer.apiAdapter)
@@ -114,7 +114,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 		httpServer.authHandler,
 		httpServer.healthHandler,
 		httpServer.docsHandler,
-		httpServer.websocketHandler,
+		httpServer.enhancedWebSocketHandler,
 		httpServer.notificationHandler,
 		httpServer.asyncHandler,
 		httpServer.rateLimitHandler,
@@ -167,10 +167,7 @@ func (h *HTTPServer) WriteStandardResponse(w http.ResponseWriter, status int, da
 	h.WriteJSON(w, status, response)
 }
 
-// writeStandardResponse is an alias for WriteStandardResponse
-func (h *HTTPServer) writeStandardResponse(w http.ResponseWriter, status int, data interface{}, pagination *dto.PaginationInfo) {
-	h.WriteStandardResponse(w, status, data, pagination)
-}
+// Removed unused function: writeStandardResponse
 
 // ParsePaginationParams parses pagination parameters
 func (h *HTTPServer) ParsePaginationParams(r *http.Request) *dto.PaginationParams {
@@ -199,10 +196,7 @@ func (h *HTTPServer) GetRequestIDFromContext(r *http.Request) string {
 	return h.generateRequestID()
 }
 
-// getRequestIDFromContext is an alias for GetRequestIDFromContext
-func (h *HTTPServer) getRequestIDFromContext(r *http.Request) string {
-	return h.GetRequestIDFromContext(r)
-}
+// Removed unused function: getRequestIDFromContext
 
 // generateRequestID generates a new request ID using UUID
 func (h *HTTPServer) generateRequestID() string {
@@ -265,10 +259,4 @@ func (h *HTTPServer) Stop() error {
 
 // Legacy handler methods moved to respective handler files
 
-// getAPIVersionFromContext retrieves the API version from request context
-func (h *HTTPServer) getAPIVersionFromContext(r *http.Request) string {
-	if version, ok := r.Context().Value("api_version").(string); ok {
-		return version
-	}
-	return "v1" // Default fallback
-}
+// Removed unused function: getAPIVersionFromContext

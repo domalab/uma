@@ -26,29 +26,31 @@ func (h *AsyncHandler) HandleAsyncOperations(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Return placeholder async operations data
+	// Return placeholder async operations data with required fields
 	operations := []map[string]interface{}{
 		{
-			"id":           "op-001",
-			"type":         "docker_bulk_start",
-			"status":       "completed",
-			"progress":     100,
-			"created_at":   "2024-01-01T00:00:00Z",
-			"completed_at": "2024-01-01T00:01:00Z",
+			"id":          "op-001",
+			"type":        "bulk_container", // Use valid enum value instead of "docker_bulk_start"
+			"status":      "completed",
+			"progress":    100,
+			"description": "Bulk container start operation", // Add required field
+			"started":     "2024-01-01T00:00:00Z",           // Add required field (renamed from created_at)
+			"completed":   "2024-01-01T00:01:00Z",           // Rename from completed_at
+			"cancellable": false,
 		},
 		{
-			"id":         "op-002",
-			"type":       "array_start",
-			"status":     "running",
-			"progress":   75,
-			"created_at": "2024-01-01T00:02:00Z",
+			"id":          "op-002",
+			"type":        "array_start",
+			"status":      "running",
+			"progress":    75,
+			"description": "Array start operation", // Add required field
+			"started":     "2024-01-01T00:02:00Z",  // Add required field (renamed from created_at)
+			"cancellable": true,
 		},
 	}
 
-	utils.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"operations": operations,
-		"total":      len(operations),
-	})
+	// Return array directly to match schema expectation
+	utils.WriteJSON(w, http.StatusOK, operations)
 }
 
 // HandleAsyncOperation handles GET /api/v1/operations/{id}
@@ -65,14 +67,16 @@ func (h *AsyncHandler) HandleAsyncOperation(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Return placeholder operation data
+	// Return placeholder operation data with required fields
 	operation := map[string]interface{}{
-		"id":           path,
-		"type":         "docker_bulk_start",
-		"status":       "completed",
-		"progress":     100,
-		"created_at":   "2024-01-01T00:00:00Z",
-		"completed_at": "2024-01-01T00:01:00Z",
+		"id":          path,
+		"type":        "bulk_container", // Use valid enum value
+		"status":      "completed",
+		"progress":    100,
+		"description": "Bulk container operation", // Add required field
+		"started":     "2024-01-01T00:00:00Z",     // Add required field (renamed from created_at)
+		"completed":   "2024-01-01T00:01:00Z",     // Rename from completed_at
+		"cancellable": false,
 		"result": map[string]interface{}{
 			"success": true,
 			"message": "Operation completed successfully",
@@ -89,8 +93,14 @@ func (h *AsyncHandler) HandleAsyncStats(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Return placeholder async operation stats
+	// Return stats with required fields matching schema
 	stats := map[string]interface{}{
+		// Required fields per schema
+		"total":     10,
+		"active":    1,
+		"completed": 8,
+		"failed":    1,
+		// Additional fields (keeping existing data)
 		"total_operations":     10,
 		"running_operations":   1,
 		"completed_operations": 8,

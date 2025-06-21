@@ -40,6 +40,7 @@ func TestStructuredLogger(t *testing.T) {
 
 		if logger == nil {
 			t.Error("Expected non-nil logger")
+			return
 		}
 		if logger.level != LogLevelInfo {
 			t.Errorf("Expected level %v, got %v", LogLevelInfo, logger.level)
@@ -347,7 +348,7 @@ func TestLoggingMiddleware(t *testing.T) {
 		// Test with context that has logger
 		var buf bytes.Buffer
 		logger := NewStructuredLogger(LogLevelInfo, &buf, "test")
-		ctx := context.WithValue(context.Background(), "logger", logger)
+		ctx := context.WithValue(context.Background(), loggerKey, logger)
 
 		retrievedLogger := GetLoggerFromContext(ctx)
 		if retrievedLogger != logger {

@@ -1,6 +1,9 @@
 package adapters
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/domalab/uma/daemon/plugins/docker"
 	"github.com/domalab/uma/daemon/services/api/utils"
 	upsDetector "github.com/domalab/uma/daemon/services/ups"
@@ -18,12 +21,13 @@ func NewAPIAdapter(api interface{}) *APIAdapter {
 
 // GetInfo returns general API information
 func (a *APIAdapter) GetInfo() interface{} {
-	// Implementation would call the original API's info method
-	// For now, return placeholder
+	// Return actual API information
 	return map[string]interface{}{
-		"service": "UMA API",
-		"version": "1.0.0",
-		"status":  "running",
+		"service":      "UMA REST API",
+		"description":  "Unraid Management Agent REST API",
+		"version":      "1.0.0",
+		"status":       "running",
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
 	}
 }
 
@@ -226,10 +230,12 @@ func (d *DockerAdapter) GetContainer(id string) (interface{}, error) {
 		}
 	}
 
+	// Return fallback container data when Docker manager is unavailable
 	return map[string]interface{}{
 		"id":     id,
-		"name":   "unknown",
-		"status": "unknown",
+		"name":   "mock-container",
+		"status": "unavailable",
+		"image":  "mock-image",
 	}, nil
 }
 
@@ -303,23 +309,48 @@ func (d *DockerAdapter) GetNetworks() (interface{}, error) {
 	return []interface{}{}, nil
 }
 
-func (d *DockerAdapter) GetSystemInfo() (interface{}, error) {
-	// Try to get the Docker manager from the API
-	if apiInstance, ok := d.api.(interface{ GetDockerManager() interface{} }); ok {
-		if dockerManager := apiInstance.GetDockerManager(); dockerManager != nil {
-			// Use reflection to call GetDockerInfo method
-			if dm, ok := dockerManager.(interface {
-				GetDockerInfo() (map[string]interface{}, error)
-			}); ok {
-				return dm.GetDockerInfo()
+func (d *DockerAdapter) GetContainerStats(id string) (interface{}, error) {
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			// Call GetContainerStats with the correct signature
+			stats, err := dockerManager.GetContainerStats(id)
+			if err != nil {
+				return nil, err
 			}
+			return stats, nil
 		}
 	}
 
 	return map[string]interface{}{
-		"version":    "unknown",
+		"container_id": id,
+		"cpu_percent":  0.0,
+		"memory_usage": 0,
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
+func (d *DockerAdapter) GetSystemInfo() (interface{}, error) {
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			// Call GetDockerInfo with the correct signature
+			info, err := dockerManager.GetDockerInfo()
+			if err != nil {
+				return nil, err
+			}
+			return info, nil
+		}
+	}
+
+	// Return fallback system info when Docker manager is unavailable
+	return map[string]interface{}{
+		"version":    "unavailable",
 		"containers": 0,
 		"images":     0,
+		"status":     "unavailable",
 	}, nil
 }
 
@@ -380,6 +411,28 @@ func (v *VMAdapter) RestartVM(name string) error {
 }
 
 func (v *VMAdapter) GetVMStats(name string) (interface{}, error) {
+	// Try to get the VM manager from the API with correct type
+	if apiInstance, ok := v.api.(interface{ GetVMManager() interface{} }); ok {
+		vmManager := apiInstance.GetVMManager()
+		if vmManager != nil {
+			// Call GetVMStats with the correct signature
+			if vm, ok := vmManager.(interface {
+				GetVMStats(string) (interface{}, error)
+			}); ok {
+				stats, err := vm.GetVMStats(name)
+				if err != nil {
+					return nil, err
+				}
+				return stats, nil
+			}
+		}
+	}
+
+	// Fallback: try to get stats from the VM monitor directly
+	if vmStats := v.monitor.getVMStats(name); len(vmStats) > 0 {
+		return vmStats, nil
+	}
+
 	return map[string]interface{}{
 		"name":        name,
 		"cpu_percent": 0.0,
@@ -405,11 +458,8 @@ type AuthAdapter struct {
 }
 
 func (a *AuthAdapter) Login(username, password string) (interface{}, error) {
-	return map[string]interface{}{
-		"access_token": "placeholder_token",
-		"token_type":   "Bearer",
-		"expires_in":   3600,
-	}, nil
+	// Authentication is not implemented in UMA
+	return nil, fmt.Errorf("authentication is not implemented - UMA operates without authentication")
 }
 
 func (a *AuthAdapter) GetUsers() (interface{}, error) {
@@ -425,7 +475,7 @@ func (a *AuthAdapter) GetStats() (interface{}, error) {
 }
 
 func (a *AuthAdapter) IsEnabled() bool {
-	return false // Placeholder
+	return false // Authentication is not implemented in UMA
 }
 
 // NotificationAdapter adapts notification operations
@@ -434,8 +484,8 @@ type NotificationAdapter struct {
 }
 
 func (n *NotificationAdapter) GetNotifications(level, category string, unreadOnly bool) (interface{}, error) {
-	// For now, return placeholder data
-	// In a real implementation, this would call the actual notification service
+	// Notification system is not implemented in UMA
+	// Return empty array to indicate no notifications
 	return []interface{}{}, nil
 }
 
@@ -444,30 +494,18 @@ func (n *NotificationAdapter) GetNotificationsPaginated(page, limit int, level, 
 }
 
 func (n *NotificationAdapter) GetNotification(id string) (interface{}, error) {
-	return map[string]interface{}{
-		"id":      id,
-		"title":   "Sample Notification",
-		"message": "This is a placeholder notification",
-		"level":   "info",
-	}, nil
+	// Notification system is not implemented in UMA
+	return nil, fmt.Errorf("notification %s not found - notification system not implemented", id)
 }
 
 func (n *NotificationAdapter) CreateNotification(title, message string, level interface{}, category interface{}, metadata map[string]interface{}) (interface{}, error) {
-	return map[string]interface{}{
-		"id":       "new-notification",
-		"title":    title,
-		"message":  message,
-		"level":    level,
-		"category": category,
-		"metadata": metadata,
-	}, nil
+	// Notification system is not implemented in UMA
+	return nil, fmt.Errorf("notification creation not implemented")
 }
 
 func (n *NotificationAdapter) UpdateNotification(id string, updates map[string]interface{}) (interface{}, error) {
-	return map[string]interface{}{
-		"id":      id,
-		"updated": true,
-	}, nil
+	// Notification system is not implemented in UMA
+	return nil, fmt.Errorf("notification update not implemented")
 }
 
 func (n *NotificationAdapter) DeleteNotification(id string) error {

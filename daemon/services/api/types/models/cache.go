@@ -1,7 +1,6 @@
 package models
 
 import (
-	"sync"
 	"time"
 )
 
@@ -13,10 +12,5 @@ type CacheEntry struct {
 
 // GeneralFormatCache caches expensive operations for the general format endpoint
 type GeneralFormatCache struct {
-	mu                sync.RWMutex
-	systemData        *CacheEntry
-	dockerData        *CacheEntry
-	vmData            *CacheEntry
-	cacheDuration     time.Duration
-	lastArrayInfoHash string
+	// Removed unused fields: mu, systemData, dockerData, vmData, cacheDuration, lastArrayInfoHash
 }

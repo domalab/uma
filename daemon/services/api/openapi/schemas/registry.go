@@ -82,10 +82,28 @@ func (r *Registry) RegisterAll() {
 	r.schemas["AsyncOperationStatsResponse"] = GetAsyncOperationStatsResponse()
 
 	// Register rate limiting schemas
+	for name, schema := range GetRateLimitingSchemas() {
+		r.schemas[name] = schema
+	}
 	r.schemas["RateLimitStatsResponse"] = GetRateLimitStatsResponse()
 	r.schemas["RateLimitConfigResponse"] = GetRateLimitConfigResponse()
 	r.schemas["RateLimitConfigUpdate"] = GetRateLimitConfigUpdate()
 	r.schemas["RateLimitConfigUpdateResponse"] = GetRateLimitConfigUpdateResponse()
+
+	// Register scripts schemas
+	for name, schema := range GetScriptsSchemas() {
+		r.schemas[name] = schema
+	}
+
+	// Register shares schemas
+	for name, schema := range GetSharesSchemas() {
+		r.schemas[name] = schema
+	}
+
+	// Register documentation schemas
+	for name, schema := range GetDocumentationSchemas() {
+		r.schemas[name] = schema
+	}
 
 	// Register enhanced error schemas
 	r.schemas["APIError"] = GetAPIError()
@@ -260,8 +278,7 @@ func isVMSchema(name string) bool {
 func isWebSocketSchema(name string) bool {
 	wsSchemas := []string{
 		"WebSocketMessage", "WebSocketEvent", "WebSocketSubscription",
-		"WebSocketError", "WebSocketStats", "WebSocketConnection",
-		"DockerEventsStream", "SystemStatsStream", "StorageStatusStream",
+		"WebSocketError", "UnifiedWebSocketStream",
 	}
 	for _, schema := range wsSchemas {
 		if name == schema {
@@ -274,7 +291,8 @@ func isWebSocketSchema(name string) bool {
 func isAuthSchema(name string) bool {
 	authSchemas := []string{
 		"LoginRequest", "LoginResponse", "TokenResponse", "RefreshRequest",
-		"UserInfo", "APIKeyInfo", "AuthError",
+		"UserInfo", "APIKeyInfo", "AuthError", "AuthStats", "AuthUser",
+		"SessionInfo", "PermissionInfo",
 	}
 	for _, schema := range authSchemas {
 		if name == schema {
@@ -300,7 +318,7 @@ func isAsyncOperationSchema(name string) bool {
 func isRateLimitingSchema(name string) bool {
 	rateLimitSchemas := []string{
 		"RateLimitStatsResponse", "RateLimitConfigResponse", "RateLimitConfigUpdate",
-		"RateLimitConfigUpdateResponse",
+		"RateLimitConfigUpdateResponse", "RateLimitConfig", "RateLimitStats",
 	}
 	for _, schema := range rateLimitSchemas {
 		if name == schema {

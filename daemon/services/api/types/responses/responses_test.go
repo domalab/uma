@@ -212,7 +212,7 @@ func TestHealthResponse(t *testing.T) {
 		response := &HealthResponse{
 			Status:    "degraded",
 			Version:   "1.0.0",
-			Uptime:    "24h30m",
+			Uptime:    88200, // 24h30m in seconds (24*3600 + 30*60)
 			Timestamp: now,
 			Checks:    checks,
 		}

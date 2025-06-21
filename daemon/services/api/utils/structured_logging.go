@@ -14,6 +14,14 @@ import (
 	"time"
 )
 
+// Custom context key types to avoid collisions
+type contextKey string
+
+const (
+	requestIDKey contextKey = "request_id"
+	loggerKey    contextKey = "logger"
+)
+
 // LogLevel represents the severity level of a log entry
 type LogLevel int
 
@@ -359,7 +367,7 @@ func LoggingMiddleware(logger *StructuredLogger) func(http.Handler) http.Handler
 			requestLogger := logger.WithRequestID(requestID)
 
 			// Add logger to request context
-			ctx := context.WithValue(r.Context(), "logger", requestLogger)
+			ctx := context.WithValue(r.Context(), loggerKey, requestLogger)
 			r = r.WithContext(ctx)
 
 			// Wrap response writer to capture status code
@@ -396,7 +404,7 @@ func (rw *responseWriter) WriteHeader(code int) {
 
 // GetLoggerFromContext retrieves the logger from the request context
 func GetLoggerFromContext(ctx context.Context) *StructuredLogger {
-	if logger, ok := ctx.Value("logger").(*StructuredLogger); ok {
+	if logger, ok := ctx.Value(loggerKey).(*StructuredLogger); ok {
 		return logger
 	}
 	// Return a default logger if none found

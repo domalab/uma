@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -181,11 +180,4 @@ func TestValidateAPIVersion(t *testing.T) {
 	}
 }
 
-// Helper function to generate container IDs for testing
-func generateContainerIDs(count int) []string {
-	ids := make([]string, count)
-	for i := 0; i < count; i++ {
-		ids[i] = fmt.Sprintf("container-%d", i+1)
-	}
-	return ids
-}
+// Removed unused function: generateContainerIDs

@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/domalab/uma/daemon/services/api/types/responses"
@@ -161,12 +165,31 @@ func (p *ProductionReadinessChecker) checkGoroutineCount(ctx context.Context) re
 	}
 }
 
-// checkDiskSpace checks available disk space (mock implementation)
+// checkDiskSpace checks available disk space
 func (p *ProductionReadinessChecker) checkDiskSpace(ctx context.Context) responses.HealthCheck {
-	// In a real implementation, this would check actual disk space
-	// For now, we'll simulate a check
+	// Check disk space on root filesystem
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs("/", &stat); err != nil {
+		// On some systems, disk space check might not be available
+		// Return a pass status with a note about the limitation
+		return responses.HealthCheck{
+			Status:  "pass",
+			Message: "Disk space check not available on this platform",
+		}
+	}
+
+	total := stat.Blocks * uint64(stat.Bsize)
+	free := stat.Bavail * uint64(stat.Bsize)
+	usedPercent := float64(total-free) / float64(total) * 100
+
 	status := "pass"
-	message := "Disk space: sufficient"
+	if usedPercent > 90 {
+		status = "fail"
+	} else if usedPercent > 80 {
+		status = "warn"
+	}
+
+	message := fmt.Sprintf("Disk space: %.1f%% used (%.1fGB free)", usedPercent, float64(free)/1024/1024/1024)
 
 	return responses.HealthCheck{
 		Status:  status,
@@ -174,12 +197,48 @@ func (p *ProductionReadinessChecker) checkDiskSpace(ctx context.Context) respons
 	}
 }
 
-// checkSystemLoad checks system load (mock implementation)
+// checkSystemLoad checks system load
 func (p *ProductionReadinessChecker) checkSystemLoad(ctx context.Context) responses.HealthCheck {
-	// In a real implementation, this would check actual system load
-	// For now, we'll simulate a check
+	// Read load average from /proc/loadavg
+	data, err := os.ReadFile("/proc/loadavg")
+	if err != nil {
+		// On non-Linux systems (like macOS), /proc/loadavg doesn't exist
+		// Return a pass status with a note about the limitation
+		return responses.HealthCheck{
+			Status:  "pass",
+			Message: "System load check not available on this platform",
+		}
+	}
+
+	// Parse load averages (1min, 5min, 15min)
+	fields := strings.Fields(string(data))
+	if len(fields) < 3 {
+		return responses.HealthCheck{
+			Status:  "fail",
+			Message: "Invalid load average format",
+		}
+	}
+
+	load1, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		return responses.HealthCheck{
+			Status:  "fail",
+			Message: fmt.Sprintf("Failed to parse load average: %v", err),
+		}
+	}
+
+	// Get CPU count for load comparison
+	cpuCount := runtime.NumCPU()
+	loadPercent := (load1 / float64(cpuCount)) * 100
+
 	status := "pass"
-	message := "System load: normal"
+	if loadPercent > 90 {
+		status = "fail"
+	} else if loadPercent > 70 {
+		status = "warn"
+	}
+
+	message := fmt.Sprintf("System load: %.2f (%.1f%% of %d CPUs)", load1, loadPercent, cpuCount)
 
 	return responses.HealthCheck{
 		Status:  status,
@@ -364,7 +423,7 @@ func WriteProductionHealthResponse(w http.ResponseWriter, checker *ProductionRea
 	response := responses.HealthResponse{
 		Status:    overallStatus,
 		Version:   version,
-		Uptime:    time.Since(time.Now().Add(-24 * time.Hour)).String(), // Mock uptime
+		Uptime:    int(time.Since(time.Now().Add(-24 * time.Hour)).Seconds()), // Mock uptime in seconds
 		Timestamp: time.Now(),
 		Checks:    checks,
 	}

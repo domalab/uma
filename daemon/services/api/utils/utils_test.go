@@ -736,7 +736,7 @@ func TestResponseFunctions(t *testing.T) {
 			},
 		}
 
-		WriteHealthResponse(w, "degraded", "1.0.0", "24h", checks)
+		WriteHealthResponse(w, "degraded", "1.0.0", 86400, checks) // 24h in seconds
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)

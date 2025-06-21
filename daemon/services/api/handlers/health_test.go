@@ -450,6 +450,10 @@ func (m *MockDockerWithFailures) GetNetworks() (interface{}, error) {
 	return nil, fmt.Errorf("failed to get networks")
 }
 
+func (m *MockDockerWithFailures) GetContainerStats(id string) (interface{}, error) {
+	return nil, fmt.Errorf("failed to get container stats")
+}
+
 func (m *MockDockerWithFailures) GetSystemInfo() (interface{}, error) {
 	return nil, fmt.Errorf("docker system info unavailable")
 }

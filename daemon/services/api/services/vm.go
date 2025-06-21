@@ -218,8 +218,48 @@ func (v *VMService) ShutdownVM(vmName string) error {
 
 // GetVMStats retrieves VM resource usage statistics
 func (v *VMService) GetVMStats(vmName string) (*VMStats, error) {
-	// VM stats functionality would need to be implemented
-	// For now, return placeholder stats
+	// Call the actual VM interface to get stats
+	stats, err := v.api.GetVM().GetVMStats(vmName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VM stats: %v", err)
+	}
+
+	// Convert interface{} to VMStats
+	if statsMap, ok := stats.(map[string]interface{}); ok {
+		vmStats := &VMStats{
+			Name: vmName,
+		}
+
+		// Extract values from the stats map
+		if cpuPercent, ok := statsMap["cpu_percent"].(float64); ok {
+			vmStats.CPUPercent = cpuPercent
+		}
+		if memoryUsed, ok := statsMap["memory_used"].(uint64); ok {
+			vmStats.MemoryUsed = memoryUsed
+		}
+		if memoryTotal, ok := statsMap["memory_total"].(uint64); ok {
+			vmStats.MemoryTotal = memoryTotal
+		}
+		if memoryPercent, ok := statsMap["memory_percent"].(float64); ok {
+			vmStats.MemoryPercent = memoryPercent
+		}
+		if networkRx, ok := statsMap["network_rx"].(uint64); ok {
+			vmStats.NetworkRx = networkRx
+		}
+		if networkTx, ok := statsMap["network_tx"].(uint64); ok {
+			vmStats.NetworkTx = networkTx
+		}
+		if diskRead, ok := statsMap["disk_read"].(uint64); ok {
+			vmStats.DiskRead = diskRead
+		}
+		if diskWrite, ok := statsMap["disk_write"].(uint64); ok {
+			vmStats.DiskWrite = diskWrite
+		}
+
+		return vmStats, nil
+	}
+
+	// Fallback if conversion fails
 	return &VMStats{
 		Name:          vmName,
 		State:         "unknown",

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/domalab/uma/daemon/logger"
 	"github.com/domalab/uma/daemon/plugins/notifications"
@@ -88,7 +89,9 @@ func (h *NotificationHandler) HandleNotificationsStats(w http.ResponseWriter, r 
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, stats)
+	// Transform stats to ensure required fields are present
+	transformedStats := h.transformNotificationStats(stats)
+	utils.WriteJSON(w, http.StatusOK, transformedStats)
 }
 
 // HandleNotificationsMarkAllRead handles POST /api/v1/notifications/mark-all-read
@@ -187,9 +190,8 @@ func (h *NotificationHandler) handleGetNotifications(w http.ResponseWriter, r *h
 		}
 		utils.WriteJSON(w, http.StatusOK, response)
 	} else {
-		utils.WriteJSON(w, http.StatusOK, map[string]interface{}{
-			"notifications": notificationList,
-		})
+		// Return array directly to match schema expectation
+		utils.WriteJSON(w, http.StatusOK, notificationList)
 	}
 }
 
@@ -304,4 +306,61 @@ func (h *NotificationHandler) parsePaginationParams(r *http.Request) PaginationP
 	}
 
 	return params
+}
+
+// transformNotificationStats transforms notification stats to ensure required fields are present
+func (h *NotificationHandler) transformNotificationStats(stats interface{}) map[string]interface{} {
+	transformed := map[string]interface{}{
+		"by_severity": map[string]interface{}{
+			"info":     0,
+			"warning":  0,
+			"error":    0,
+			"critical": 0,
+		},
+	}
+
+	// Handle different possible return types
+	if statsMap, ok := stats.(map[string]interface{}); ok {
+		// Copy all existing fields
+		for key, value := range statsMap {
+			transformed[key] = value
+		}
+
+		// Ensure by_severity field is present
+		if _, exists := statsMap["by_severity"]; !exists {
+			// Try to calculate by_severity from other fields or use defaults
+			if notifications, err := h.api.GetNotifications().GetNotifications("", "", false); err == nil {
+				severityCounts := map[string]int{
+					"info":     0,
+					"warning":  0,
+					"error":    0,
+					"critical": 0,
+				}
+
+				// Count notifications by severity
+				if notifList, ok := notifications.([]interface{}); ok {
+					for _, notif := range notifList {
+						if notifMap, ok := notif.(map[string]interface{}); ok {
+							if severity, exists := notifMap["severity"]; exists {
+								if severityStr, ok := severity.(string); ok {
+									if _, validSeverity := severityCounts[severityStr]; validSeverity {
+										severityCounts[severityStr]++
+									}
+								}
+							}
+						}
+					}
+				}
+
+				transformed["by_severity"] = severityCounts
+			}
+		}
+
+		// Add last_updated if missing
+		if _, exists := transformed["last_updated"]; !exists {
+			transformed["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+		}
+	}
+
+	return transformed
 }

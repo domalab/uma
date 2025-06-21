@@ -3,19 +3,17 @@ package paths
 // GetWebSocketPaths returns all WebSocket API paths
 func GetWebSocketPaths() map[string]interface{} {
 	return map[string]interface{}{
-		"/api/v1/ws":          getWebSocketPath(),
-		"/api/v1/ws/stats":    getWebSocketStatsPath(),
-		"/api/v1/ws/channels": getWebSocketChannelsPath(),
+		"/api/v1/ws": getUnifiedWebSocketPath(),
 	}
 }
 
-func getWebSocketPath() map[string]interface{} {
+func getUnifiedWebSocketPath() map[string]interface{} {
 	return map[string]interface{}{
 		"get": map[string]interface{}{
-			"summary":     "WebSocket connection",
-			"description": "Establish WebSocket connection for real-time updates",
-			"operationId": "connectWebSocket",
-			"tags":        []string{"WebSocket"},
+			"summary":     "Unified WebSocket connection with subscription management",
+			"description": "Establish WebSocket connection for real-time updates with subscription management. Supports subscribing to specific event channels including system stats, Docker events, storage status, temperature alerts, and more.",
+			"operationId": "connectUnifiedWebSocket",
+			"tags":        []string{"WebSocket", "Real-time"},
 			"parameters": []interface{}{
 				map[string]interface{}{
 					"name":        "Upgrade",
@@ -56,87 +54,6 @@ func getWebSocketPath() map[string]interface{} {
 				"426": map[string]interface{}{
 					"description": "Upgrade Required - Invalid WebSocket upgrade request",
 				},
-			},
-			"security": []map[string][]string{
-				{"BearerAuth": {}},
-				{"ApiKeyAuth": {}},
-			},
-		},
-	}
-}
-
-func getWebSocketStatsPath() map[string]interface{} {
-	return map[string]interface{}{
-		"get": map[string]interface{}{
-			"summary":     "Get WebSocket statistics",
-			"description": "Retrieve WebSocket server statistics including connections, subscriptions, and message counts",
-			"operationId": "getWebSocketStats",
-			"tags":        []string{"WebSocket"},
-			"responses": map[string]interface{}{
-				"200": map[string]interface{}{
-					"description": "WebSocket statistics retrieved successfully",
-					"content": map[string]interface{}{
-						"application/json": map[string]interface{}{
-							"schema": map[string]interface{}{
-								"allOf": []interface{}{
-									map[string]interface{}{"$ref": "#/components/schemas/StandardResponse"},
-									map[string]interface{}{
-										"type": "object",
-										"properties": map[string]interface{}{
-											"data": map[string]interface{}{
-												"$ref": "#/components/schemas/WebSocketStats",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				"401": map[string]interface{}{"$ref": "#/components/responses/Unauthorized"},
-				"500": map[string]interface{}{"$ref": "#/components/responses/InternalServerError"},
-			},
-			"security": []map[string][]string{
-				{"BearerAuth": {}},
-				{"ApiKeyAuth": {}},
-			},
-		},
-	}
-}
-
-func getWebSocketChannelsPath() map[string]interface{} {
-	return map[string]interface{}{
-		"get": map[string]interface{}{
-			"summary":     "List WebSocket channels",
-			"description": "Retrieve a list of available WebSocket channels for real-time updates",
-			"operationId": "listWebSocketChannels",
-			"tags":        []string{"WebSocket"},
-			"responses": map[string]interface{}{
-				"200": map[string]interface{}{
-					"description": "WebSocket channels retrieved successfully",
-					"content": map[string]interface{}{
-						"application/json": map[string]interface{}{
-							"schema": map[string]interface{}{
-								"allOf": []interface{}{
-									map[string]interface{}{"$ref": "#/components/schemas/StandardResponse"},
-									map[string]interface{}{
-										"type": "object",
-										"properties": map[string]interface{}{
-											"data": map[string]interface{}{
-												"type": "array",
-												"items": map[string]interface{}{
-													"$ref": "#/components/schemas/WebSocketChannel",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				"401": map[string]interface{}{"$ref": "#/components/responses/Unauthorized"},
-				"500": map[string]interface{}{"$ref": "#/components/responses/InternalServerError"},
 			},
 			"security": []map[string][]string{
 				{"BearerAuth": {}},

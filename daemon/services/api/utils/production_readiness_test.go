@@ -15,6 +15,7 @@ func TestProductionReadinessChecker(t *testing.T) {
 		checker := NewProductionReadinessChecker()
 		if checker == nil {
 			t.Error("Expected non-nil ProductionReadinessChecker")
+			return
 		}
 
 		if len(checker.checks) == 0 {
@@ -163,6 +164,7 @@ func TestConfigurationValidator(t *testing.T) {
 		validator := NewConfigurationValidator()
 		if validator == nil {
 			t.Error("Expected non-nil ConfigurationValidator")
+			return
 		}
 
 		if len(validator.validationRules) == 0 {
@@ -266,6 +268,7 @@ func TestMonitoringCollector(t *testing.T) {
 		collector := NewMonitoringCollector()
 		if collector == nil {
 			t.Error("Expected non-nil MonitoringCollector")
+			return
 		}
 
 		if collector.metrics == nil {

@@ -93,12 +93,17 @@ func (s *SystemService) GetTemperatureData() map[string]interface{} {
 	// Convert to map if needed
 	if tempMap, ok := enhancedData.(map[string]interface{}); ok {
 		tempMap["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+		// Add overall_status if missing
+		if _, exists := tempMap["overall_status"]; !exists {
+			tempMap["overall_status"] = s.calculateOverallTemperatureStatus(tempMap)
+		}
 		return tempMap
 	}
 
 	return map[string]interface{}{
-		"data":         enhancedData,
-		"last_updated": time.Now().UTC().Format(time.RFC3339),
+		"data":           enhancedData,
+		"last_updated":   time.Now().UTC().Format(time.RFC3339),
+		"overall_status": "normal", // Default overall status
 	}
 }
 
@@ -117,10 +122,26 @@ func (s *SystemService) getBasicTemperatureData() map[string]interface{} {
 		})
 	}
 
+	// Calculate overall status based on sensors
+	overallStatus := "normal"
+	for _, sensor := range sensors {
+		if status, exists := sensor["status"]; exists {
+			if statusStr, ok := status.(string); ok {
+				if statusStr == "critical" {
+					overallStatus = "critical"
+					break
+				} else if statusStr == "warning" && overallStatus != "critical" {
+					overallStatus = "warm"
+				}
+			}
+		}
+	}
+
 	return map[string]interface{}{
-		"sensors":      sensors,
-		"fans":         []map[string]interface{}{},
-		"last_updated": time.Now().UTC().Format(time.RFC3339),
+		"sensors":        sensors,
+		"fans":           []map[string]interface{}{},
+		"overall_status": overallStatus,
+		"last_updated":   time.Now().UTC().Format(time.RFC3339),
 	}
 }
 
@@ -159,6 +180,32 @@ func (s *SystemService) getTemperatureStatus(temp float64) string {
 		return "warm"
 	}
 	return "normal"
+}
+
+// calculateOverallTemperatureStatus calculates overall temperature status from sensor data
+func (s *SystemService) calculateOverallTemperatureStatus(tempData map[string]interface{}) string {
+	overallStatus := "normal"
+
+	// Check sensors array if present
+	if sensors, exists := tempData["sensors"]; exists {
+		if sensorsArray, ok := sensors.([]interface{}); ok {
+			for _, sensor := range sensorsArray {
+				if sensorMap, ok := sensor.(map[string]interface{}); ok {
+					if status, exists := sensorMap["status"]; exists {
+						if statusStr, ok := status.(string); ok {
+							if statusStr == "critical" {
+								return "critical" // Critical takes precedence
+							} else if statusStr == "warning" && overallStatus != "critical" {
+								overallStatus = "warm"
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return overallStatus
 }
 
 // GetNetworkData retrieves network interface information

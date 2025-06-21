@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/domalab/uma/daemon/logger"
 	"github.com/domalab/uma/daemon/services/api/utils"
@@ -27,50 +28,21 @@ func (h *RateLimitHandler) HandleRateLimitStats(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Return placeholder rate limit statistics
+	// Note: Rate limiting is not currently implemented in UMA
+	// This endpoint returns a disabled state to indicate no active rate limiting
 	stats := map[string]interface{}{
-		"enabled":            true,
-		"global_limit":       1000,
-		"global_window":      "1h",
-		"current_requests":   245,
-		"remaining_requests": 755,
-		"reset_time":         "2024-01-01T01:00:00Z",
-		"blocked_requests":   12,
-		"total_requests":     2567,
-		"endpoints": map[string]interface{}{
-			"/api/v1/docker/containers": map[string]interface{}{
-				"limit":              100,
-				"window":             "1h",
-				"current_requests":   23,
-				"remaining_requests": 77,
-			},
-			"/api/v1/storage/array": map[string]interface{}{
-				"limit":              50,
-				"window":             "1h",
-				"current_requests":   8,
-				"remaining_requests": 42,
-			},
-			"/api/v1/vms": map[string]interface{}{
-				"limit":              200,
-				"window":             "1h",
-				"current_requests":   45,
-				"remaining_requests": 155,
-			},
-		},
-		"clients": map[string]interface{}{
-			"192.168.1.100": map[string]interface{}{
-				"requests":           156,
-				"blocked":            2,
-				"last_request":       "2024-01-01T00:45:30Z",
-				"remaining_requests": 844,
-			},
-			"192.168.1.101": map[string]interface{}{
-				"requests":           89,
-				"blocked":            0,
-				"last_request":       "2024-01-01T00:42:15Z",
-				"remaining_requests": 911,
-			},
-		},
+		"enabled":            false,
+		"global_limit":       0,
+		"global_window":      "disabled",
+		"current_requests":   0,
+		"remaining_requests": 0,
+		"reset_time":         nil,
+		"blocked_requests":   0,
+		"total_requests":     0,
+		"endpoints":          map[string]interface{}{},
+		"clients":            map[string]interface{}{},
+		"message":            "Rate limiting is not currently implemented",
+		"last_updated":       time.Now().UTC().Format(time.RFC3339),
 	}
 
 	utils.WriteJSON(w, http.StatusOK, stats)
@@ -90,52 +62,24 @@ func (h *RateLimitHandler) HandleRateLimitConfig(w http.ResponseWriter, r *http.
 
 // handleGetRateLimitConfig handles GET /api/v1/rate-limits/config
 func (h *RateLimitHandler) handleGetRateLimitConfig(w http.ResponseWriter, r *http.Request) {
-	// Return placeholder rate limit configuration
+	// Note: Rate limiting is not currently implemented in UMA
+	// Return disabled configuration to indicate no active rate limiting
 	config := map[string]interface{}{
-		"enabled":       true,
-		"global_limit":  1000,
-		"global_window": "1h",
-		"endpoints": map[string]interface{}{
-			"/api/v1/docker/containers": map[string]interface{}{
-				"enabled": true,
-				"limit":   100,
-				"window":  "1h",
-				"burst":   10,
-			},
-			"/api/v1/storage/array": map[string]interface{}{
-				"enabled": true,
-				"limit":   50,
-				"window":  "1h",
-				"burst":   5,
-			},
-			"/api/v1/vms": map[string]interface{}{
-				"enabled": true,
-				"limit":   200,
-				"window":  "1h",
-				"burst":   20,
-			},
-			"/api/v1/auth/login": map[string]interface{}{
-				"enabled": true,
-				"limit":   10,
-				"window":  "15m",
-				"burst":   3,
-			},
-		},
-		"whitelist": []string{
-			"127.0.0.1",
-			"::1",
-			"192.168.1.0/24",
-		},
-		"blacklist": []string{
-			"10.0.0.100",
-		},
+		"enabled":       false,
+		"global_limit":  0,
+		"global_window": "disabled",
+		"endpoints":     map[string]interface{}{},
+		"whitelist":     []string{},
+		"blacklist":     []string{},
 		"headers": map[string]interface{}{
-			"include_headers":    true,
-			"limit_header":       "X-RateLimit-Limit",
-			"remaining_header":   "X-RateLimit-Remaining",
-			"reset_header":       "X-RateLimit-Reset",
-			"retry_after_header": "Retry-After",
+			"include_headers":    false,
+			"limit_header":       "",
+			"remaining_header":   "",
+			"reset_header":       "",
+			"retry_after_header": "",
 		},
+		"message":      "Rate limiting is not currently implemented",
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
 	}
 
 	utils.WriteJSON(w, http.StatusOK, config)
@@ -149,24 +93,9 @@ func (h *RateLimitHandler) handleUpdateRateLimitConfig(w http.ResponseWriter, r 
 		return
 	}
 
-	// Validate configuration (placeholder validation)
-	if enabled, ok := config["enabled"].(bool); ok && !enabled {
-		logger.Yellow("Rate limiting disabled via API")
-	}
+	// Note: Rate limiting is not currently implemented in UMA
+	// This endpoint returns an error to indicate the feature is not available
+	logger.Yellow("Rate limit configuration update attempted, but rate limiting is not implemented")
 
-	if globalLimit, ok := config["global_limit"].(float64); ok {
-		if globalLimit < 1 || globalLimit > 10000 {
-			utils.WriteError(w, http.StatusBadRequest, "Global limit must be between 1 and 10000")
-			return
-		}
-	}
-
-	// In a real implementation, this would update the actual rate limit configuration
-	logger.Blue("Rate limit configuration updated via API")
-
-	utils.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": "Rate limit configuration updated successfully",
-		"config":  config,
-	})
+	utils.WriteError(w, http.StatusNotImplemented, "Rate limiting is not currently implemented in UMA")
 }

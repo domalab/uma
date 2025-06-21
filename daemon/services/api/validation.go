@@ -3,15 +3,9 @@ package api
 import (
 	"fmt"
 	"strings"
-
-	"github.com/go-playground/validator/v10"
 )
 
-var validate *validator.Validate
-
-func init() {
-	validate = validator.New()
-}
+// Removed unused variable: validate
 
 // validatePaginationParams validates pagination parameters
 func (h *HTTPServer) validatePaginationParams(page, limit int) error {

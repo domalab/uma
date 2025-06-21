@@ -30,13 +30,11 @@ body:
       label: 🔗 WebSocket Endpoint
       description: "Which WebSocket endpoint is experiencing issues?"
       options:
-        - "/api/v1/ws/system/stats"
-        - "/api/v1/ws/docker/events"
-        - "/api/v1/ws/storage/status"
-        - "/api/v1/ws/vm/events"
-        - "/api/v1/ws/ups/status"
-        - "Multiple endpoints"
-        - "Other/Custom endpoint"
+        - "/api/v1/ws (Unified WebSocket)"
+        - "Subscription management"
+        - "Event broadcasting"
+        - "Connection issues"
+        - "Other/Custom issue"
     validations:
       required: true
 
@@ -184,9 +182,13 @@ body:
         You can test WebSocket connectivity using your browser's developer console:
         
         ```javascript
-        // Test system stats WebSocket
-        const ws = new WebSocket('ws://YOUR_UNRAID_IP:34600/api/v1/ws/system/stats');
-        ws.onopen = () => console.log('Connected');
+        // Test unified WebSocket with subscription
+        const ws = new WebSocket('ws://YOUR_UNRAID_IP:34600/api/v1/ws');
+        ws.onopen = () => {
+            console.log('Connected');
+            // Subscribe to system stats
+            ws.send(JSON.stringify({type: 'subscribe', channel: 'system.stats'}));
+        };
         ws.onmessage = (e) => console.log('Data:', e.data);
         ws.onerror = (e) => console.log('Error:', e);
         ws.onclose = (e) => console.log('Closed:', e.code, e.reason);

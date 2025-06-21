@@ -11,7 +11,7 @@ func GetNotificationSchemas() map[string]interface{} {
 
 func getNotificationListSchema() map[string]interface{} {
 	return map[string]interface{}{
-		"type": "array",
+		"type":        "array",
 		"description": "List of notifications",
 		"items": map[string]interface{}{
 			"$ref": "#/components/schemas/NotificationInfo",
@@ -74,6 +74,12 @@ func getNotificationStatsSchema() map[string]interface{} {
 					},
 				},
 			},
+			"persistent": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of persistent notifications",
+				"example":     0,
+				"minimum":     0,
+			},
 			"last_updated": map[string]interface{}{
 				"type":        "string",
 				"format":      "date-time",
@@ -81,7 +87,7 @@ func getNotificationStatsSchema() map[string]interface{} {
 				"example":     "2024-01-01T12:00:00Z",
 			},
 		},
-		"required": []string{"total", "unread", "by_severity"},
+		"required": []string{"total", "unread", "by_severity", "persistent"},
 	}
 }
 
@@ -172,8 +178,8 @@ func getNotificationInfoSchema() map[string]interface{} {
 				},
 			},
 			"metadata": map[string]interface{}{
-				"type":        "object",
-				"description": "Additional notification metadata",
+				"type":                 "object",
+				"description":          "Additional notification metadata",
 				"additionalProperties": true,
 				"example": map[string]interface{}{
 					"cpu_usage":    "85%",

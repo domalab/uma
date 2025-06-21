@@ -414,6 +414,50 @@ func getOperationStatsSchema() map[string]interface{} {
 					"disk_scan":    7,
 				},
 			},
+			"total_operations": map[string]interface{}{
+				"type":        "integer",
+				"description": "Total number of operations (alternative field)",
+				"example":     15,
+				"minimum":     0,
+			},
+			"running_operations": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of currently running operations",
+				"example":     1,
+				"minimum":     0,
+			},
+			"completed_operations": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of completed operations",
+				"example":     10,
+				"minimum":     0,
+			},
+			"failed_operations": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of failed operations",
+				"example":     2,
+				"minimum":     0,
+			},
+			"operations_by_type": map[string]interface{}{
+				"type":        "object",
+				"description": "Operation count by type (alternative field)",
+				"additionalProperties": map[string]interface{}{
+					"type": "integer",
+				},
+				"example": map[string]interface{}{
+					"array_start":       2,
+					"array_stop":        1,
+					"docker_bulk_start": 3,
+					"docker_bulk_stop":  2,
+					"vm_start":          1,
+					"vm_stop":           1,
+				},
+			},
+			"average_duration": map[string]interface{}{
+				"type":        "string",
+				"description": "Average operation duration",
+				"example":     "45s",
+			},
 			"last_updated": map[string]interface{}{
 				"type":        "string",
 				"format":      "date-time",

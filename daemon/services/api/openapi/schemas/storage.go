@@ -4,6 +4,8 @@ package schemas
 func GetStorageSchemas() map[string]interface{} {
 	return map[string]interface{}{
 		"ArrayInfo":       getArrayInfoSchema(),
+		"ArrayDisk":       getArrayDiskSchema(),
+		"ParityDisk":      getParityDiskSchema(),
 		"DiskInfo":        getDiskInfoSchema(),
 		"SMARTData":       getSMARTDataSchema(),
 		"ParityInfo":      getParityInfoSchema(),
@@ -26,53 +28,42 @@ func getArrayInfoSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"status": map[string]interface{}{
+			"disks": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"$ref": "#/components/schemas/ArrayDisk",
+				},
+				"description": "Array data disks",
+			},
+			"parity": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"$ref": "#/components/schemas/ParityDisk",
+				},
+				"description": "Parity disks",
+			},
+			"protection": map[string]interface{}{
 				"type":        "string",
-				"description": "Array status",
-				"enum":        []string{"started", "stopped", "starting", "stopping"},
-				"example":     "started",
+				"description": "Array protection level",
+				"enum":        []string{"parity", "dual-parity", "none"},
+				"example":     "parity",
 			},
 			"state": map[string]interface{}{
 				"type":        "string",
 				"description": "Array state",
-				"enum":        []string{"normal", "degraded", "invalid", "emulated"},
-				"example":     "normal",
+				"enum":        []string{"started", "stopped", "starting", "stopping"},
+				"example":     "started",
 			},
-			"num_disks": map[string]interface{}{
-				"type":        "integer",
-				"description": "Number of data disks",
-				"example":     6,
-				"minimum":     0,
+			"sync_action": map[string]interface{}{
+				"type":        "string",
+				"description": "Current synchronization action",
+				"enum":        []string{"check", "check P", "resync", "none", "idle"},
+				"example":     "check P",
 			},
-			"num_parity": map[string]interface{}{
-				"type":        "integer",
-				"description": "Number of parity disks",
-				"example":     2,
-				"minimum":     0,
-				"maximum":     2,
-			},
-			"size": map[string]interface{}{
-				"type":        "integer",
-				"description": "Total array size in bytes",
-				"example":     48000000000000,
-				"minimum":     0,
-			},
-			"free": map[string]interface{}{
-				"type":        "integer",
-				"description": "Free space in bytes",
-				"example":     24000000000000,
-				"minimum":     0,
-			},
-			"used": map[string]interface{}{
-				"type":        "integer",
-				"description": "Used space in bytes",
-				"example":     24000000000000,
-				"minimum":     0,
-			},
-			"usage_percent": map[string]interface{}{
+			"sync_progress": map[string]interface{}{
 				"type":        "number",
-				"description": "Usage percentage",
-				"example":     50.0,
+				"description": "Synchronization progress percentage",
+				"example":     45.2,
 				"minimum":     0,
 				"maximum":     100,
 			},
@@ -80,10 +71,124 @@ func getArrayInfoSchema() map[string]interface{} {
 				"type":        "string",
 				"format":      "date-time",
 				"description": "Last update timestamp",
-				"example":     "2025-06-16T14:30:00Z",
+				"example":     "2025-06-19T14:30:00Z",
 			},
 		},
-		"required": []string{"status", "state", "num_disks", "num_parity", "last_updated"},
+		"required": []string{"disks", "parity", "protection", "state", "last_updated"},
+	}
+}
+
+func getArrayDiskSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"device": map[string]interface{}{
+				"type":        "string",
+				"description": "Device path",
+				"example":     "/dev/sda",
+			},
+			"health": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk health status",
+				"enum":        []string{"PASSED", "FAILED", "UNKNOWN"},
+				"example":     "PASSED",
+			},
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk name",
+				"example":     "disk1",
+			},
+			"serial": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk serial number",
+				"example":     "WD-WCC4N7XXXXXX",
+			},
+			"size": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk size (human readable)",
+				"example":     "8.0 TB",
+			},
+			"smart_data": map[string]interface{}{
+				"type":                 "object",
+				"description":          "SMART data attributes",
+				"additionalProperties": true,
+			},
+			"status": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk status",
+				"enum":        []string{"active", "standby", "spun_down", "error", "missing"},
+				"example":     "active",
+			},
+			"temperature": map[string]interface{}{
+				"type":        "number",
+				"description": "Disk temperature in Celsius",
+				"example":     35.0,
+			},
+			"type": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk type",
+				"enum":        []string{"data", "cache", "pool"},
+				"example":     "data",
+			},
+		},
+		"required": []string{"device", "name", "status", "type"},
+	}
+}
+
+func getParityDiskSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"device": map[string]interface{}{
+				"type":        "string",
+				"description": "Device path",
+				"example":     "/dev/sdb",
+			},
+			"health": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk health status",
+				"enum":        []string{"PASSED", "FAILED", "UNKNOWN"},
+				"example":     "PASSED",
+			},
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "Parity disk name",
+				"example":     "parity",
+			},
+			"serial": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk serial number",
+				"example":     "WD-WCC4N7YYYYYY",
+			},
+			"size": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk size (human readable)",
+				"example":     "8.0 TB",
+			},
+			"smart_data": map[string]interface{}{
+				"type":                 "object",
+				"description":          "SMART data attributes",
+				"additionalProperties": true,
+			},
+			"status": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk status",
+				"enum":        []string{"active", "standby", "spun_down", "error", "missing"},
+				"example":     "active",
+			},
+			"temperature": map[string]interface{}{
+				"type":        "number",
+				"description": "Disk temperature in Celsius",
+				"example":     34.0,
+			},
+			"type": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk type",
+				"enum":        []string{"parity", "parity2"},
+				"example":     "parity",
+			},
+		},
+		"required": []string{"device", "name", "status", "type"},
 	}
 }
 
@@ -153,6 +258,47 @@ func getDiskInfoSchema() map[string]interface{} {
 				"description": "Filesystem type",
 				"example":     "xfs",
 			},
+			"health": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk health status",
+				"enum":        []string{"healthy", "unknown", "warning", "critical"},
+				"example":     "healthy",
+			},
+			"type": map[string]interface{}{
+				"type":        "string",
+				"description": "Disk type",
+				"enum":        []string{"disk", "parity", "cache", "pool"},
+				"example":     "disk",
+			},
+			"smart_data": map[string]interface{}{
+				"type":        "object",
+				"description": "SMART monitoring data",
+				"properties": map[string]interface{}{
+					"available": map[string]interface{}{
+						"type":        "boolean",
+						"description": "Whether SMART data is available",
+						"example":     true,
+					},
+					"status": map[string]interface{}{
+						"type":        "string",
+						"description": "SMART status",
+						"enum":        []string{"passed", "failed", "unknown"},
+						"example":     "passed",
+					},
+					"attributes": map[string]interface{}{
+						"type":        "object",
+						"description": "SMART attributes",
+						"additionalProperties": map[string]interface{}{
+							"type": "number",
+						},
+						"example": map[string]interface{}{
+							"power_on_hours":    18762,
+							"power_cycle_count": 241,
+						},
+					},
+				},
+				"required": []string{"available", "status"},
+			},
 			"smart": map[string]interface{}{
 				"$ref": "#/components/schemas/SMARTData",
 			},
@@ -163,7 +309,7 @@ func getDiskInfoSchema() map[string]interface{} {
 				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
-		"required": []string{"name", "device", "size", "status", "last_updated"},
+		"required": []string{"name", "device", "size", "status", "health", "type", "smart_data", "last_updated"},
 	}
 }
 
@@ -233,10 +379,18 @@ func getParityInfoSchema() map[string]interface{} {
 		"type": "object",
 		"properties": map[string]interface{}{
 			"parity1": map[string]interface{}{
-				"$ref": "#/components/schemas/DiskInfo",
+				"anyOf": []interface{}{
+					map[string]interface{}{"$ref": "#/components/schemas/DiskInfo"},
+					map[string]interface{}{"type": "null"},
+				},
+				"description": "First parity disk (null if not present)",
 			},
 			"parity2": map[string]interface{}{
-				"$ref": "#/components/schemas/DiskInfo",
+				"anyOf": []interface{}{
+					map[string]interface{}{"$ref": "#/components/schemas/DiskInfo"},
+					map[string]interface{}{"type": "null"},
+				},
+				"description": "Second parity disk (null if not present)",
 			},
 			"check_status": map[string]interface{}{
 				"$ref": "#/components/schemas/ParityCheckInfo",
@@ -351,6 +505,73 @@ func getCacheInfoSchema() map[string]interface{} {
 				"minimum":     0,
 				"maximum":     100,
 			},
+			"pools": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"name": map[string]interface{}{
+							"type":        "string",
+							"description": "Pool name",
+							"example":     "cache",
+						},
+						"type": map[string]interface{}{
+							"type":        "string",
+							"description": "Pool type",
+							"enum":        []string{"cache", "zfs_cache"},
+							"example":     "cache",
+						},
+						"device": map[string]interface{}{
+							"type":        "string",
+							"description": "Pool device",
+							"example":     "/dev/nvme0n1p1",
+						},
+						"mountpoint": map[string]interface{}{
+							"type":        "string",
+							"description": "Pool mountpoint",
+							"example":     "/mnt/cache",
+						},
+						"size": map[string]interface{}{
+							"type":        "string",
+							"description": "Pool size",
+							"example":     "477G",
+						},
+						"used": map[string]interface{}{
+							"type":        "string",
+							"description": "Used space",
+							"example":     "67G",
+						},
+						"available": map[string]interface{}{
+							"type":        "string",
+							"description": "Available space",
+							"example":     "408G",
+						},
+						"usage": map[string]interface{}{
+							"type":        "string",
+							"description": "Usage percentage",
+							"example":     "14%",
+						},
+						"health": map[string]interface{}{
+							"type":        "string",
+							"description": "Pool health",
+							"enum":        []string{"healthy", "ONLINE", "DEGRADED", "FAULTED"},
+							"example":     "healthy",
+						},
+						"temperature": map[string]interface{}{
+							"type":        "number",
+							"description": "Pool temperature",
+							"example":     0,
+						},
+						"smart_data": map[string]interface{}{
+							"type":                 "object",
+							"description":          "SMART data for the pool",
+							"additionalProperties": true,
+						},
+					},
+					"required": []string{"name", "type", "size", "health"},
+				},
+				"description": "Cache pools information",
+			},
 			"last_updated": map[string]interface{}{
 				"type":        "string",
 				"format":      "date-time",
@@ -358,7 +579,7 @@ func getCacheInfoSchema() map[string]interface{} {
 				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
-		"required": []string{"disks", "pool_status", "last_updated"},
+		"required": []string{"disks", "pool_status", "pools", "last_updated"},
 	}
 }
 
@@ -683,6 +904,18 @@ func getBootInfoSchema() map[string]interface{} {
 				"minimum":     0,
 				"maximum":     100,
 			},
+			"usage": map[string]interface{}{
+				"type":        "number",
+				"description": "Usage percentage (alternative field)",
+				"example":     6.6,
+				"minimum":     0,
+				"maximum":     100,
+			},
+			"available": map[string]interface{}{
+				"type":        "string",
+				"description": "Available space (human readable)",
+				"example":     "29.9GB",
+			},
 			"mount_point": map[string]interface{}{
 				"type":        "string",
 				"description": "Mount point",
@@ -695,7 +928,7 @@ func getBootInfoSchema() map[string]interface{} {
 				"example":     "2024-01-01T12:00:00Z",
 			},
 		},
-		"required": []string{"device", "filesystem", "size", "used", "free", "mount_point", "last_updated"},
+		"required": []string{"device", "filesystem", "size", "used", "free", "usage", "available", "mount_point", "last_updated"},
 	}
 }
 
@@ -755,13 +988,144 @@ func getStorageGeneralSchema() map[string]interface{} {
 			"array_status": map[string]interface{}{
 				"type":        "string",
 				"description": "Array status",
-				"enum":        []string{"started", "stopped", "starting", "stopping"},
+				"enum":        []string{"started", "stopped", "starting", "stopping", "unknown"},
 				"example":     "started",
 			},
 			"parity_valid": map[string]interface{}{
 				"type":        "boolean",
 				"description": "Whether parity is valid",
 				"example":     true,
+			},
+			"log_usage": map[string]interface{}{
+				"type":        "object",
+				"description": "Log directory usage information",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Log directory path",
+						"example":     "/var/log",
+					},
+					"total": map[string]interface{}{
+						"type":        "number",
+						"description": "Total log space in bytes",
+						"example":     134217728,
+						"minimum":     0,
+					},
+					"used": map[string]interface{}{
+						"type":        "number",
+						"description": "Used log space in bytes",
+						"example":     4771840,
+						"minimum":     0,
+					},
+					"free": map[string]interface{}{
+						"type":        "number",
+						"description": "Free log space in bytes",
+						"example":     129445888,
+						"minimum":     0,
+					},
+					"usage": map[string]interface{}{
+						"type":        "number",
+						"description": "Log usage percentage",
+						"example":     3.56,
+						"minimum":     0,
+						"maximum":     100,
+					},
+					"last_updated": map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "Last update timestamp",
+						"example":     "2025-06-20T00:56:59Z",
+					},
+				},
+				"required": []string{"path", "total", "used", "free", "usage", "last_updated"},
+			},
+			"boot_usage": map[string]interface{}{
+				"type":        "object",
+				"description": "Boot device usage information",
+				"properties": map[string]interface{}{
+					"device": map[string]interface{}{
+						"type":        "string",
+						"description": "Boot device path",
+						"example":     "/dev/sda1",
+					},
+					"filesystem": map[string]interface{}{
+						"type":        "string",
+						"description": "Boot filesystem type",
+						"example":     "vfat",
+					},
+					"size": map[string]interface{}{
+						"type":        "string",
+						"description": "Boot device size",
+						"example":     "32GB",
+					},
+					"used": map[string]interface{}{
+						"type":        "string",
+						"description": "Used boot space",
+						"example":     "2.1GB",
+					},
+					"available": map[string]interface{}{
+						"type":        "string",
+						"description": "Available boot space",
+						"example":     "29.9GB",
+					},
+					"usage": map[string]interface{}{
+						"type":        "number",
+						"description": "Boot usage percentage",
+						"example":     6.6,
+						"minimum":     0,
+						"maximum":     100,
+					},
+					"last_updated": map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "Last update timestamp",
+						"example":     "2025-06-20T00:56:59Z",
+					},
+				},
+				"required": []string{"device", "filesystem", "size", "used", "available", "usage", "last_updated"},
+			},
+			"docker_vdisk": map[string]interface{}{
+				"type":        "object",
+				"description": "Docker virtual disk usage information",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Docker vdisk path",
+						"example":     "/var/lib/docker",
+					},
+					"total": map[string]interface{}{
+						"type":        "number",
+						"description": "Total docker vdisk space in bytes",
+						"example":     161061273600,
+						"minimum":     0,
+					},
+					"used": map[string]interface{}{
+						"type":        "number",
+						"description": "Used docker vdisk space in bytes",
+						"example":     12305375232,
+						"minimum":     0,
+					},
+					"free": map[string]interface{}{
+						"type":        "number",
+						"description": "Free docker vdisk space in bytes",
+						"example":     148755898368,
+						"minimum":     0,
+					},
+					"usage": map[string]interface{}{
+						"type":        "number",
+						"description": "Docker vdisk usage percentage",
+						"example":     7.64,
+						"minimum":     0,
+						"maximum":     100,
+					},
+					"last_updated": map[string]interface{}{
+						"type":        "string",
+						"format":      "date-time",
+						"description": "Last update timestamp",
+						"example":     "2025-06-20T00:56:59Z",
+					},
+				},
+				"required": []string{"path", "total", "used", "free", "usage", "last_updated"},
 			},
 			"last_updated": map[string]interface{}{
 				"type":        "string",
@@ -770,7 +1134,7 @@ func getStorageGeneralSchema() map[string]interface{} {
 				"example":     "2024-01-01T12:00:00Z",
 			},
 		},
-		"required": []string{"total_capacity", "total_used", "total_free", "usage_percent", "disk_count", "array_status", "last_updated"},
+		"required": []string{"total_capacity", "total_used", "total_free", "usage_percent", "disk_count", "array_status", "log_usage", "boot_usage", "docker_vdisk", "last_updated"},
 	}
 }
 

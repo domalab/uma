@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -39,9 +38,9 @@ func (h *HealthHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate uptime
+	// Calculate uptime in seconds
 	uptime := time.Since(h.startTime)
-	uptimeStr := formatDuration(uptime)
+	uptimeSeconds := int(uptime.Seconds())
 
 	// Perform health checks
 	checks := h.performHealthChecks()
@@ -49,7 +48,7 @@ func (h *HealthHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	// Determine overall status
 	status := h.determineOverallStatus(checks)
 
-	utils.WriteHealthResponse(w, status, h.version, uptimeStr, checks)
+	utils.WriteHealthResponse(w, status, h.version, uptimeSeconds, checks)
 }
 
 // GetHealthStatus returns comprehensive health status using the health service
@@ -143,6 +142,12 @@ func (h *HealthHandler) performHealthChecks() map[string]responses.HealthCheck {
 
 	// Auth service health check
 	checks["auth"] = h.checkAuthHealth()
+
+	// UPS health check
+	checks["ups"] = h.checkUPSHealth()
+
+	// Virtual Machines health check
+	checks["vms"] = h.checkVMHealth()
 
 	return checks
 }
@@ -269,6 +274,57 @@ func (h *HealthHandler) checkAuthHealth() responses.HealthCheck {
 	}
 }
 
+func (h *HealthHandler) checkUPSHealth() responses.HealthCheck {
+	start := time.Now()
+
+	// Check if UPS detector is available
+	upsDetector := h.api.GetUPSDetector()
+	if !upsDetector.IsAvailable() {
+		duration := time.Since(start)
+		return responses.HealthCheck{
+			Status:    "fail",
+			Message:   "UPS service unavailable",
+			Timestamp: time.Now().UTC(),
+			Duration:  duration.String(),
+		}
+	}
+
+	// Try to get UPS status
+	_ = upsDetector.GetStatus()
+	duration := time.Since(start)
+
+	return responses.HealthCheck{
+		Status:    "pass",
+		Message:   "UPS API healthy",
+		Timestamp: time.Now().UTC(),
+		Duration:  duration.String(),
+	}
+}
+
+func (h *HealthHandler) checkVMHealth() responses.HealthCheck {
+	start := time.Now()
+
+	// Try to get VM list
+	_, err := h.api.GetVM().GetVMs()
+	duration := time.Since(start)
+
+	if err != nil {
+		return responses.HealthCheck{
+			Status:    "fail",
+			Message:   "VM service unavailable",
+			Timestamp: time.Now().UTC(),
+			Duration:  duration.String(),
+		}
+	}
+
+	return responses.HealthCheck{
+		Status:    "pass",
+		Message:   "Virtual Machines API healthy",
+		Timestamp: time.Now().UTC(),
+		Duration:  duration.String(),
+	}
+}
+
 // Readiness check methods
 
 func (h *HealthHandler) checkSystemAPIReadiness() responses.HealthCheck {
@@ -316,20 +372,4 @@ func (h *HealthHandler) isSystemReady(checks map[string]responses.HealthCheck) b
 	return true
 }
 
-func formatDuration(d time.Duration) string {
-	days := int(d.Hours()) / 24
-	hours := int(d.Hours()) % 24
-	minutes := int(d.Minutes()) % 60
-	seconds := int(d.Seconds()) % 60
-
-	if days > 0 {
-		return fmt.Sprintf("%dd %dh %dm %ds", days, hours, minutes, seconds)
-	}
-	if hours > 0 {
-		return fmt.Sprintf("%dh %dm %ds", hours, minutes, seconds)
-	}
-	if minutes > 0 {
-		return fmt.Sprintf("%dm %ds", minutes, seconds)
-	}
-	return fmt.Sprintf("%ds", seconds)
-}
+// Removed unused function: formatDuration

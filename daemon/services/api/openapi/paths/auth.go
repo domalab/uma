@@ -9,6 +9,8 @@ func GetAuthPaths() map[string]interface{} {
 		"/api/v1/auth/me":       getUserInfoPath(),
 		"/api/v1/auth/sessions": getSessionsPath(),
 		"/api/v1/auth/apikeys":  getAPIKeysPath(),
+		"/api/v1/auth/stats":    getAuthStatsPath(),
+		"/api/v1/auth/users":    getAuthUsersPath(),
 	}
 }
 
@@ -216,6 +218,99 @@ func getAPIKeysPath() map[string]interface{} {
 												"type": "array",
 												"items": map[string]interface{}{
 													"$ref": "#/components/schemas/APIKeyInfo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				"401": map[string]interface{}{"$ref": "#/components/responses/Unauthorized"},
+				"403": map[string]interface{}{"$ref": "#/components/responses/Forbidden"},
+				"500": map[string]interface{}{"$ref": "#/components/responses/InternalServerError"},
+			},
+			"security": []map[string][]string{
+				{"BearerAuth": {}},
+			},
+		},
+	}
+}
+
+func getAuthStatsPath() map[string]interface{} {
+	return map[string]interface{}{
+		"get": map[string]interface{}{
+			"summary":     "Get authentication statistics",
+			"description": "Retrieve authentication system statistics including login attempts, active sessions, and security metrics",
+			"operationId": "getAuthStats",
+			"tags":        []string{"Authentication"},
+			"responses": map[string]interface{}{
+				"200": map[string]interface{}{
+					"description": "Authentication statistics retrieved successfully",
+					"content": map[string]interface{}{
+						"application/json": map[string]interface{}{
+							"schema": map[string]interface{}{
+								"allOf": []interface{}{
+									map[string]interface{}{"$ref": "#/components/schemas/StandardResponse"},
+									map[string]interface{}{
+										"type": "object",
+										"properties": map[string]interface{}{
+											"data": map[string]interface{}{
+												"$ref": "#/components/schemas/AuthStats",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				"401": map[string]interface{}{"$ref": "#/components/responses/Unauthorized"},
+				"403": map[string]interface{}{"$ref": "#/components/responses/Forbidden"},
+				"500": map[string]interface{}{"$ref": "#/components/responses/InternalServerError"},
+			},
+			"security": []map[string][]string{
+				{"BearerAuth": {}},
+			},
+		},
+	}
+}
+
+func getAuthUsersPath() map[string]interface{} {
+	return map[string]interface{}{
+		"get": map[string]interface{}{
+			"summary":     "List system users",
+			"description": "Retrieve a list of system users with authentication information",
+			"operationId": "listAuthUsers",
+			"tags":        []string{"Authentication"},
+			"parameters": []map[string]interface{}{
+				{
+					"name":        "active_only",
+					"in":          "query",
+					"description": "Filter to show only active users",
+					"required":    false,
+					"schema": map[string]interface{}{
+						"type":    "boolean",
+						"default": false,
+					},
+				},
+			},
+			"responses": map[string]interface{}{
+				"200": map[string]interface{}{
+					"description": "Users retrieved successfully",
+					"content": map[string]interface{}{
+						"application/json": map[string]interface{}{
+							"schema": map[string]interface{}{
+								"allOf": []interface{}{
+									map[string]interface{}{"$ref": "#/components/schemas/StandardResponse"},
+									map[string]interface{}{
+										"type": "object",
+										"properties": map[string]interface{}{
+											"data": map[string]interface{}{
+												"type": "array",
+												"items": map[string]interface{}{
+													"$ref": "#/components/schemas/AuthUser",
 												},
 											},
 										},

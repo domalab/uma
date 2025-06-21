@@ -2,6 +2,8 @@ package adapters
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,12 +15,102 @@ import (
 	"github.com/domalab/uma/daemon/logger"
 )
 
+// FileSystemInterface for dependency injection in tests
+type FileSystemInterface interface {
+	Open(name string) (FileInterface, error)
+	ReadFile(filename string) ([]byte, error)
+	Stat(name string) (os.FileInfo, error)
+}
+
+// FileInterface wraps os.File for testing
+type FileInterface interface {
+	Close() error
+	Read([]byte) (int, error)
+	Scan() *bufio.Scanner
+}
+
+// DefaultFileSystem uses the real filesystem
+type DefaultFileSystem struct{}
+
+func (d *DefaultFileSystem) Open(name string) (FileInterface, error) {
+	file, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return &DefaultFile{file: file}, nil
+}
+
+func (d *DefaultFileSystem) ReadFile(filename string) ([]byte, error) {
+	return os.ReadFile(filename)
+}
+
+func (d *DefaultFileSystem) Stat(name string) (os.FileInfo, error) {
+	return os.Stat(name)
+}
+
+// DefaultFile wraps os.File
+type DefaultFile struct {
+	file *os.File
+}
+
+func (d *DefaultFile) Close() error {
+	return d.file.Close()
+}
+
+func (d *DefaultFile) Read(b []byte) (int, error) {
+	return d.file.Read(b)
+}
+
+func (d *DefaultFile) Scan() *bufio.Scanner {
+	return bufio.NewScanner(d.file)
+}
+
+// CommandExecutorInterface for dependency injection in tests
+type CommandExecutorInterface interface {
+	Command(name string, args ...string) CommandInterface
+}
+
+// CommandInterface wraps exec.Cmd for testing
+type CommandInterface interface {
+	Output() ([]byte, error)
+}
+
+// DefaultCommandExecutor uses real commands
+type DefaultCommandExecutor struct{}
+
+func (d *DefaultCommandExecutor) Command(name string, args ...string) CommandInterface {
+	return &DefaultCommand{cmd: exec.Command(name, args...)}
+}
+
+// DefaultCommand wraps exec.Cmd
+type DefaultCommand struct {
+	cmd *exec.Cmd
+}
+
+func (d *DefaultCommand) Output() ([]byte, error) {
+	return d.cmd.Output()
+}
+
 // SystemMonitor provides real system data collection
-type SystemMonitor struct{}
+type SystemMonitor struct {
+	fs  FileSystemInterface
+	cmd CommandExecutorInterface
+}
 
 // NewSystemMonitor creates a new system monitor
 func NewSystemMonitor() *SystemMonitor {
-	return &SystemMonitor{}
+	return &SystemMonitor{
+		fs:  &DefaultFileSystem{},
+		cmd: &DefaultCommandExecutor{},
+	}
+}
+
+// NewSystemMonitorWithDeps creates a new system monitor with custom dependencies (for testing)
+func NewSystemMonitorWithDeps(fs FileSystemInterface, cmd CommandExecutorInterface) *SystemMonitor {
+	return &SystemMonitor{
+		fs:  fs,
+		cmd: cmd,
+	}
 }
 
 // GetRealCPUInfo retrieves actual CPU information from the system
@@ -61,7 +153,7 @@ func (s *SystemMonitor) GetRealCPUInfo() (interface{}, error) {
 
 // parseCPUInfo parses /proc/cpuinfo for CPU details
 func (s *SystemMonitor) parseCPUInfo(cpuInfo map[string]interface{}) error {
-	file, err := os.Open("/proc/cpuinfo")
+	file, err := s.fs.Open("/proc/cpuinfo")
 	if err != nil {
 		return err
 	}
@@ -71,7 +163,7 @@ func (s *SystemMonitor) parseCPUInfo(cpuInfo map[string]interface{}) error {
 	var model, architecture string
 	var frequency float64
 
-	scanner := bufio.NewScanner(file)
+	scanner := file.Scan()
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.Contains(line, ":") {
@@ -131,7 +223,7 @@ func (s *SystemMonitor) parseCPUInfo(cpuInfo map[string]interface{}) error {
 
 // parseLoadAverage parses /proc/loadavg for load averages
 func (s *SystemMonitor) parseLoadAverage(cpuInfo map[string]interface{}) error {
-	content, err := os.ReadFile("/proc/loadavg")
+	content, err := s.fs.ReadFile("/proc/loadavg")
 	if err != nil {
 		return err
 	}
@@ -187,7 +279,7 @@ type cpuStat struct {
 
 // readCPUStat reads CPU statistics from /proc/stat
 func (s *SystemMonitor) readCPUStat() (*cpuStat, error) {
-	content, err := os.ReadFile("/proc/stat")
+	content, err := s.fs.ReadFile("/proc/stat")
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +320,7 @@ func (s *SystemMonitor) getCPUTemperature() float64 {
 	}
 
 	for _, path := range thermalPaths {
-		if content, err := os.ReadFile(path); err == nil {
+		if content, err := s.fs.ReadFile(path); err == nil {
 			if temp, err := strconv.ParseFloat(strings.TrimSpace(string(content)), 64); err == nil {
 				// Convert millidegrees to degrees if needed
 				if temp > 1000 {
@@ -256,13 +348,13 @@ func (s *SystemMonitor) GetRealMemoryInfo() (interface{}, error) {
 		"usage":     0.0,
 	}
 
-	file, err := os.Open("/proc/meminfo")
+	file, err := s.fs.Open("/proc/meminfo")
 	if err != nil {
 		return memInfo, err
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := file.Scan()
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
@@ -310,13 +402,13 @@ func (s *SystemMonitor) GetRealNetworkInfo() (interface{}, error) {
 	interfaces := make([]map[string]interface{}, 0)
 
 	// Parse /proc/net/dev for interface statistics
-	file, err := os.Open("/proc/net/dev")
+	file, err := s.fs.Open("/proc/net/dev")
 	if err != nil {
 		return map[string]interface{}{"interfaces": interfaces}, err
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := file.Scan()
 	// Skip header lines
 	scanner.Scan()
 	scanner.Scan()
@@ -360,7 +452,7 @@ func (s *SystemMonitor) GetRealNetworkInfo() (interface{}, error) {
 // getInterfaceDetails gets IP address and status for an interface
 func (s *SystemMonitor) getInterfaceDetails(ifaceName string) (string, string) {
 	// Use ip command to get interface details
-	cmd := exec.Command("ip", "addr", "show", ifaceName)
+	cmd := s.cmd.Command("ip", "addr", "show", ifaceName)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", "unknown"
@@ -423,7 +515,7 @@ func (s *SystemMonitor) GetRealTemperatureData() (interface{}, error) {
 func (s *SystemMonitor) parseSensorsCommand() []map[string]interface{} {
 	sensors := make([]map[string]interface{}, 0)
 
-	cmd := exec.Command("sensors")
+	cmd := s.cmd.Command("sensors")
 	output, err := cmd.Output()
 	if err != nil {
 		return sensors
@@ -545,12 +637,16 @@ func (s *SystemMonitor) getHwmonChipName(hwmonPath string) string {
 func (s *SystemMonitor) parseFanData() []map[string]interface{} {
 	fans := make([]map[string]interface{}, 0)
 
-	// Check hwmon paths for fan data
+	// Check hwmon paths for fan data - expanded to include more hwmon devices
 	hwmonPaths := []string{
 		"/sys/class/hwmon/hwmon0",
 		"/sys/class/hwmon/hwmon1",
 		"/sys/class/hwmon/hwmon2",
 		"/sys/class/hwmon/hwmon3",
+		"/sys/class/hwmon/hwmon4",
+		"/sys/class/hwmon/hwmon5",
+		"/sys/class/hwmon/hwmon6",
+		"/sys/class/hwmon/hwmon7",
 	}
 
 	for _, hwmonPath := range hwmonPaths {
@@ -563,20 +659,23 @@ func (s *SystemMonitor) parseFanData() []map[string]interface{} {
 
 			if content, err := os.ReadFile(fanPath); err == nil {
 				if rpm, err := strconv.ParseFloat(strings.TrimSpace(string(content)), 64); err == nil {
-					// Get label if available
-					label := fmt.Sprintf("fan%d", i)
-					if labelContent, err := os.ReadFile(labelPath); err == nil {
-						label = strings.TrimSpace(string(labelContent))
-					}
+					// Only include fans that are actually connected and running (RPM > 0)
+					if rpm > 0 {
+						// Get label if available
+						label := fmt.Sprintf("fan%d", i)
+						if labelContent, err := os.ReadFile(labelPath); err == nil {
+							label = strings.TrimSpace(string(labelContent))
+						}
 
-					fan := map[string]interface{}{
-						"name":   fmt.Sprintf("%s - %s", chipName, label),
-						"speed":  rpm,
-						"unit":   "RPM",
-						"status": s.getFanStatus(rpm),
-						"source": chipName,
+						fan := map[string]interface{}{
+							"name":   fmt.Sprintf("%s - %s", chipName, label),
+							"speed":  rpm,
+							"unit":   "RPM",
+							"status": s.getFanStatus(rpm),
+							"source": chipName,
+						}
+						fans = append(fans, fan)
 					}
-					fans = append(fans, fan)
 				}
 			}
 		}
@@ -611,7 +710,7 @@ func (s *SystemMonitor) getFanStatus(rpm float64) string {
 
 // GetRealUptimeInfo retrieves actual system uptime
 func (s *SystemMonitor) GetRealUptimeInfo() (interface{}, error) {
-	content, err := os.ReadFile("/proc/uptime")
+	content, err := s.fs.ReadFile("/proc/uptime")
 	if err != nil {
 		return map[string]interface{}{"uptime": "0d 0h 0m 0s"}, err
 	}
@@ -644,15 +743,109 @@ func (s *SystemMonitor) GetRealUptimeInfo() (interface{}, error) {
 	}, nil
 }
 
-// GetRealGPUInfo retrieves actual GPU information
+// Enhanced GPU data structures
+type GPUInfo struct {
+	Index       int        `json:"index"`
+	Name        string     `json:"name"`
+	UUID        string     `json:"uuid,omitempty"`
+	Vendor      string     `json:"vendor"`
+	Type        string     `json:"type"` // "integrated", "discrete"
+	Driver      string     `json:"driver"`
+	Usage       float64    `json:"usage"`
+	Temperature int        `json:"temperature"`
+	Memory      GPUMemory  `json:"memory,omitempty"`
+	Power       GPUPower   `json:"power,omitempty"`
+	Clocks      GPUClocks  `json:"clocks,omitempty"`
+	Engines     GPUEngines `json:"engines,omitempty"`
+	Status      string     `json:"status"`
+	LastUpdated string     `json:"last_updated"`
+}
+
+type GPUMemory struct {
+	Total          uint64  `json:"total_bytes,omitempty"`
+	Used           uint64  `json:"used_bytes,omitempty"`
+	Free           uint64  `json:"free_bytes,omitempty"`
+	Usage          float64 `json:"usage_percent,omitempty"`
+	TotalFormatted string  `json:"total_formatted,omitempty"`
+	UsedFormatted  string  `json:"used_formatted,omitempty"`
+	FreeFormatted  string  `json:"free_formatted,omitempty"`
+}
+
+type GPUPower struct {
+	Draw           float64 `json:"draw_watts,omitempty"`
+	Limit          float64 `json:"limit_watts,omitempty"`
+	Usage          float64 `json:"usage_percent,omitempty"`
+	DrawFormatted  string  `json:"draw_formatted,omitempty"`
+	LimitFormatted string  `json:"limit_formatted,omitempty"`
+}
+
+type GPUClocks struct {
+	Core   int `json:"core_mhz,omitempty"`
+	Memory int `json:"memory_mhz,omitempty"`
+	Shader int `json:"shader_mhz,omitempty"`
+}
+
+type GPUEngines struct {
+	// Intel-specific engines
+	Render       float64 `json:"render_percent,omitempty"`
+	Video        float64 `json:"video_percent,omitempty"`
+	VideoEnhance float64 `json:"video_enhance_percent,omitempty"`
+	Blitter      float64 `json:"blitter_percent,omitempty"`
+	// Nvidia-specific engines
+	Encoder float64 `json:"encoder_percent,omitempty"`
+	Decoder float64 `json:"decoder_percent,omitempty"`
+	// AMD-specific engines
+	GraphicsEngine float64 `json:"graphics_engine_percent,omitempty"`
+	MediaEngine    float64 `json:"media_engine_percent,omitempty"`
+}
+
+// GetRealGPUInfo retrieves actual GPU information with enhanced monitoring
 func (s *SystemMonitor) GetRealGPUInfo() (interface{}, error) {
-	gpus := make([]interface{}, 0)
+	gpus := make([]GPUInfo, 0)
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
+	// Collect GPU information from all available sources
+	detectedGPUs := s.detectGPUs()
+
+	for i, detectedGPU := range detectedGPUs {
+		gpu := GPUInfo{
+			Index:       i,
+			Name:        detectedGPU["name"].(string),
+			Vendor:      detectedGPU["vendor"].(string),
+			Type:        detectedGPU["type"].(string),
+			Driver:      detectedGPU["driver"].(string),
+			Status:      "active",
+			LastUpdated: timestamp,
+		}
+
+		// Enhance with vendor-specific data
+		switch gpu.Vendor {
+		case "Intel":
+			s.enhanceIntelGPU(&gpu)
+		case "NVIDIA":
+			s.enhanceNvidiaGPU(&gpu)
+		case "AMD":
+			s.enhanceAMDGPU(&gpu)
+		}
+
+		gpus = append(gpus, gpu)
+	}
+
+	return map[string]interface{}{
+		"gpus":         gpus,
+		"last_updated": timestamp,
+	}, nil
+}
+
+// detectGPUs detects all GPUs using lspci
+func (s *SystemMonitor) detectGPUs() []map[string]interface{} {
+	gpus := make([]map[string]interface{}, 0)
 
 	// Use lspci to detect GPUs
-	cmd := exec.Command("lspci", "-v")
+	cmd := s.cmd.Command("lspci", "-v")
 	output, err := cmd.Output()
 	if err != nil {
-		return map[string]interface{}{"gpus": gpus}, nil
+		return gpus
 	}
 
 	lines := strings.Split(string(output), "\n")
@@ -668,13 +861,10 @@ func (s *SystemMonitor) GetRealGPUInfo() (interface{}, error) {
 			parts := strings.Split(line, ": ")
 			if len(parts) >= 2 {
 				currentGPU = map[string]interface{}{
-					"name":        parts[1],
-					"type":        "integrated",
-					"vendor":      s.extractGPUVendor(parts[1]),
-					"driver":      "unknown",
-					"memory":      "unknown",
-					"temperature": 0.0,
-					"usage":       0.0,
+					"name":   parts[1],
+					"type":   "integrated",
+					"vendor": s.extractGPUVendor(parts[1]),
+					"driver": "unknown",
 				}
 
 				// Determine GPU type
@@ -705,18 +895,7 @@ func (s *SystemMonitor) GetRealGPUInfo() (interface{}, error) {
 		gpus = append(gpus, currentGPU)
 	}
 
-	// Try to get Intel GPU temperature
-	for _, gpu := range gpus {
-		if gpuMap, ok := gpu.(map[string]interface{}); ok {
-			if gpuMap["vendor"] == "Intel" {
-				if temp := s.getIntelGPUTemperature(); temp > 0 {
-					gpuMap["temperature"] = temp
-				}
-			}
-		}
-	}
-
-	return map[string]interface{}{"gpus": gpus}, nil
+	return gpus
 }
 
 // extractGPUVendor extracts vendor from GPU name
@@ -730,6 +909,82 @@ func (s *SystemMonitor) extractGPUVendor(name string) string {
 		return "AMD"
 	}
 	return "Unknown"
+}
+
+// enhanceIntelGPU enhances Intel GPU data using intel_gpu_top
+func (s *SystemMonitor) enhanceIntelGPU(gpu *GPUInfo) {
+	// Get basic temperature
+	if temp := s.getIntelGPUTemperature(); temp > 0 {
+		gpu.Temperature = int(temp)
+	}
+
+	// Try to get comprehensive data from intel_gpu_top
+	if intelData := s.getIntelGPUTopData(); intelData != nil {
+		// Update usage from render engine
+		if engines, ok := intelData["engines"].(map[string]interface{}); ok {
+			if render, ok := engines["Render/3D"].(map[string]interface{}); ok {
+				if busy, ok := render["busy"].(float64); ok {
+					gpu.Usage = busy
+				}
+			}
+		}
+
+		// Update frequency information
+		if frequency, ok := intelData["frequency"].(map[string]interface{}); ok {
+			if actual, ok := frequency["actual"].(float64); ok && actual > 0 {
+				gpu.Clocks.Core = int(actual)
+			}
+		}
+
+		// Update power information
+		if power, ok := intelData["power"].(map[string]interface{}); ok {
+			if gpuPower, ok := power["GPU"].(float64); ok && gpuPower > 0 {
+				gpu.Power.Draw = gpuPower
+				gpu.Power.DrawFormatted = fmt.Sprintf("%.1f W", gpuPower)
+			}
+		}
+
+		// Update engine-specific utilization
+		if engines, ok := intelData["engines"].(map[string]interface{}); ok {
+			gpu.Engines = GPUEngines{}
+
+			if render, ok := engines["Render/3D"].(map[string]interface{}); ok {
+				if busy, ok := render["busy"].(float64); ok {
+					gpu.Engines.Render = busy
+				}
+			}
+
+			if video, ok := engines["Video"].(map[string]interface{}); ok {
+				if busy, ok := video["busy"].(float64); ok {
+					gpu.Engines.Video = busy
+				}
+			}
+
+			if videoEnhance, ok := engines["VideoEnhance"].(map[string]interface{}); ok {
+				if busy, ok := videoEnhance["busy"].(float64); ok {
+					gpu.Engines.VideoEnhance = busy
+				}
+			}
+
+			if blitter, ok := engines["Blitter"].(map[string]interface{}); ok {
+				if busy, ok := blitter["busy"].(float64); ok {
+					gpu.Engines.Blitter = busy
+				}
+			}
+		}
+	}
+}
+
+// enhanceNvidiaGPU enhances Nvidia GPU data using nvidia-smi
+func (s *SystemMonitor) enhanceNvidiaGPU(gpu *GPUInfo) {
+	// Placeholder for Nvidia GPU enhancement
+	// Will be implemented in the next task
+}
+
+// enhanceAMDGPU enhances AMD GPU data using radeontop
+func (s *SystemMonitor) enhanceAMDGPU(gpu *GPUInfo) {
+	// Placeholder for AMD GPU enhancement
+	// Will be implemented in the next task
 }
 
 // getIntelGPUTemperature gets Intel GPU temperature
@@ -758,6 +1013,56 @@ func (s *SystemMonitor) getIntelGPUTemperature() float64 {
 	}
 
 	return 0
+}
+
+// getIntelGPUTopData gets comprehensive Intel GPU data using intel_gpu_top
+func (s *SystemMonitor) getIntelGPUTopData() map[string]interface{} {
+	// Check if intel_gpu_top is available
+	if _, err := exec.LookPath("intel_gpu_top"); err != nil {
+		return nil
+	}
+
+	// Run intel_gpu_top for a short duration to get a sample with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "intel_gpu_top", "-J", "-s", "500", "-o", "-")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	// Parse the JSON output - intel_gpu_top outputs a stream of JSON objects
+	lines := strings.Split(string(output), "\n")
+	var lastValidJSON string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "[" || line == "]" {
+			continue
+		}
+
+		// Remove trailing comma if present
+		line = strings.TrimSuffix(line, ",")
+
+		// Try to parse as JSON
+		var jsonData map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &jsonData); err == nil {
+			lastValidJSON = line
+		}
+	}
+
+	if lastValidJSON == "" {
+		return nil
+	}
+
+	// Parse the last valid JSON sample
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(lastValidJSON), &result); err != nil {
+		return nil
+	}
+
+	return result
 }
 
 // GetRealSystemLogs retrieves system log information
@@ -801,7 +1106,7 @@ func (s *SystemMonitor) getLogEntries(logPath string, maxEntries int) []interfac
 	entries := make([]interface{}, 0)
 
 	// Use tail command to get recent entries
-	cmd := exec.Command("tail", "-n", fmt.Sprintf("%d", maxEntries), logPath)
+	cmd := s.cmd.Command("tail", "-n", fmt.Sprintf("%d", maxEntries), logPath)
 	output, err := cmd.Output()
 	if err != nil {
 		return entries
@@ -857,11 +1162,22 @@ func (s *SystemMonitor) parseLogTimestamp(line string) time.Time {
 }
 
 // VMMonitor provides VM management and monitoring
-type VMMonitor struct{}
+type VMMonitor struct {
+	cmd CommandExecutorInterface
+}
 
 // NewVMMonitor creates a new VM monitor
 func NewVMMonitor() *VMMonitor {
-	return &VMMonitor{}
+	return &VMMonitor{
+		cmd: &DefaultCommandExecutor{},
+	}
+}
+
+// NewVMMonitorWithDeps creates a new VM monitor with custom dependencies (for testing)
+func NewVMMonitorWithDeps(cmd CommandExecutorInterface) *VMMonitor {
+	return &VMMonitor{
+		cmd: cmd,
+	}
 }
 
 // GetRealVMs retrieves actual VM information using libvirt
@@ -869,7 +1185,7 @@ func (v *VMMonitor) GetRealVMs() (interface{}, error) {
 	vms := make([]interface{}, 0)
 
 	// Use virsh to list all VMs
-	cmd := exec.Command("virsh", "list", "--all")
+	cmd := v.cmd.Command("virsh", "list", "--all")
 	output, err := cmd.Output()
 	if err != nil {
 		return vms, nil // libvirt might not be available
@@ -919,7 +1235,7 @@ func (v *VMMonitor) getVMDetails(vmName string) map[string]interface{} {
 	details := make(map[string]interface{})
 
 	// Get VM domain info
-	cmd := exec.Command("virsh", "dominfo", vmName)
+	cmd := v.cmd.Command("virsh", "dominfo", vmName)
 	output, err := cmd.Output()
 	if err != nil {
 		return details
@@ -966,7 +1282,7 @@ func (v *VMMonitor) getVMStats(vmName string) map[string]interface{} {
 	stats := make(map[string]interface{})
 
 	// Get CPU stats
-	cmd := exec.Command("virsh", "cpu-stats", vmName)
+	cmd := v.cmd.Command("virsh", "cpu-stats", vmName)
 	if output, err := cmd.Output(); err == nil {
 		lines := strings.Split(string(output), "\n")
 		for _, line := range lines {
@@ -980,7 +1296,7 @@ func (v *VMMonitor) getVMStats(vmName string) map[string]interface{} {
 	}
 
 	// Get memory stats
-	cmd = exec.Command("virsh", "dommemstat", vmName)
+	cmd = v.cmd.Command("virsh", "dommemstat", vmName)
 	if output, err := cmd.Output(); err == nil {
 		lines := strings.Split(string(output), "\n")
 		for _, line := range lines {
@@ -1012,30 +1328,30 @@ func (v *VMMonitor) ControlVM(vmName, action string) (interface{}, error) {
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
 
-	var cmd *exec.Cmd
+	var cmd CommandInterface
 	switch action {
 	case "start":
-		cmd = exec.Command("virsh", "start", vmName)
+		cmd = v.cmd.Command("virsh", "start", vmName)
 	case "stop":
-		cmd = exec.Command("virsh", "shutdown", vmName)
+		cmd = v.cmd.Command("virsh", "shutdown", vmName)
 	case "force-stop":
-		cmd = exec.Command("virsh", "destroy", vmName)
+		cmd = v.cmd.Command("virsh", "destroy", vmName)
 	case "restart":
 		// First shutdown, then start
-		shutdownCmd := exec.Command("virsh", "shutdown", vmName)
-		if err := shutdownCmd.Run(); err != nil {
+		shutdownCmd := v.cmd.Command("virsh", "shutdown", vmName)
+		if _, err := shutdownCmd.Output(); err != nil {
 			result["message"] = fmt.Sprintf("Failed to shutdown VM: %v", err)
 			return result, err
 		}
 		// Wait a moment for shutdown
 		time.Sleep(3 * time.Second)
-		cmd = exec.Command("virsh", "start", vmName)
+		cmd = v.cmd.Command("virsh", "start", vmName)
 	default:
 		result["message"] = fmt.Sprintf("Unknown action: %s", action)
 		return result, fmt.Errorf("unknown action: %s", action)
 	}
 
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.Output()
 	if err != nil {
 		result["message"] = fmt.Sprintf("Command failed: %v - %s", err, string(output))
 		return result, err
@@ -1047,20 +1363,35 @@ func (v *VMMonitor) ControlVM(vmName, action string) (interface{}, error) {
 }
 
 // StorageMonitor provides storage health monitoring
-type StorageMonitor struct{}
+type StorageMonitor struct {
+	cmd CommandExecutorInterface
+	fs  FileSystemInterface
+}
 
 // NewStorageMonitor creates a new storage monitor
 func NewStorageMonitor() *StorageMonitor {
-	return &StorageMonitor{}
+	return &StorageMonitor{
+		cmd: &DefaultCommandExecutor{},
+		fs:  &DefaultFileSystem{},
+	}
+}
+
+// NewStorageMonitorWithDeps creates a new storage monitor with custom dependencies (for testing)
+func NewStorageMonitorWithDeps(cmd CommandExecutorInterface, fs FileSystemInterface) *StorageMonitor {
+	return &StorageMonitor{
+		cmd: cmd,
+		fs:  fs,
+	}
 }
 
 // GetRealArrayInfo retrieves actual Unraid array information
 func (s *StorageMonitor) GetRealArrayInfo() (interface{}, error) {
 	arrayInfo := map[string]interface{}{
-		"state":      "unknown",
-		"protection": "unknown",
-		"disks":      []interface{}{},
-		"parity":     []interface{}{},
+		"state":        "unknown",
+		"protection":   "unknown",
+		"disks":        []interface{}{},
+		"parity":       []interface{}{},
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
 	}
 
 	// Parse Unraid array status from /proc/mdstat
@@ -1071,6 +1402,8 @@ func (s *StorageMonitor) GetRealArrayInfo() (interface{}, error) {
 		arrayInfo["parity"] = unraidData["parity"]
 		arrayInfo["sync_action"] = unraidData["sync_action"]
 		arrayInfo["sync_progress"] = unraidData["sync_progress"]
+		// Update the timestamp since we have fresh data
+		arrayInfo["last_updated"] = time.Now().UTC().Format(time.RFC3339)
 	}
 
 	return arrayInfo, nil
@@ -1079,7 +1412,7 @@ func (s *StorageMonitor) GetRealArrayInfo() (interface{}, error) {
 // parseUnraidStatus parses Unraid status from /var/local/emhttp/var.ini
 func (s *StorageMonitor) parseUnraidStatus() map[string]interface{} {
 	// Read from Unraid's real-time status file
-	content, err := os.ReadFile("/var/local/emhttp/var.ini")
+	content, err := s.fs.ReadFile("/var/local/emhttp/var.ini")
 	if err != nil {
 		// Fallback to /proc/mdstat if var.ini is not available
 		return s.parseUnraidStatusFromMdstat()
@@ -1163,7 +1496,7 @@ func (s *StorageMonitor) parseUnraidStatus() map[string]interface{} {
 
 // parseUnraidStatusFromMdstat fallback method to parse from /proc/mdstat
 func (s *StorageMonitor) parseUnraidStatusFromMdstat() map[string]interface{} {
-	content, err := os.ReadFile("/proc/mdstat")
+	content, err := s.fs.ReadFile("/proc/mdstat")
 	if err != nil {
 		return nil
 	}
@@ -1204,7 +1537,7 @@ func (s *StorageMonitor) parseUnraidStatusFromMdstat() map[string]interface{} {
 
 // parseUnraidDisks parses disk information from /proc/mdstat
 func (s *StorageMonitor) parseUnraidDisks(unraidData map[string]interface{}) {
-	content, err := os.ReadFile("/proc/mdstat")
+	content, err := s.fs.ReadFile("/proc/mdstat")
 	if err != nil {
 		return
 	}
@@ -1241,11 +1574,11 @@ func (s *StorageMonitor) getParityCheckHistory() map[string]interface{} {
 
 	// Try to read parity check log
 	logPath := "/boot/config/parity-checks.log"
-	content, err := os.ReadFile(logPath)
+	content, err := s.fs.ReadFile(logPath)
 	if err != nil {
 		// Try alternative location
 		logPath = "/var/log/parity-checks.log"
-		content, err = os.ReadFile(logPath)
+		content, err = s.fs.ReadFile(logPath)
 		if err != nil {
 			// Return empty history but still include the structure
 			return history
@@ -1369,63 +1702,12 @@ func (s *StorageMonitor) parseUnraidDisk(lines []string, diskLine string) map[st
 	return disk
 }
 
-// getArrayDisks gets information about array disks
-func (s *StorageMonitor) getArrayDisks() []interface{} {
-	disks := make([]interface{}, 0)
-
-	// Use lsblk to get disk information
-	cmd := exec.Command("lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,MODEL")
-	output, err := cmd.Output()
-	if err != nil {
-		return disks
-	}
-
-	// Parse JSON output (simplified - would need proper JSON parsing)
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "disk") && !strings.Contains(line, "loop") {
-			// Extract disk information (simplified parsing)
-			if strings.Contains(line, "sd") {
-				disk := map[string]interface{}{
-					"name":   "disk1",    // Would extract actual name
-					"device": "/dev/sda", // Would extract actual device
-					"size":   "1TB",      // Would extract actual size
-					"status": "active",
-					"health": s.getDiskHealth("/dev/sda"),
-				}
-				disks = append(disks, disk)
-			}
-		}
-	}
-
-	return disks
-}
-
-// getParityDisks gets information about parity disks
-func (s *StorageMonitor) getParityDisks() []interface{} {
-	parity := make([]interface{}, 0)
-
-	// Check for parity disks in /proc/mdstat
-	if content, err := os.ReadFile("/proc/mdstat"); err == nil {
-		if strings.Contains(string(content), "parity") {
-			parityDisk := map[string]interface{}{
-				"name":   "parity1",
-				"device": "/dev/sdb", // Would extract actual device
-				"size":   "1TB",      // Would extract actual size
-				"status": "active",
-				"health": s.getDiskHealth("/dev/sdb"),
-			}
-			parity = append(parity, parityDisk)
-		}
-	}
-
-	return parity
-}
+// Removed unused functions: getArrayDisks, getParityDisks
 
 // getDiskHealth gets SMART health status for a disk
 func (s *StorageMonitor) getDiskHealth(device string) string {
 	// Try to get SMART status using smartctl
-	cmd := exec.Command("smartctl", "-H", device)
+	cmd := s.cmd.Command("smartctl", "-H", device)
 	output, err := cmd.Output()
 	if err != nil {
 		return "unknown"
@@ -1446,7 +1728,7 @@ func (s *StorageMonitor) GetRealDisks() (interface{}, error) {
 	disks := make([]interface{}, 0)
 
 	// Get all block devices
-	cmd := exec.Command("lsblk", "-d", "-n", "-o", "NAME,SIZE,TYPE")
+	cmd := s.cmd.Command("lsblk", "-d", "-n", "-o", "NAME,SIZE,TYPE")
 	output, err := cmd.Output()
 	if err != nil {
 		return disks, err
@@ -1485,7 +1767,7 @@ func (s *StorageMonitor) GetRealDisks() (interface{}, error) {
 
 // getDiskTemperature gets disk temperature from SMART data
 func (s *StorageMonitor) getDiskTemperature(device string) float64 {
-	cmd := exec.Command("smartctl", "-A", device)
+	cmd := s.cmd.Command("smartctl", "-A", device)
 	output, err := cmd.Output()
 	if err != nil {
 		return 0
@@ -1493,12 +1775,41 @@ func (s *StorageMonitor) getDiskTemperature(device string) float64 {
 
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "Temperature") || strings.Contains(line, "194") {
+		if strings.Contains(line, "Temperature_Celsius") || strings.Contains(line, "Airflow_Temperature_Cel") {
 			fields := strings.Fields(line)
 			if len(fields) >= 10 {
-				if temp, err := strconv.ParseFloat(fields[9], 64); err == nil {
-					return temp
+				if temp := s.parseTemperatureFromRawValue(fields[9]); temp > 0 && temp < 150 {
+					return float64(temp)
 				}
+			}
+		}
+	}
+
+	return 0
+}
+
+// parseTemperatureFromRawValue extracts temperature from complex SMART raw value formats
+func (s *StorageMonitor) parseTemperatureFromRawValue(rawValue string) int {
+	// Handle simple integer values first
+	if temp, err := strconv.Atoi(rawValue); err == nil {
+		return temp
+	}
+
+	// Handle complex formats like "37 (0 18 0 0 0)" or "37 (Min/Max 35/41)"
+	// Extract the first number before any space or parenthesis
+	if idx := strings.IndexAny(rawValue, " ("); idx > 0 {
+		if temp, err := strconv.Atoi(rawValue[:idx]); err == nil {
+			return temp
+		}
+	}
+
+	// Handle hex values
+	if strings.HasPrefix(rawValue, "0x") {
+		if val, err := strconv.ParseInt(rawValue[2:], 16, 64); err == nil {
+			// For temperature, the value is usually in the lower byte
+			temp := int(val & 0xFF)
+			if temp > 0 && temp < 150 {
+				return temp
 			}
 		}
 	}
@@ -1514,7 +1825,7 @@ func (s *StorageMonitor) getSMARTData(device string) map[string]interface{} {
 		"attributes": map[string]interface{}{},
 	}
 
-	cmd := exec.Command("smartctl", "-a", device)
+	cmd := s.cmd.Command("smartctl", "-a", device)
 	output, err := cmd.Output()
 	if err != nil {
 		return smartData
@@ -1557,7 +1868,7 @@ func (s *StorageMonitor) GetRealZFSPools() (interface{}, error) {
 	pools := make([]interface{}, 0)
 
 	// Execute zpool list command
-	cmd := exec.Command("zpool", "list", "-H", "-o", "name,size,alloc,free,cap,health")
+	cmd := s.cmd.Command("zpool", "list", "-H", "-o", "name,size,alloc,free,cap,health")
 	output, err := cmd.Output()
 	if err != nil {
 		return pools, nil // ZFS might not be available
@@ -1599,7 +1910,7 @@ func (s *StorageMonitor) getZFSPoolDetails(poolName string) map[string]interface
 	details := make(map[string]interface{})
 
 	// Get pool status
-	cmd := exec.Command("zpool", "status", poolName)
+	cmd := s.cmd.Command("zpool", "status", poolName)
 	output, err := cmd.Output()
 	if err != nil {
 		return details
@@ -1647,9 +1958,9 @@ func (s *StorageMonitor) GetRealCacheInfo() (interface{}, error) {
 	pools := make([]interface{}, 0)
 
 	// Check for cache mount point
-	if _, err := os.Stat("/mnt/cache"); err == nil {
+	if _, err := s.fs.Stat("/mnt/cache"); err == nil {
 		// Get cache filesystem information
-		cmd := exec.Command("df", "-h", "/mnt/cache")
+		cmd := s.cmd.Command("df", "-h", "/mnt/cache")
 		output, err := cmd.Output()
 		if err == nil {
 			lines := strings.Split(string(output), "\n")

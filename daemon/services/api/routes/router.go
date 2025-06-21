@@ -12,20 +12,20 @@ type Router struct {
 	mux *http.ServeMux
 
 	// Handlers
-	systemHandler       *handlers.SystemHandler
-	storageHandler      *handlers.StorageHandler
-	dockerHandler       *handlers.DockerHandler
-	vmHandler           *handlers.VMHandler
-	authHandler         *handlers.AuthHandler
-	healthHandler       *handlers.HealthHandler
-	docsHandler         *handlers.DocsHandler
-	websocketHandler    *handlers.WebSocketHandler
-	notificationHandler *handlers.NotificationHandler
-	asyncHandler        *handlers.AsyncHandler
-	rateLimitHandler    *handlers.RateLimitHandler
-	shareHandler        *handlers.ShareHandler
-	scriptHandler       *handlers.ScriptHandler
-	diagnosticsHandler  *handlers.DiagnosticsHandler
+	systemHandler            *handlers.SystemHandler
+	storageHandler           *handlers.StorageHandler
+	dockerHandler            *handlers.DockerHandler
+	vmHandler                *handlers.VMHandler
+	authHandler              *handlers.AuthHandler
+	healthHandler            *handlers.HealthHandler
+	docsHandler              *handlers.DocsHandler
+	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler
+	notificationHandler      *handlers.NotificationHandler
+	asyncHandler             *handlers.AsyncHandler
+	rateLimitHandler         *handlers.RateLimitHandler
+	shareHandler             *handlers.ShareHandler
+	scriptHandler            *handlers.ScriptHandler
+	diagnosticsHandler       *handlers.DiagnosticsHandler
 
 	// Legacy handlers for gradual migration
 	httpServer interface{} // Will be *HTTPServer during transition
@@ -40,7 +40,7 @@ func NewRouter(
 	authHandler *handlers.AuthHandler,
 	healthHandler *handlers.HealthHandler,
 	docsHandler *handlers.DocsHandler,
-	websocketHandler *handlers.WebSocketHandler,
+	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler,
 	notificationHandler *handlers.NotificationHandler,
 	asyncHandler *handlers.AsyncHandler,
 	rateLimitHandler *handlers.RateLimitHandler,
@@ -50,22 +50,22 @@ func NewRouter(
 	httpServer interface{}, // Legacy server for transition
 ) *Router {
 	return &Router{
-		mux:                 http.NewServeMux(),
-		systemHandler:       systemHandler,
-		storageHandler:      storageHandler,
-		dockerHandler:       dockerHandler,
-		vmHandler:           vmHandler,
-		authHandler:         authHandler,
-		healthHandler:       healthHandler,
-		docsHandler:         docsHandler,
-		websocketHandler:    websocketHandler,
-		notificationHandler: notificationHandler,
-		asyncHandler:        asyncHandler,
-		rateLimitHandler:    rateLimitHandler,
-		shareHandler:        shareHandler,
-		scriptHandler:       scriptHandler,
-		diagnosticsHandler:  diagnosticsHandler,
-		httpServer:          httpServer,
+		mux:                      http.NewServeMux(),
+		systemHandler:            systemHandler,
+		storageHandler:           storageHandler,
+		dockerHandler:            dockerHandler,
+		vmHandler:                vmHandler,
+		authHandler:              authHandler,
+		healthHandler:            healthHandler,
+		docsHandler:              docsHandler,
+		enhancedWebSocketHandler: enhancedWebSocketHandler,
+		notificationHandler:      notificationHandler,
+		asyncHandler:             asyncHandler,
+		rateLimitHandler:         rateLimitHandler,
+		shareHandler:             shareHandler,
+		scriptHandler:            scriptHandler,
+		diagnosticsHandler:       diagnosticsHandler,
+		httpServer:               httpServer,
 	}
 }
 
@@ -115,9 +115,7 @@ func (r *Router) GetHandler() http.Handler {
 // isWebSocketEndpoint checks if the path is a WebSocket endpoint
 func isWebSocketEndpoint(path string) bool {
 	wsEndpoints := []string{
-		"/api/v1/ws/system/stats",
-		"/api/v1/ws/docker/events",
-		"/api/v1/ws/storage/status",
+		"/api/v1/ws", // Unified WebSocket endpoint
 	}
 
 	for _, endpoint := range wsEndpoints {

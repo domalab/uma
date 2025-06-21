@@ -11,8 +11,22 @@ import (
 	"github.com/domalab/uma/daemon/logger"
 )
 
+// CommandExecutor interface for dependency injection in tests
+type CommandExecutor interface {
+	GetCmdOutput(command string, args ...string) []string
+}
+
+// DefaultCommandExecutor uses the real lib.GetCmdOutput
+type DefaultCommandExecutor struct{}
+
+func (d *DefaultCommandExecutor) GetCmdOutput(command string, args ...string) []string {
+	return lib.GetCmdOutput(command, args...)
+}
+
 // DockerManager provides Docker container management capabilities
-type DockerManager struct{}
+type DockerManager struct {
+	cmdExecutor CommandExecutor
+}
 
 // ContainerInfo represents information about a Docker container
 type ContainerInfo struct {
@@ -115,12 +129,21 @@ type DockerImage struct {
 
 // NewDockerManager creates a new Docker manager
 func NewDockerManager() *DockerManager {
-	return &DockerManager{}
+	return &DockerManager{
+		cmdExecutor: &DefaultCommandExecutor{},
+	}
+}
+
+// NewDockerManagerWithExecutor creates a new Docker manager with custom command executor (for testing)
+func NewDockerManagerWithExecutor(executor CommandExecutor) *DockerManager {
+	return &DockerManager{
+		cmdExecutor: executor,
+	}
 }
 
 // IsDockerAvailable checks if Docker is available and running
 func (d *DockerManager) IsDockerAvailable() bool {
-	output := lib.GetCmdOutput("docker", "version", "--format", "{{.Server.Version}}")
+	output := d.cmdExecutor.GetCmdOutput("docker", "version", "--format", "{{.Server.Version}}")
 	return len(output) > 0 && !strings.Contains(strings.Join(output, ""), "Cannot connect")
 }
 
@@ -137,7 +160,7 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 		args = append(args, "--all")
 	}
 
-	output := lib.GetCmdOutput("docker", args...)
+	output := d.cmdExecutor.GetCmdOutput("docker", args...)
 	logger.Blue("Docker ps output: %d lines", len(output))
 
 	for i, line := range output {
@@ -215,7 +238,7 @@ func (d *DockerManager) GetContainer(nameOrID string) (*ContainerInfo, error) {
 		return nil, fmt.Errorf("docker is not available")
 	}
 
-	output := lib.GetCmdOutput("docker", "inspect", nameOrID)
+	output := d.cmdExecutor.GetCmdOutput("docker", "inspect", nameOrID)
 	if len(output) == 0 {
 		return nil, fmt.Errorf("container not found: %s", nameOrID)
 	}
@@ -245,7 +268,7 @@ func (d *DockerManager) StartContainer(nameOrID string) error {
 		return fmt.Errorf("docker is not available")
 	}
 
-	output := lib.GetCmdOutput("docker", "start", nameOrID)
+	output := d.cmdExecutor.GetCmdOutput("docker", "start", nameOrID)
 	if len(output) == 0 {
 		return fmt.Errorf("failed to start container: %s", nameOrID)
 	}
@@ -273,7 +296,7 @@ func (d *DockerManager) StopContainer(nameOrID string, timeout int) error {
 	}
 	args = append(args, nameOrID)
 
-	output := lib.GetCmdOutput("docker", args...)
+	output := d.cmdExecutor.GetCmdOutput("docker", args...)
 
 	// Check if there were any errors
 	for _, line := range output {
@@ -298,7 +321,7 @@ func (d *DockerManager) RestartContainer(nameOrID string, timeout int) error {
 	}
 	args = append(args, nameOrID)
 
-	output := lib.GetCmdOutput("docker", args...)
+	output := d.cmdExecutor.GetCmdOutput("docker", args...)
 
 	// Check if there were any errors
 	for _, line := range output {
@@ -326,7 +349,7 @@ func (d *DockerManager) GetContainerLogs(nameOrID string, lines int, follow bool
 	}
 	args = append(args, nameOrID)
 
-	output := lib.GetCmdOutput("docker", args...)
+	output := d.cmdExecutor.GetCmdOutput("docker", args...)
 	return output, nil
 }
 
@@ -341,17 +364,121 @@ func (d *DockerManager) GetContainerStats(nameOrID string) (*DockerStats, error)
 		args = append(args, nameOrID)
 	}
 
-	output := lib.GetCmdOutput("docker", args...)
+	output := d.cmdExecutor.GetCmdOutput("docker", args...)
 	if len(output) == 0 {
 		return nil, fmt.Errorf("no stats available")
 	}
 
-	var stats DockerStats
-	if err := json.Unmarshal([]byte(output[0]), &stats); err != nil {
+	// Parse the raw Docker stats JSON format
+	var rawStats map[string]interface{}
+	if err := json.Unmarshal([]byte(output[0]), &rawStats); err != nil {
 		return nil, fmt.Errorf("failed to parse stats: %w", err)
 	}
 
-	return &stats, nil
+	// Convert to our DockerStats format
+	stats := &DockerStats{}
+	d.parseDockerStats(stats, rawStats)
+
+	return stats, nil
+}
+
+// parseDockerStats parses raw Docker stats JSON into DockerStats struct
+func (d *DockerManager) parseDockerStats(stats *DockerStats, rawStats map[string]interface{}) {
+	// Parse container ID and name
+	if id, ok := rawStats["ID"].(string); ok {
+		stats.ContainerID = id
+	}
+	if name, ok := rawStats["Name"].(string); ok {
+		stats.Name = name
+	}
+
+	// Parse CPU percentage - format: "0.67%"
+	if cpuPerc, ok := rawStats["CPUPerc"].(string); ok {
+		cpuStr := strings.TrimSuffix(cpuPerc, "%")
+		if cpu, err := strconv.ParseFloat(cpuStr, 64); err == nil {
+			stats.CPUPercent = cpu
+		}
+	}
+
+	// Parse memory percentage - format: "0.38%"
+	if memPerc, ok := rawStats["MemPerc"].(string); ok {
+		memStr := strings.TrimSuffix(memPerc, "%")
+		if mem, err := strconv.ParseFloat(memStr, 64); err == nil {
+			stats.MemPercent = mem
+		}
+	}
+
+	// Parse memory usage - format: "121.5MiB / 31.04GiB"
+	if memUsage, ok := rawStats["MemUsage"].(string); ok {
+		parts := strings.Split(memUsage, " / ")
+		if len(parts) == 2 {
+			// Parse memory usage (first part)
+			if usage := d.parseMemoryValue(strings.TrimSpace(parts[0])); usage > 0 {
+				stats.MemUsage = usage
+			}
+			// Parse memory limit (second part)
+			if limit := d.parseMemoryValue(strings.TrimSpace(parts[1])); limit > 0 {
+				stats.MemLimit = limit
+			}
+		}
+	}
+
+	// Parse network I/O - format: "0B / 0B"
+	if netIO, ok := rawStats["NetIO"].(string); ok {
+		stats.NetIO = netIO
+	}
+
+	// Parse block I/O - format: "138MB / 24MB"
+	if blockIO, ok := rawStats["BlockIO"].(string); ok {
+		stats.BlockIO = blockIO
+	}
+}
+
+// parseMemoryValue parses memory values like "121.5MiB", "31.04GiB" into bytes
+func (d *DockerManager) parseMemoryValue(memStr string) uint64 {
+	// Remove any whitespace
+	memStr = strings.TrimSpace(memStr)
+	if memStr == "" {
+		return 0
+	}
+
+	// Extract numeric part and unit
+	var value float64
+	var unit string
+
+	// Find where the unit starts
+	i := len(memStr) - 1
+	for i >= 0 && (memStr[i] < '0' || memStr[i] > '9') && memStr[i] != '.' {
+		i--
+	}
+
+	if i < 0 {
+		return 0
+	}
+
+	valueStr := memStr[:i+1]
+	unit = memStr[i+1:]
+
+	var err error
+	if value, err = strconv.ParseFloat(valueStr, 64); err != nil {
+		return 0
+	}
+
+	// Convert to bytes based on unit
+	switch strings.ToLower(unit) {
+	case "b", "":
+		return uint64(value)
+	case "kb", "kib":
+		return uint64(value * 1024)
+	case "mb", "mib":
+		return uint64(value * 1024 * 1024)
+	case "gb", "gib":
+		return uint64(value * 1024 * 1024 * 1024)
+	case "tb", "tib":
+		return uint64(value * 1024 * 1024 * 1024 * 1024)
+	default:
+		return uint64(value)
+	}
 }
 
 // PauseContainer pauses a container
@@ -360,7 +487,7 @@ func (d *DockerManager) PauseContainer(nameOrID string) error {
 		return fmt.Errorf("docker is not available")
 	}
 
-	output := lib.GetCmdOutput("docker", "pause", nameOrID)
+	output := d.cmdExecutor.GetCmdOutput("docker", "pause", nameOrID)
 
 	// Check if there were any errors
 	for _, line := range output {
@@ -379,7 +506,7 @@ func (d *DockerManager) UnpauseContainer(nameOrID string) error {
 		return fmt.Errorf("docker is not available")
 	}
 
-	output := lib.GetCmdOutput("docker", "unpause", nameOrID)
+	output := d.cmdExecutor.GetCmdOutput("docker", "unpause", nameOrID)
 
 	// Check if there were any errors
 	for _, line := range output {
@@ -404,7 +531,7 @@ func (d *DockerManager) RemoveContainer(nameOrID string, force bool) error {
 	}
 	args = append(args, nameOrID)
 
-	output := lib.GetCmdOutput("docker", args...)
+	output := d.cmdExecutor.GetCmdOutput("docker", args...)
 
 	// Check if there were any errors
 	for _, line := range output {
@@ -423,7 +550,7 @@ func (d *DockerManager) GetDockerInfo() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("docker is not available")
 	}
 
-	output := lib.GetCmdOutput("docker", "info", "--format", "json")
+	output := d.cmdExecutor.GetCmdOutput("docker", "info", "--format", "json")
 	if len(output) == 0 {
 		return nil, fmt.Errorf("failed to get Docker info")
 	}
@@ -445,7 +572,7 @@ func (d *DockerManager) ListNetworks() ([]DockerNetwork, error) {
 		return networks, fmt.Errorf("docker is not available")
 	}
 
-	output := lib.GetCmdOutput("docker", "network", "ls", "--format", "json", "--no-trunc")
+	output := d.cmdExecutor.GetCmdOutput("docker", "network", "ls", "--format", "json", "--no-trunc")
 	logger.Blue("Docker network ls output: %d lines", len(output))
 
 	for i, line := range output {
@@ -485,7 +612,7 @@ func (d *DockerManager) ListImages() ([]DockerImage, error) {
 		return images, fmt.Errorf("docker is not available")
 	}
 
-	output := lib.GetCmdOutput("docker", "images", "--format", "json", "--no-trunc")
+	output := d.cmdExecutor.GetCmdOutput("docker", "images", "--format", "json", "--no-trunc")
 	logger.Blue("Docker images output: %d lines", len(output))
 
 	for i, line := range output {
@@ -553,7 +680,7 @@ func (d *DockerManager) parseImageData(image *DockerImage, data map[string]inter
 
 // getImageDetails gets detailed information about an image using docker image inspect
 func (d *DockerManager) getImageDetails(image *DockerImage) error {
-	output := lib.GetCmdOutput("docker", "image", "inspect", image.ID)
+	output := d.cmdExecutor.GetCmdOutput("docker", "image", "inspect", image.ID)
 	if len(output) == 0 {
 		return fmt.Errorf("failed to inspect image %s", image.ID)
 	}
@@ -701,7 +828,7 @@ func (d *DockerManager) parseNetworkData(network *DockerNetwork, data map[string
 
 // getNetworkDetails gets detailed information about a network using docker network inspect
 func (d *DockerManager) getNetworkDetails(network *DockerNetwork) error {
-	output := lib.GetCmdOutput("docker", "network", "inspect", network.ID)
+	output := d.cmdExecutor.GetCmdOutput("docker", "network", "inspect", network.ID)
 	if len(output) == 0 {
 		return fmt.Errorf("failed to inspect network %s", network.ID)
 	}
@@ -817,7 +944,7 @@ func (d *DockerManager) parseNetworkInspectData(network *DockerNetwork, data map
 // getContainerDetails gets detailed information about a container
 func (d *DockerManager) getContainerDetails(container *ContainerInfo) error {
 	// Get detailed inspect information
-	output := lib.GetCmdOutput("docker", "inspect", container.ID)
+	output := d.cmdExecutor.GetCmdOutput("docker", "inspect", container.ID)
 	if len(output) == 0 {
 		return fmt.Errorf("failed to inspect container")
 	}

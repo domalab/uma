@@ -1,120 +1,216 @@
 # WebSocket Real-time Monitoring Guide
 
-UMA provides WebSocket endpoints for real-time monitoring of system statistics, Docker events, and storage status. This enables live dashboards and immediate notifications of system changes.
+UMA provides a unified WebSocket endpoint for real-time monitoring with subscription management. This enables live dashboards and immediate notifications of system changes across multiple event types.
 
-## Available WebSocket Endpoints
+## Unified WebSocket Endpoint
 
-### System Statistics
-**Endpoint**: `ws://your-unraid-ip:34600/api/v1/ws/system/stats`
+### Main Endpoint
+**Endpoint**: `ws://your-unraid-ip:34600/api/v1/ws`
 
-Real-time system performance metrics including CPU usage, memory consumption, and uptime.
+The unified WebSocket endpoint supports subscription management for multiple event types:
 
-### Docker Events
-**Endpoint**: `ws://your-unraid-ip:34600/api/v1/ws/docker/events`
-
-Live Docker container events including start, stop, restart, and status changes.
-
-### Storage Status
-**Endpoint**: `ws://your-unraid-ip:34600/api/v1/ws/storage/status`
-
-Real-time storage information including disk usage, array status, and health updates.
+- **System Statistics**: CPU usage, memory consumption, and uptime
+- **Docker Events**: Container start, stop, restart, and status changes  
+- **Storage Status**: Array status, disk health, and parity information
+- **Temperature Alerts**: Critical temperature monitoring and alerts
+- **Resource Alerts**: CPU, memory, and disk usage threshold alerts
+- **Infrastructure Status**: UPS, fans, and power monitoring
 
 ## Connection Examples
 
 ### JavaScript (Browser)
+
 ```javascript
-// Connect to system stats
-const statsSocket = new WebSocket('ws://your-unraid-ip:34600/api/v1/ws/system/stats');
+// Connect to unified WebSocket endpoint
+const socket = new WebSocket('ws://your-unraid-ip:34600/api/v1/ws');
 
-statsSocket.onopen = function(event) {
-    console.log('Connected to system stats');
+socket.onopen = function(event) {
+    console.log('Connected to unified WebSocket');
+    
+    // Subscribe to system stats
+    socket.send(JSON.stringify({
+        type: 'subscribe',
+        channel: 'system.stats'
+    }));
+    
+    // Subscribe to Docker events
+    socket.send(JSON.stringify({
+        type: 'subscribe', 
+        channel: 'docker.events'
+    }));
+    
+    // Subscribe to temperature alerts
+    socket.send(JSON.stringify({
+        type: 'subscribe',
+        channel: 'temperature.alert'
+    }));
 };
 
-statsSocket.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    console.log('System stats:', data);
-    updateDashboard(data);
+socket.onmessage = function(event) {
+    const message = JSON.parse(event.data);
+    console.log('Received event:', message);
+    
+    switch(message.type) {
+        case 'system.stats':
+            updateSystemStats(message.data);
+            break;
+        case 'docker.events':
+            updateDockerEvents(message.data);
+            break;
+        case 'storage.status':
+            updateStorageStatus(message.data);
+            break;
+        case 'temperature.alert':
+            showTemperatureAlert(message.data);
+            break;
+        case 'resource.alert':
+            showResourceAlert(message.data);
+            break;
+    }
 };
 
-statsSocket.onclose = function(event) {
-    console.log('Disconnected from system stats');
+socket.onclose = function(event) {
+    console.log('Disconnected from WebSocket');
 };
 
-statsSocket.onerror = function(error) {
+socket.onerror = function(error) {
     console.error('WebSocket error:', error);
 };
 ```
 
 ### Python
+
 ```python
 import asyncio
 import websockets
 import json
 
-async def monitor_system_stats():
-    uri = "ws://your-unraid-ip:34600/api/v1/ws/system/stats"
+async def monitor_unraid():
+    uri = "ws://your-unraid-ip:34600/api/v1/ws"
     
     async with websockets.connect(uri) as websocket:
-        print("Connected to system stats")
+        print("Connected to unified WebSocket")
+        
+        # Subscribe to multiple channels
+        await websocket.send(json.dumps({
+            "type": "subscribe",
+            "channel": "system.stats"
+        }))
+        
+        await websocket.send(json.dumps({
+            "type": "subscribe", 
+            "channel": "docker.events"
+        }))
         
         async for message in websocket:
             data = json.loads(message)
-            print(f"CPU: {data['cpu_percent']}%, Memory: {data['memory_percent']}%")
+            
+            if data['type'] == 'system.stats':
+                print(f"CPU: {data['data']['cpu_percent']}%, Memory: {data['data']['memory_percent']}%")
+            elif data['type'] == 'docker.events':
+                print(f"Docker: {data['data']['action']} - {data['data']['container_name']}")
+            elif data['type'] == 'temperature.alert':
+                print(f"Temperature Alert: {data['data']['message']}")
 
 # Run the monitor
-asyncio.run(monitor_system_stats())
+asyncio.run(monitor_unraid())
 ```
 
 ### Node.js
+
 ```javascript
 const WebSocket = require('ws');
 
-const ws = new WebSocket('ws://your-unraid-ip:34600/api/v1/ws/system/stats');
+const ws = new WebSocket('ws://your-unraid-ip:34600/api/v1/ws');
 
 ws.on('open', function open() {
-    console.log('Connected to system stats');
+    console.log('Connected to unified WebSocket');
+    
+    // Subscribe to system stats
+    ws.send(JSON.stringify({
+        type: 'subscribe',
+        channel: 'system.stats'
+    }));
+    
+    // Subscribe to storage status
+    ws.send(JSON.stringify({
+        type: 'subscribe',
+        channel: 'storage.status'
+    }));
 });
 
 ws.on('message', function message(data) {
-    const stats = JSON.parse(data);
-    console.log('System stats received:', stats);
+    const event = JSON.parse(data);
+    console.log('Event received:', event);
+    
+    switch(event.type) {
+        case 'system.stats':
+            console.log(`System: CPU ${event.data.cpu_percent}%, Memory ${event.data.memory_percent}%`);
+            break;
+        case 'storage.status':
+            console.log(`Storage: Array ${event.data.array_status}, Disks: ${event.data.disks.length}`);
+            break;
+    }
 });
 
 ws.on('close', function close() {
-    console.log('Disconnected from system stats');
+    console.log('Disconnected from WebSocket');
 });
 ```
 
-### curl (for testing)
-```bash
-# Test WebSocket connection
-curl --include \
-     --no-buffer \
-     --header "Connection: Upgrade" \
-     --header "Upgrade: websocket" \
-     --header "Sec-WebSocket-Key: SGVsbG8sIHdvcmxkIQ==" \
-     --header "Sec-WebSocket-Version: 13" \
-     http://your-unraid-ip:34600/api/v1/ws/system/stats
+## Subscription Management
+
+### Available Channels
+
+- `system.stats` - Real-time system performance metrics
+- `docker.events` - Docker container lifecycle events
+- `storage.status` - Storage array and disk status updates
+- `temperature.alert` - Temperature threshold alerts
+- `resource.alert` - CPU/memory/disk usage alerts
+- `infrastructure.status` - UPS, fans, power monitoring
+
+### Subscribe to Channel
+
+```javascript
+socket.send(JSON.stringify({
+    type: 'subscribe',
+    channel: 'system.stats'
+}));
+```
+
+### Unsubscribe from Channel
+
+```javascript
+socket.send(JSON.stringify({
+    type: 'unsubscribe',
+    channel: 'system.stats'
+}));
+```
+
+### List Active Subscriptions
+
+```javascript
+socket.send(JSON.stringify({
+    type: 'list_subscriptions'
+}));
 ```
 
 ## Message Formats
 
-### System Statistics Message
+### System Statistics Event
+
 ```json
 {
-  "type": "stats",
-  "timestamp": "2025-06-15T23:00:00Z",
+  "type": "system.stats",
+  "channel": "system.stats",
+  "timestamp": "2025-06-19T14:30:00Z",
   "data": {
-    "cpu_percent": 15.2,
-    "memory_percent": 45.8,
+    "cpu_percent": 25.5,
+    "memory_percent": 50.0,
     "memory_used": 8589934592,
     "memory_total": 17179869184,
     "uptime": 86400,
     "load_average": [0.5, 0.7, 0.9],
-    "disk_io": {
-      "read_bytes": 1048576,
-      "write_bytes": 2097152
-    },
     "network_io": {
       "bytes_sent": 1048576,
       "bytes_recv": 2097152
@@ -123,283 +219,66 @@ curl --include \
 }
 ```
 
-### Docker Events Message
+### Docker Events
+
 ```json
 {
-  "type": "docker_event",
-  "timestamp": "2025-06-15T23:00:00Z",
+  "type": "docker.events",
+  "channel": "docker.events", 
+  "timestamp": "2025-06-19T14:30:00Z",
   "data": {
     "action": "start",
     "container_id": "abc123def456",
     "container_name": "plex",
     "image": "plexinc/pms-docker:latest",
-    "status": "running",
-    "attributes": {
-      "exitCode": "0",
-      "signal": ""
-    }
+    "status": "running"
   }
 }
 ```
 
-### Storage Status Message
+### Temperature Alert
+
 ```json
 {
-  "type": "storage_status",
-  "timestamp": "2025-06-15T23:00:00Z",
+  "type": "temperature.alert",
+  "channel": "temperature.alert",
+  "timestamp": "2025-06-19T14:30:00Z", 
   "data": {
-    "array_status": "started",
-    "array_protection": "protected",
-    "disks": [
-      {
-        "name": "disk1",
-        "device": "/dev/sdb1",
-        "status": "active",
-        "temperature": 35,
-        "size": "8TB",
-        "used": "4.2TB",
-        "free": "3.8TB"
-      }
-    ],
-    "cache_disks": [
-      {
-        "name": "cache",
-        "device": "/dev/nvme0n1",
-        "status": "active",
-        "temperature": 42,
-        "size": "1TB",
-        "used": "256GB",
-        "free": "768GB"
-      }
-    ]
+    "sensor_name": "CPU Package",
+    "sensor_type": "cpu",
+    "temperature": 75.2,
+    "threshold": 70.0,
+    "level": "warning",
+    "message": "CPU Package temperature warning: 75.2°C (threshold: 70.0°C)"
   }
 }
-```
-
-## Building a Real-time Dashboard
-
-### HTML Dashboard Example
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>UMA Real-time Dashboard</title>
-    <style>
-        .metric { margin: 10px; padding: 10px; border: 1px solid #ccc; }
-        .value { font-size: 24px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <h1>UMA System Monitor</h1>
-    
-    <div class="metric">
-        <div>CPU Usage</div>
-        <div class="value" id="cpu">--</div>
-    </div>
-    
-    <div class="metric">
-        <div>Memory Usage</div>
-        <div class="value" id="memory">--</div>
-    </div>
-    
-    <div class="metric">
-        <div>Uptime</div>
-        <div class="value" id="uptime">--</div>
-    </div>
-    
-    <div class="metric">
-        <div>Docker Events</div>
-        <div id="docker-events"></div>
-    </div>
-
-    <script>
-        // System stats connection
-        const statsWs = new WebSocket('ws://your-unraid-ip:34600/api/v1/ws/system/stats');
-        
-        statsWs.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            if (data.type === 'stats') {
-                document.getElementById('cpu').textContent = data.data.cpu_percent.toFixed(1) + '%';
-                document.getElementById('memory').textContent = data.data.memory_percent.toFixed(1) + '%';
-                document.getElementById('uptime').textContent = formatUptime(data.data.uptime);
-            }
-        };
-        
-        // Docker events connection
-        const dockerWs = new WebSocket('ws://your-unraid-ip:34600/api/v1/ws/docker/events');
-        
-        dockerWs.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            if (data.type === 'docker_event') {
-                const eventsDiv = document.getElementById('docker-events');
-                const eventElement = document.createElement('div');
-                eventElement.textContent = `${data.data.action}: ${data.data.container_name}`;
-                eventsDiv.insertBefore(eventElement, eventsDiv.firstChild);
-                
-                // Keep only last 5 events
-                while (eventsDiv.children.length > 5) {
-                    eventsDiv.removeChild(eventsDiv.lastChild);
-                }
-            }
-        };
-        
-        function formatUptime(seconds) {
-            const days = Math.floor(seconds / 86400);
-            const hours = Math.floor((seconds % 86400) / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            return `${days}d ${hours}h ${minutes}m`;
-        }
-    </script>
-</body>
-</html>
-```
-
-## Connection Management
-
-### Automatic Reconnection
-```javascript
-class UMAWebSocket {
-    constructor(endpoint) {
-        this.endpoint = endpoint;
-        this.reconnectInterval = 5000; // 5 seconds
-        this.maxReconnectAttempts = 10;
-        this.reconnectAttempts = 0;
-        this.connect();
-    }
-    
-    connect() {
-        this.ws = new WebSocket(this.endpoint);
-        
-        this.ws.onopen = () => {
-            console.log('Connected to', this.endpoint);
-            this.reconnectAttempts = 0;
-        };
-        
-        this.ws.onmessage = (event) => {
-            this.handleMessage(JSON.parse(event.data));
-        };
-        
-        this.ws.onclose = () => {
-            console.log('Disconnected from', this.endpoint);
-            this.reconnect();
-        };
-        
-        this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-        };
-    }
-    
-    reconnect() {
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            console.log(`Reconnecting... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-            setTimeout(() => this.connect(), this.reconnectInterval);
-        } else {
-            console.error('Max reconnection attempts reached');
-        }
-    }
-    
-    handleMessage(data) {
-        // Override this method to handle messages
-        console.log('Received:', data);
-    }
-}
-
-// Usage
-const systemMonitor = new UMAWebSocket('ws://your-unraid-ip:34600/api/v1/ws/system/stats');
-systemMonitor.handleMessage = function(data) {
-    if (data.type === 'stats') {
-        updateSystemStats(data.data);
-    }
-};
-```
-
-## Performance Considerations
-
-### Message Frequency
-- **System stats**: Updated every 5 seconds
-- **Docker events**: Real-time (as they occur)
-- **Storage status**: Updated every 30 seconds
-
-### Connection Limits
-- Maximum 100 concurrent WebSocket connections per endpoint
-- Connections are automatically cleaned up when clients disconnect
-
-### Bandwidth Usage
-- System stats: ~500 bytes per message
-- Docker events: ~200-800 bytes per event
-- Storage status: ~1-5KB per message
-
-## Troubleshooting
-
-### Common Issues
-
-**Connection refused:**
-```
-Error: WebSocket connection failed
-```
-- Verify UMA is running
-- Check the correct port (34600)
-- Ensure WebSocket endpoint path is correct
-
-**Connection drops frequently:**
-```javascript
-// Add connection monitoring
-ws.addEventListener('close', function(event) {
-    console.log('Close code:', event.code);
-    console.log('Close reason:', event.reason);
-});
-```
-
-**No messages received:**
-- Check if the specific monitoring service is enabled
-- Verify system has activity to generate events
-- Test with curl to ensure endpoint responds
-
-### Debugging WebSocket Connections
-
-```javascript
-// Enable verbose logging
-const ws = new WebSocket('ws://your-unraid-ip:34600/api/v1/ws/system/stats');
-
-ws.addEventListener('open', function(event) {
-    console.log('WebSocket opened:', event);
-});
-
-ws.addEventListener('message', function(event) {
-    console.log('Message received:', event.data);
-});
-
-ws.addEventListener('error', function(event) {
-    console.error('WebSocket error:', event);
-});
-
-ws.addEventListener('close', function(event) {
-    console.log('WebSocket closed:', event.code, event.reason);
-});
 ```
 
 ## Integration Examples
 
 ### Home Assistant
+
 ```yaml
 # configuration.yaml
 sensor:
   - platform: websocket
-    resource: ws://your-unraid-ip:34600/api/v1/ws/system/stats
+    resource: ws://your-unraid-ip:34600/api/v1/ws
     name: "Unraid CPU Usage"
     value_template: "{{ value_json.data.cpu_percent }}"
     unit_of_measurement: "%"
+    json_attributes_path: "$.data"
+    json_attributes:
+      - memory_percent
+      - uptime
+      - load_average
 ```
 
-### Grafana Dashboard
-Use WebSocket data with Grafana's WebSocket data source plugin to create real-time dashboards.
+### Real-time Dashboard
 
-### Custom Monitoring Scripts
-Create custom monitoring solutions that react to real-time events and send notifications or trigger automation.
+Create responsive dashboards that react to live system events and provide immediate feedback on system health and performance.
 
 ## Next Steps
 
-- **[Complete Endpoint Reference](endpoints.md)** - All available REST endpoints
-- **[Bulk Operations](bulk-operations.md)** - Efficient container management
+- **[Complete API Reference](endpoints.md)** - All available REST endpoints
+- **[Temperature Monitoring](temperature-monitoring.md)** - Advanced temperature alerts
 - **[Metrics Guide](../development/metrics.md)** - Prometheus monitoring setup

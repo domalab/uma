@@ -40,6 +40,7 @@ type StorageInterface interface {
 type DockerInterface interface {
 	GetContainers() (interface{}, error)
 	GetContainer(id string) (interface{}, error)
+	GetContainerStats(id string) (interface{}, error)
 	StartContainer(id string) error
 	StopContainer(id string) error
 	RestartContainer(id string) error

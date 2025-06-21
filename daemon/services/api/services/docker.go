@@ -305,20 +305,19 @@ func (d *DockerService) GetDockerInfo() (map[string]interface{}, error) {
 	info, err := d.api.GetDocker().GetSystemInfo()
 	if err == nil {
 		if infoMap, ok := info.(map[string]interface{}); ok {
+			// Add system-level aggregation metrics
+			d.addSystemLevelMetrics(infoMap)
 			infoMap["last_updated"] = time.Now().UTC().Format(time.RFC3339)
 			return infoMap, nil
 		}
 	}
 
-	// For now, return basic info
-	return map[string]interface{}{
-		"version":        "20.10.x",
-		"api_version":    "1.41",
-		"containers":     0,
-		"images":         0,
-		"storage_driver": "overlay2",
-		"last_updated":   time.Now().UTC().Format(time.RFC3339),
-	}, nil
+	// Fallback: calculate system metrics from container data
+	systemInfo := d.calculateSystemMetricsFromContainers()
+	systemInfo["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+	systemInfo["error"] = fmt.Sprintf("Docker info unavailable: %v", err)
+
+	return systemInfo, nil
 }
 
 // Helper methods
@@ -407,4 +406,98 @@ func (d *DockerService) GetDockerDataOptimized() interface{} {
 		"containers": containerSlice,
 		"total":      len(containerSlice),
 	}
+}
+
+// addSystemLevelMetrics adds system-level aggregation metrics to Docker info
+func (d *DockerService) addSystemLevelMetrics(infoMap map[string]interface{}) {
+	// Get container data for aggregation
+	containers, err := d.api.GetDocker().GetContainers()
+	if err != nil {
+		logger.Yellow("Failed to get containers for system metrics: %v", err)
+		return
+	}
+
+	var containerSlice []interface{}
+	if slice, ok := containers.([]interface{}); ok {
+		containerSlice = slice
+	}
+
+	// Calculate container counts by state
+	totalContainers := len(containerSlice)
+	runningContainers := 0
+	pausedContainers := 0
+	stoppedContainers := 0
+
+	for _, container := range containerSlice {
+		if containerMap, ok := container.(map[string]interface{}); ok {
+			state := d.getStringValue(containerMap, "state")
+			switch state {
+			case "running":
+				runningContainers++
+			case "paused":
+				pausedContainers++
+			case "exited", "stopped":
+				stoppedContainers++
+			}
+		}
+	}
+
+	// Add aggregated metrics to info map
+	infoMap["containers_total"] = totalContainers
+	infoMap["containers_running"] = runningContainers
+	infoMap["containers_paused"] = pausedContainers
+	infoMap["containers_stopped"] = stoppedContainers
+}
+
+// calculateSystemMetricsFromContainers calculates system metrics when Docker info is unavailable
+func (d *DockerService) calculateSystemMetricsFromContainers() map[string]interface{} {
+	systemInfo := map[string]interface{}{
+		"version":            "unknown",
+		"api_version":        "unknown",
+		"containers_total":   0,
+		"containers_running": 0,
+		"containers_paused":  0,
+		"containers_stopped": 0,
+		"images":             0,
+		"storage_driver":     "unknown",
+	}
+
+	// Get container data
+	containers, err := d.api.GetDocker().GetContainers()
+	if err != nil {
+		logger.Yellow("Failed to get containers for fallback metrics: %v", err)
+		return systemInfo
+	}
+
+	var containerSlice []interface{}
+	if slice, ok := containers.([]interface{}); ok {
+		containerSlice = slice
+	}
+
+	// Calculate container counts
+	totalContainers := len(containerSlice)
+	runningContainers := 0
+	pausedContainers := 0
+	stoppedContainers := 0
+
+	for _, container := range containerSlice {
+		if containerMap, ok := container.(map[string]interface{}); ok {
+			state := d.getStringValue(containerMap, "state")
+			switch state {
+			case "running":
+				runningContainers++
+			case "paused":
+				pausedContainers++
+			case "exited", "stopped":
+				stoppedContainers++
+			}
+		}
+	}
+
+	systemInfo["containers_total"] = totalContainers
+	systemInfo["containers_running"] = runningContainers
+	systemInfo["containers_paused"] = pausedContainers
+	systemInfo["containers_stopped"] = stoppedContainers
+
+	return systemInfo
 }

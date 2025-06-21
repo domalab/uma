@@ -1487,9 +1487,38 @@ func (s *SystemMonitor) getSMARTTemperature(devicePath string) int {
 		if strings.Contains(line, "Temperature_Celsius") || strings.Contains(line, "Airflow_Temperature_Cel") {
 			fields := strings.Fields(line)
 			if len(fields) >= 10 {
-				if temp, err := strconv.Atoi(fields[9]); err == nil {
+				if temp := s.parseTemperatureFromRawValue(fields[9]); temp > 0 && temp < 150 {
 					return temp
 				}
+			}
+		}
+	}
+
+	return 0
+}
+
+// parseTemperatureFromRawValue extracts temperature from complex SMART raw value formats
+func (s *SystemMonitor) parseTemperatureFromRawValue(rawValue string) int {
+	// Handle simple integer values first
+	if temp, err := strconv.Atoi(rawValue); err == nil {
+		return temp
+	}
+
+	// Handle complex formats like "37 (0 18 0 0 0)" or "37 (Min/Max 35/41)"
+	// Extract the first number before any space or parenthesis
+	if idx := strings.IndexAny(rawValue, " ("); idx > 0 {
+		if temp, err := strconv.Atoi(rawValue[:idx]); err == nil {
+			return temp
+		}
+	}
+
+	// Handle hex values
+	if strings.HasPrefix(rawValue, "0x") {
+		if val, err := strconv.ParseInt(rawValue[2:], 16, 64); err == nil {
+			// For temperature, the value is usually in the lower byte
+			temp := int(val & 0xFF)
+			if temp > 0 && temp < 150 {
+				return temp
 			}
 		}
 	}

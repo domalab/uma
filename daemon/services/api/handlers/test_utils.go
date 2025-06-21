@@ -168,7 +168,17 @@ func (m *MockDockerInterface) GetContainers() (interface{}, error) {
 }
 
 func (m *MockDockerInterface) GetContainer(id string) (interface{}, error) {
-	return map[string]interface{}{"id": id, "name": "test-container"}, nil
+	return map[string]interface{}{
+		"id":       id,
+		"name":     "test-container",
+		"state":    "running", // Default state that allows stop operations
+		"status":   "Up 2 hours",
+		"image":    "nginx:latest",
+		"ports":    []interface{}{},
+		"mounts":   []interface{}{},
+		"networks": []interface{}{},
+		"labels":   map[string]interface{}{},
+	}, nil
 }
 
 func (m *MockDockerInterface) StartContainer(id string) error {
@@ -189,6 +199,14 @@ func (m *MockDockerInterface) GetImages() (interface{}, error) {
 
 func (m *MockDockerInterface) GetNetworks() (interface{}, error) {
 	return []interface{}{}, nil
+}
+
+func (m *MockDockerInterface) GetContainerStats(id string) (interface{}, error) {
+	return map[string]interface{}{
+		"container_id": id,
+		"cpu_percent":  0.0,
+		"memory_usage": 0,
+	}, nil
 }
 
 func (m *MockDockerInterface) GetSystemInfo() (interface{}, error) {

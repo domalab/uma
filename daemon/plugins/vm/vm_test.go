@@ -50,14 +50,14 @@ func TestListVMs(t *testing.T) {
 			t.Errorf("Unexpected VM state: %s", vm.State)
 		}
 
-		// Memory should be non-negative
-		if vm.Memory < 0 {
-			t.Errorf("Expected non-negative VM memory, got %d", vm.Memory)
+		// Memory should be reasonable (uint64 is always non-negative)
+		if vm.Memory == 0 {
+			t.Logf("VM memory is 0, which may indicate missing data: %s", vm.Name)
 		}
 
-		// CPUs should be positive if set
-		if vm.CPUs < 0 {
-			t.Errorf("Expected non-negative VM CPUs, got %d", vm.CPUs)
+		// CPUs should be reasonable (uint64 is always non-negative)
+		if vm.CPUs == 0 {
+			t.Logf("VM CPUs is 0, which may indicate missing data: %s", vm.Name)
 		}
 	}
 }
@@ -106,9 +106,9 @@ func TestGetVM(t *testing.T) {
 				t.Error("Expected non-empty disk source")
 			}
 
-			// Size should be non-negative
-			if disk.Size > 0 && disk.Size < 0 {
-				t.Errorf("Expected non-negative disk size, got %d", disk.Size)
+			// Size should be reasonable (uint64 is always non-negative)
+			if disk.Size == 0 {
+				t.Logf("Disk size is 0, which may indicate missing data: %s", disk.Device)
 			}
 		}
 	}
@@ -199,27 +199,27 @@ func TestGetVMStats(t *testing.T) {
 			t.Errorf("CPU usage should be between 0 and 100, got %f", stats.CPUUsage)
 		}
 
-		// Memory usage should be non-negative
-		if stats.MemoryUsage < 0 {
-			t.Errorf("Expected non-negative memory usage, got %d", stats.MemoryUsage)
+		// Memory usage should be reasonable (uint64 is always non-negative)
+		if stats.MemoryUsage == 0 {
+			t.Logf("Memory usage is 0, which may indicate missing data")
 		}
 
-		// Network stats should be non-negative
-		if stats.NetRx < 0 {
-			t.Errorf("Expected non-negative network RX bytes, got %d", stats.NetRx)
+		// Network stats should be reasonable (uint64 is always non-negative)
+		if stats.NetRx == 0 {
+			t.Logf("Network RX bytes is 0, which may indicate no network activity")
 		}
 
-		if stats.NetTx < 0 {
-			t.Errorf("Expected non-negative network TX bytes, got %d", stats.NetTx)
+		if stats.NetTx == 0 {
+			t.Logf("Network TX bytes is 0, which may indicate no network activity")
 		}
 
-		// Disk stats should be non-negative
-		if stats.DiskRead < 0 {
-			t.Errorf("Expected non-negative disk read bytes, got %d", stats.DiskRead)
+		// Disk stats should be reasonable (uint64 is always non-negative)
+		if stats.DiskRead == 0 {
+			t.Logf("Disk read bytes is 0, which may indicate no disk activity")
 		}
 
-		if stats.DiskWrite < 0 {
-			t.Errorf("Expected non-negative disk write bytes, got %d", stats.DiskWrite)
+		if stats.DiskWrite == 0 {
+			t.Logf("Disk write bytes is 0, which may indicate no disk activity")
 		}
 	}
 }

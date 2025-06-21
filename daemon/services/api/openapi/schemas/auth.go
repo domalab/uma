@@ -11,6 +11,7 @@ func GetAuthSchemas() map[string]interface{} {
 		"APIKeyInfo":     getAPIKeyInfoSchema(),
 		"AuthError":      getAuthErrorSchema(),
 		"AuthStats":      getAuthStatsSchema(),
+		"AuthUser":       getAuthUserSchema(),
 		"SessionInfo":    getSessionInfoSchema(),
 		"PermissionInfo": getPermissionInfoSchema(),
 	}
@@ -373,6 +374,78 @@ func getAuthStatsSchema() map[string]interface{} {
 			},
 		},
 		"required": []string{"total_users", "active_users", "active_sessions", "api_keys", "last_updated"},
+	}
+}
+
+func getAuthUserSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"id": map[string]interface{}{
+				"type":        "string",
+				"description": "User ID",
+				"example":     "user_1234567890",
+			},
+			"username": map[string]interface{}{
+				"type":        "string",
+				"description": "Username",
+				"example":     "admin",
+			},
+			"email": map[string]interface{}{
+				"type":        "string",
+				"format":      "email",
+				"description": "User email address",
+				"example":     "admin@example.com",
+			},
+			"full_name": map[string]interface{}{
+				"type":        "string",
+				"description": "User full name",
+				"example":     "System Administrator",
+			},
+			"role": map[string]interface{}{
+				"type":        "string",
+				"description": "User role",
+				"enum":        []string{"admin", "user", "readonly"},
+				"example":     "admin",
+			},
+			"permissions": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"description": "User permissions",
+				"example":     []string{"read", "write", "admin"},
+			},
+			"created_at": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "User creation timestamp",
+				"example":     "2025-06-16T14:30:00Z",
+			},
+			"last_login": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "Last login timestamp",
+				"example":     "2025-06-16T14:30:00Z",
+			},
+			"active": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Whether user account is active",
+				"example":     true,
+			},
+			"login_count": map[string]interface{}{
+				"type":        "integer",
+				"description": "Total number of logins",
+				"example":     42,
+				"minimum":     0,
+			},
+			"last_ip": map[string]interface{}{
+				"type":        "string",
+				"description": "Last login IP address",
+				"example":     "192.168.1.100",
+			},
+		},
+		"required": []string{"id", "username", "role", "permissions", "active"},
 	}
 }
 

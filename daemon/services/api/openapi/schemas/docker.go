@@ -34,7 +34,7 @@ func getContainerInfoSchema() map[string]interface{} {
 			"name": map[string]interface{}{
 				"type":        "string",
 				"description": "Container name",
-				"example":     "plex",
+				"example":     "jackett",
 				"pattern":     "^[a-zA-Z0-9][a-zA-Z0-9_.-]+$",
 			},
 			"status": map[string]interface{}{
@@ -55,7 +55,7 @@ func getContainerInfoSchema() map[string]interface{} {
 			"image": map[string]interface{}{
 				"type":        "string",
 				"description": "Container image",
-				"example":     "linuxserver/plex:latest",
+				"example":     "lscr.io/linuxserver/jackett",
 			},
 			"ports": map[string]interface{}{
 				"type": "array",
@@ -87,6 +87,41 @@ func getContainerInfoSchema() map[string]interface{} {
 						},
 					},
 				},
+			},
+			"environment": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"description": "Environment variables",
+				"example":     []string{"PATH=/usr/local/sbin:/usr/local/bin", "HOME=/root"},
+			},
+			"networks": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"name": map[string]interface{}{
+							"type": "string",
+						},
+						"ip_address": map[string]interface{}{
+							"type": "string",
+						},
+					},
+				},
+				"description": "Network configurations",
+			},
+			"restart_policy": map[string]interface{}{
+				"type":        "string",
+				"description": "Container restart policy",
+				"enum":        []string{"no", "always", "unless-stopped", "on-failure"},
+				"example":     "unless-stopped",
+			},
+			"started_at": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "Container start timestamp",
+				"example":     "2025-06-16T14:30:00Z",
 			},
 		},
 		"required": []string{"id", "name", "status", "created"},
@@ -188,7 +223,7 @@ func getBulkOperationRequestSchema() map[string]interface{} {
 					"pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]+$",
 				},
 				"description": "Array of container IDs or names",
-				"example":     []string{"plex", "nginx", "sonarr"},
+				"example":     []string{"jackett", "homeassistant", "qbittorrent"},
 				"minItems":    1,
 				"maxItems":    50,
 				"uniqueItems": true,
@@ -257,7 +292,7 @@ func getContainerOperationResultSchema() map[string]interface{} {
 			"container_id": map[string]interface{}{
 				"type":        "string",
 				"description": "Container ID or name",
-				"example":     "plex",
+				"example":     "container1",
 			},
 			"success": map[string]interface{}{
 				"type":        "boolean",
@@ -296,7 +331,7 @@ func getContainerOperationResponseSchema() map[string]interface{} {
 			"container_id": map[string]interface{}{
 				"type":        "string",
 				"description": "Container ID or name",
-				"example":     "plex",
+				"example":     "container1",
 			},
 		},
 		"required": []string{"success", "message", "container_id"},
@@ -318,7 +353,7 @@ func getDockerImageSchema() map[string]interface{} {
 					"type": "string",
 				},
 				"description": "Repository tags",
-				"example":     []string{"linuxserver/plex:latest"},
+				"example":     []string{"lscr.io/linuxserver/jackett:latest"},
 			},
 			"size": map[string]interface{}{
 				"type":        "integer",
@@ -373,13 +408,13 @@ func getDockerInfoSchema() map[string]interface{} {
 			"containers": map[string]interface{}{
 				"type":        "integer",
 				"description": "Total number of containers",
-				"example":     15,
+				"example":     13,
 				"minimum":     0,
 			},
 			"containers_running": map[string]interface{}{
 				"type":        "integer",
 				"description": "Number of running containers",
-				"example":     12,
+				"example":     13,
 				"minimum":     0,
 			},
 			"containers_paused": map[string]interface{}{
@@ -391,19 +426,400 @@ func getDockerInfoSchema() map[string]interface{} {
 			"containers_stopped": map[string]interface{}{
 				"type":        "integer",
 				"description": "Number of stopped containers",
-				"example":     3,
+				"example":     0,
 				"minimum":     0,
 			},
 			"images": map[string]interface{}{
 				"type":        "integer",
 				"description": "Total number of images",
-				"example":     25,
+				"example":     13,
 				"minimum":     0,
 			},
 			"server_version": map[string]interface{}{
 				"type":        "string",
 				"description": "Docker server version",
-				"example":     "20.10.21",
+				"example":     "27.5.1",
+			},
+			"CPUSet": map[string]interface{}{
+				"type":        "boolean",
+				"description": "CPU set support",
+				"example":     true,
+			},
+			"CgroupVersion": map[string]interface{}{
+				"type":        "string",
+				"description": "Cgroup version",
+				"example":     "2",
+			},
+			"LiveRestoreEnabled": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Live restore enabled",
+				"example":     false,
+			},
+			"RuncCommit": map[string]interface{}{
+				"type":        "object",
+				"description": "Runc commit information",
+				"properties": map[string]interface{}{
+					"Expected": map[string]interface{}{
+						"type":        "string",
+						"description": "Expected runc version",
+						"example":     "v1.2.4-0-g6c52b3f",
+					},
+					"ID": map[string]interface{}{
+						"type":        "string",
+						"description": "Runc commit ID",
+						"example":     "v1.2.4-0-g6c52b3f",
+					},
+				},
+			},
+			"SystemTime": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "System time",
+				"example":     "2025-06-20T10:57:01Z",
+			},
+			"LoggingDriver": map[string]interface{}{
+				"type":        "string",
+				"description": "Logging driver",
+				"example":     "json-file",
+			},
+			"NGoroutines": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of goroutines",
+				"example":     153,
+				"minimum":     0,
+			},
+			"Name": map[string]interface{}{
+				"type":        "string",
+				"description": "Docker daemon name",
+				"example":     "Cube",
+			},
+			"RegistryConfig": map[string]interface{}{
+				"type":                 "object",
+				"description":          "Registry configuration",
+				"additionalProperties": true,
+			},
+			"CPUShares": map[string]interface{}{
+				"type":        "boolean",
+				"description": "CPU shares support",
+				"example":     true,
+			},
+			"Debug": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Debug mode enabled",
+				"example":     false,
+			},
+			"HttpProxy": map[string]interface{}{
+				"type":        "string",
+				"description": "HTTP proxy setting",
+				"example":     "",
+			},
+			"IPv4Forwarding": map[string]interface{}{
+				"type":        "boolean",
+				"description": "IPv4 forwarding enabled",
+				"example":     true,
+			},
+			"Isolation": map[string]interface{}{
+				"type":        "string",
+				"description": "Container isolation",
+				"example":     "",
+			},
+			"KernelVersion": map[string]interface{}{
+				"type":        "string",
+				"description": "Kernel version",
+				"example":     "6.12.24-Unraid",
+			},
+			"OperatingSystem": map[string]interface{}{
+				"type":        "string",
+				"description": "Operating system",
+				"example":     "Unraid OS 7.1 x86_64",
+			},
+			"SecurityOptions": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"description": "Security options",
+				"example":     []string{"name=seccomp,profile=builtin", "name=cgroupns"},
+			},
+			"CpuCfsPeriod": map[string]interface{}{
+				"type":        "boolean",
+				"description": "CPU CFS period support",
+				"example":     true,
+			},
+			"DriverStatus": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+					},
+				},
+				"description": "Driver status",
+				"example":     [][]string{{"Btrfs", ""}},
+			},
+			"NEventsListener": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of events listeners",
+				"example":     1,
+				"minimum":     0,
+			},
+			"PidsLimit": map[string]interface{}{
+				"type":        "boolean",
+				"description": "PIDs limit support",
+				"example":     true,
+			},
+			"Containers": map[string]interface{}{
+				"type":        "integer",
+				"description": "Total containers (alternative field)",
+				"example":     13,
+				"minimum":     0,
+			},
+			"ContainersRunning": map[string]interface{}{
+				"type":        "integer",
+				"description": "Running containers (alternative field)",
+				"example":     13,
+				"minimum":     0,
+			},
+			"ID": map[string]interface{}{
+				"type":        "string",
+				"description": "Docker daemon ID",
+				"example":     "dcf99289-02ab-4aaf-b8f6-562f8ca37734",
+			},
+			"MemoryLimit": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Memory limit support",
+				"example":     true,
+			},
+			"BridgeNfIptables": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Bridge netfilter iptables support",
+				"example":     false,
+			},
+			"ClientInfo": map[string]interface{}{
+				"type":                 "object",
+				"description":          "Docker client information",
+				"additionalProperties": true,
+			},
+			"Images": map[string]interface{}{
+				"type":        "integer",
+				"description": "Total images (alternative field)",
+				"example":     13,
+				"minimum":     0,
+			},
+			"NCPU": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of CPUs",
+				"example":     12,
+				"minimum":     1,
+			},
+			"SwapLimit": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Swap limit support",
+				"example":     false,
+			},
+			"ContainersStopped": map[string]interface{}{
+				"type":        "integer",
+				"description": "Stopped containers (alternative field)",
+				"example":     0,
+				"minimum":     0,
+			},
+			"CpuCfsQuota": map[string]interface{}{
+				"type":        "boolean",
+				"description": "CPU CFS quota support",
+				"example":     true,
+			},
+			"DefaultRuntime": map[string]interface{}{
+				"type":        "string",
+				"description": "Default container runtime",
+				"example":     "runc",
+			},
+			"NFd": map[string]interface{}{
+				"type":        "integer",
+				"description": "Number of file descriptors",
+				"example":     125,
+				"minimum":     0,
+			},
+			"Runtimes": map[string]interface{}{
+				"type":                 "object",
+				"description":          "Available container runtimes",
+				"additionalProperties": true,
+			},
+			"BridgeNfIp6tables": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Bridge netfilter ip6tables support",
+				"example":     false,
+			},
+			"InitBinary": map[string]interface{}{
+				"type":        "string",
+				"description": "Init binary path",
+				"example":     "docker-init",
+			},
+			"Labels": map[string]interface{}{
+				"type":        "array",
+				"description": "Docker daemon labels",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"example": []string{},
+			},
+			"ServerVersion": map[string]interface{}{
+				"type":        "string",
+				"description": "Server version (alternative field)",
+				"example":     "27.5.1",
+			},
+			"HttpsProxy": map[string]interface{}{
+				"type":        "string",
+				"description": "HTTPS proxy setting",
+				"example":     "",
+			},
+			"NoProxy": map[string]interface{}{
+				"type":        "string",
+				"description": "No proxy setting",
+				"example":     "",
+			},
+			"Containerd": map[string]interface{}{
+				"type":                 "object",
+				"description":          "Containerd information",
+				"additionalProperties": true,
+			},
+			"GenericResources": map[string]interface{}{
+				"anyOf": []interface{}{
+					map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "object",
+						},
+					},
+					map[string]interface{}{"type": "null"},
+				},
+				"description": "Generic resources (null if none)",
+				"example":     []interface{}{},
+			},
+			"CDISpecDirs": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"description": "CDI specification directories",
+				"example":     []string{"/etc/cdi", "/var/run/cdi"},
+			},
+			"DockerRootDir": map[string]interface{}{
+				"type":        "string",
+				"description": "Docker root directory",
+				"example":     "/var/lib/docker",
+			},
+			"Driver": map[string]interface{}{
+				"type":        "string",
+				"description": "Storage driver",
+				"example":     "btrfs",
+			},
+			"Plugins": map[string]interface{}{
+				"type":                 "object",
+				"description":          "Docker plugins",
+				"additionalProperties": true,
+			},
+			"Architecture": map[string]interface{}{
+				"type":        "string",
+				"description": "System architecture",
+				"example":     "x86_64",
+			},
+			"OomKillDisable": map[string]interface{}{
+				"type":        "boolean",
+				"description": "OOM kill disable support",
+				"example":     true,
+			},
+			"ContainerdCommit": map[string]interface{}{
+				"type":        "object",
+				"description": "Containerd commit information",
+				"properties": map[string]interface{}{
+					"Expected": map[string]interface{}{
+						"type":        "string",
+						"description": "Expected containerd version",
+						"example":     "v1.7.24-0-g61f9fd88",
+					},
+					"ID": map[string]interface{}{
+						"type":        "string",
+						"description": "Containerd commit ID",
+						"example":     "v1.7.24-0-g61f9fd88",
+					},
+				},
+			},
+			"Warnings": map[string]interface{}{
+				"type":        "array",
+				"description": "Docker daemon warnings",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"example": []string{},
+			},
+			"CgroupDriver": map[string]interface{}{
+				"type":        "string",
+				"description": "Cgroup driver",
+				"example":     "systemd",
+			},
+			"Swarm": map[string]interface{}{
+				"type":                 "object",
+				"description":          "Docker swarm information",
+				"additionalProperties": true,
+			},
+			"ExperimentalBuild": map[string]interface{}{
+				"type":        "boolean",
+				"description": "Experimental build flag",
+				"example":     false,
+			},
+			"MemTotal": map[string]interface{}{
+				"type":        "integer",
+				"description": "Total memory in bytes",
+				"example":     67645440000,
+				"minimum":     0,
+			},
+			"IndexServerAddress": map[string]interface{}{
+				"type":        "string",
+				"description": "Index server address",
+				"example":     "https://index.docker.io/v1/",
+			},
+			"InitCommit": map[string]interface{}{
+				"type":        "object",
+				"description": "Init commit information",
+				"properties": map[string]interface{}{
+					"Expected": map[string]interface{}{
+						"type":        "string",
+						"description": "Expected init version",
+						"example":     "de40ad0",
+					},
+					"ID": map[string]interface{}{
+						"type":        "string",
+						"description": "Init commit ID",
+						"example":     "de40ad0",
+					},
+				},
+			},
+			"OSType": map[string]interface{}{
+				"type":        "string",
+				"description": "Operating system type",
+				"example":     "linux",
+			},
+			"ContainersPaused": map[string]interface{}{
+				"type":        "integer",
+				"description": "Paused containers (alternative field)",
+				"example":     0,
+				"minimum":     0,
+			},
+			"OSVersion": map[string]interface{}{
+				"type":        "string",
+				"description": "OS version",
+				"example":     "7.1",
+			},
+			"ProductLicense": map[string]interface{}{
+				"type":        "string",
+				"description": "Product license",
+				"example":     "Community Engine",
+			},
+			"last_updated": map[string]interface{}{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "Last update timestamp",
+				"example":     "2025-06-20T01:06:25Z",
 			},
 		},
 		"required": []string{"containers", "containers_running", "containers_paused", "containers_stopped", "images"},
@@ -420,7 +836,7 @@ func getDockerContainerListSchema() map[string]interface{} {
 		"example": []interface{}{
 			map[string]interface{}{
 				"id":     "1234567890ab",
-				"name":   "plex",
+				"name":   "jackett",
 				"status": "running",
 			},
 		},
@@ -479,7 +895,7 @@ func getDockerImageListSchema() map[string]interface{} {
 		"example": []interface{}{
 			map[string]interface{}{
 				"id":   "sha256:abc123",
-				"tags": []string{"nginx:latest"},
+				"tags": []string{"organization/application:latest"},
 				"size": 142000000,
 			},
 		},
