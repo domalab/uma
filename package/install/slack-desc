@@ -1,0 +1,15 @@
+        |-----handy-ruler------------------------------------------------------|
+uma: UMA (Unraid Management Agent)
+uma:
+uma: UMA is a comprehensive monitoring and control system for Unraid servers
+uma: providing REST API access, WebSocket streaming, and MCP server support.
+uma:
+uma: Features:
+uma: - REST API with OpenAPI 3.0.3 documentation
+uma: - Model Context Protocol (MCP) server with 50+ auto-discovered tools
+uma: - WebSocket streaming for real-time monitoring
+uma: - Optimized logging system for Unraid disk space conservation
+uma: - Prometheus metrics integration
+uma:
+uma: Homepage: https://github.com/domalab/uma
+uma:
