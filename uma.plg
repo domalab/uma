@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "uma">
 <!ENTITY author      "Ruaan Deysel">
-<!ENTITY version     "2025.06.21">
+<!ENTITY version     "2025.06.22">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY pluginURL   "https://github.com/domalab/uma/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
@@ -27,6 +27,13 @@
 - Comprehensive MCP documentation and troubleshooting guide
 - Zero conflicts with existing REST API and WebSocket functionality
 - Production-tested on real Unraid hardware with full validation
+- Optimized logging system for Unraid disk space conservation
+- Disabled log file backups (no uma.log.1, uma.log.2, etc.) to prevent disk space issues
+- Set 10MB maximum log file size with automatic truncation when limit reached
+- Added automatic cleanup of existing backup log files on startup
+- Implemented real-time log file size monitoring and disk usage reporting
+- Enhanced configuration validation to prevent backup file creation
+- Maintains all UMA functionality while minimizing /var/log disk usage
 
 ###2025.06.16
 - Phase 3 Enhanced Features: JWT Authentication, Chi Router, Viper Configuration
