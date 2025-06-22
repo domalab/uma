@@ -6,8 +6,7 @@ Markdown="false"
 <style>
 /* Unraid-compatible styling - matches standard plugin appearance */
 .uma-container {
-    font-family: inherit;
-    line-height: inherit;
+    /* No typography declarations - rely on natural inheritance like controlrd */
 }
 
 .uma-status {
@@ -197,7 +196,6 @@ Markdown="false"
     border-radius: 6px;
     padding: 15px;
     margin-bottom: 20px;
-    line-height: 1.5;
     color: #004085;
 }
 
