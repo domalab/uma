@@ -7,7 +7,7 @@
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY pluginURL   "https://github.com/domalab/uma/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY md5         "cf559d87dde1e9089a70681ba72eeae2">
+<!ENTITY md5         "21bb2d159d62bda41826859ef19f0d80">
 ]>
 
 <PLUGIN  name="&name;"
@@ -59,16 +59,7 @@
 </CHANGES>
 
 <!--
-UMA (Unraid Management Agent) is a comprehensive monitoring and control system for Unraid servers.
-
-Phase 3 Enhanced Features:
-- JWT Authentication with role-based access control
-- Enhanced routing with Chi router and middleware
-- Configuration management with Viper and hot reload
-- Optimized 14.4MB binary (28% under 20MB target)
-- Configurable HTTP port with validation
-- Direct Web UI access to Swagger API documentation
-- 100% backward compatibility maintained
+UMA is a comprehensive monitoring and control system for Unraid servers.
 -->
 
 <!--
