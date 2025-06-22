@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"path/filepath"
 
 	"github.com/alecthomas/kong"
 	"github.com/cskr/pubsub"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/domalab/uma/daemon/cmd"
 	"github.com/domalab/uma/daemon/domain"
+	"github.com/domalab/uma/daemon/logger"
 )
 
 var Version string
@@ -32,13 +32,27 @@ func main() {
 	// initializeSentry()
 	// defer sentry.Flush(2 * time.Second)
 
+	// Clean up any existing backup log files first
+	if err := logger.CleanupOldLogFiles(cli.LogsDir); err != nil {
+		log.Printf("Warning: failed to cleanup old log files: %v", err)
+	}
+
+	// Setup optimized file logging for Unraid systems
+	logConfig := logger.UnraidOptimizedConfig(cli.LogsDir)
+	if err := logger.ValidateLogConfiguration(logConfig); err != nil {
+		log.Fatalf("Invalid log configuration: %v", err)
+	}
+
 	log.SetOutput(&lumberjack.Logger{
-		Filename:   filepath.Join(cli.LogsDir, "uma.log"),
-		MaxSize:    1,    // megabytes (reduced from 10MB to 1MB)
-		MaxBackups: 3,    // reduced from 10 to 3 backups
-		MaxAge:     7,    // days (reduced from 28 to 7 days)
-		Compress:   true, // enabled to save space
+		Filename:   logConfig.Filename,
+		MaxSize:    logConfig.MaxSize,    // 10MB limit as requested
+		MaxBackups: logConfig.MaxBackups, // 0 - DISABLED to prevent disk space issues
+		MaxAge:     logConfig.MaxAge,     // 0 - DISABLED for minimal disk usage
+		Compress:   logConfig.Compress,   // false - DISABLED to avoid backup files
 	})
+
+	// Log disk usage information for monitoring
+	logger.LogDiskUsageInfo(cli.LogsDir)
 
 	// Create base configuration
 	config := domain.DefaultConfig()

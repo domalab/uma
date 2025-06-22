@@ -52,9 +52,9 @@ func DefaultConfig() Config {
 		},
 		Logging: LogConfig{
 			Level:      "info",
-			MaxSize:    10,
-			MaxBackups: 10,
-			MaxAge:     28,
+			MaxSize:    10, // 10MB limit as requested
+			MaxBackups: 0,  // DISABLED - no backup files to prevent disk space issues
+			MaxAge:     0,  // DISABLED - no age-based retention
 		},
 		MCP: MCPConfig{
 			Enabled:        false,

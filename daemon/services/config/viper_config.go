@@ -92,13 +92,13 @@ func (c *ViperConfigService) setDefaults() {
 	c.viper.SetDefault("auth.jwt_secret", "")
 	c.viper.SetDefault("auth.token_expiry", "24h")
 
-	// Logging defaults
+	// Logging defaults - optimized for minimal disk usage
 	c.viper.SetDefault("logging.level", "info")
 	c.viper.SetDefault("logging.format", "console")
 	c.viper.SetDefault("logging.file", "")
-	c.viper.SetDefault("logging.max_size", 100)
-	c.viper.SetDefault("logging.max_backups", 3)
-	c.viper.SetDefault("logging.max_age", 28)
+	c.viper.SetDefault("logging.max_size", 10)   // 10MB limit as requested
+	c.viper.SetDefault("logging.max_backups", 0) // DISABLED - no backup files
+	c.viper.SetDefault("logging.max_age", 0)     // DISABLED - no age-based retention
 
 	// Metrics defaults
 	c.viper.SetDefault("metrics.enabled", true)
@@ -383,14 +383,14 @@ auth:
   jwt_secret: ""
   token_expiry: "24h"
 
-# Logging Configuration
+# Logging Configuration - Optimized for minimal disk usage
 logging:
   level: "info"
   format: "console"
   file: ""
-  max_size: 100
-  max_backups: 3
-  max_age: 28
+  max_size: 10      # 10MB limit to prevent disk space issues
+  max_backups: 0    # DISABLED - no backup files
+  max_age: 0        # DISABLED - no age-based retention
 
 # Metrics Configuration
 metrics:
