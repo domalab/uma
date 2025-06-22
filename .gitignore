@@ -31,3 +31,4 @@ build/
 # Configuration files with sensitive data
 config.local.*
 .env.local
+meta/.DS_Store
