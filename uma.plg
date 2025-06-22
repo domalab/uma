@@ -6,8 +6,8 @@
 <!ENTITY version     "2025.06.22">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY pluginURL   "https://github.com/domalab/uma/releases/latest/download/&name;.plg">
-<!ENTITY bundle      "&name;-&version;-x86_64-1.txz">
-<!ENTITY md5         "530ea003daff6c291e197e09ba5c3069">
+<!ENTITY bundle      "&name;-&version;.tgz">
+<!ENTITY md5         "0299411adfea96d6f6c4a158d524acab">
 ]>
 
 <PLUGIN  name="&name;"
@@ -111,10 +111,10 @@ killall uma 2>/dev/null
 rm -rf /usr/local/emhttp/plugins/&name;/* 2>/dev/null
 
 # Remove old 'bundle' files.
-rm -f $(ls /boot/config/plugins/&name;/&name;*.txz 2>/dev/null | grep -v '&version;-x86_64-1.txz')
+rm -f $(ls /boot/config/plugins/&name;/&name;*.tgz 2>/dev/null | grep -v '&version;.tgz')
 
 # Install the 'bundle'.
-tar -xJf /boot/config/plugins/&name;/&bundle; -C /usr/local/emhttp/plugins
+tar -xf /boot/config/plugins/&name;/&bundle; -C /usr/local/emhttp/plugins
 
 # start the plugin if it was running previously
 if [ $running -eq 1 ]; then
