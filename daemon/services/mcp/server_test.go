@@ -197,7 +197,7 @@ func TestServerGetRegistry(t *testing.T) {
 
 	registry := server.GetRegistry()
 	assert.NotNil(t, registry)
-	assert.IsType(t, &OpenAPIToolRegistry{}, registry)
+	assert.IsType(t, &SimpleToolRegistry{}, registry)
 }
 
 // Benchmark tests for performance validation

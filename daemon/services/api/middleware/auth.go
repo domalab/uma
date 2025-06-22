@@ -64,10 +64,9 @@ func DefaultAuthConfig() AuthConfig {
 		RequireAuth: false, // Default to optional auth for backward compatibility
 		ExcludedPaths: []string{
 			"/api/v1/health",
-			"/api/v1/docs",
-			"/api/v1/openapi.json",
 			"/api/v1/auth/login",
 			"/metrics",
+			// Removed OpenAPI documentation paths - system removed
 		},
 		ExcludedMethods: []string{
 			"OPTIONS",

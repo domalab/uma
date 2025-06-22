@@ -51,8 +51,9 @@ ls -la reports/
 
 1. **Implement the handler** in `daemon/services/api/handlers/`
 2. **Register the route** in `daemon/services/api/routes/`
-3. **Add OpenAPI documentation** in `daemon/services/api/openapi/paths/`
-4. **Add schemas** in `daemon/services/api/openapi/schemas/`
+3. **Add OpenAPI path definitions** in `daemon/services/api/openapi/paths/`
+4. **Add response schemas** in `daemon/services/api/openapi/schemas/`
+5. **Update the generator** in `daemon/services/api/openapi/generator.go` to include new paths
 
 #### Modifying Existing Endpoints
 

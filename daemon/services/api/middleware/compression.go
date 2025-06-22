@@ -71,9 +71,9 @@ func DefaultCompressionConfig() CompressionConfig {
 			"/api/v1/storage/zfs",
 			"/api/v1/docker/containers",
 			"/api/v1/notifications",
-			"/api/v1/openapi.json",
 			"/api/v1/system/resources",
 			"/api/v1/system/logs",
+			// Removed OpenAPI path - system removed
 		},
 		CompressibleTypes: []string{
 			"application/json",

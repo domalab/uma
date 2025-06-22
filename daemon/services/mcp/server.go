@@ -18,7 +18,7 @@ import (
 type Server struct {
 	config      config.MCPConfig
 	api         utils.APIInterface
-	registry    *OpenAPIToolRegistry
+	registry    *SimpleToolRegistry
 	upgrader    websocket.Upgrader
 	connections map[string]*Connection
 	mutex       sync.RWMutex
@@ -44,7 +44,7 @@ func NewServer(config config.MCPConfig, api utils.APIInterface) *Server {
 	server := &Server{
 		config:      config,
 		api:         api,
-		registry:    NewOpenAPIToolRegistry(api),
+		registry:    NewSimpleToolRegistry(api),
 		connections: make(map[string]*Connection),
 		ctx:         ctx,
 		cancel:      cancel,
@@ -296,6 +296,6 @@ func generateConnectionID() string {
 }
 
 // GetRegistry returns the tool registry
-func (s *Server) GetRegistry() *OpenAPIToolRegistry {
+func (s *Server) GetRegistry() *SimpleToolRegistry {
 	return s.registry
 }

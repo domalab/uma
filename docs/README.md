@@ -55,5 +55,5 @@ Welcome to the UMA (Unraid Management Agent) documentation. This comprehensive g
 
 - **Current Version**: Latest
 - **API Version**: v1
-- **OpenAPI Specification**: 3.0.3
+- **OpenAPI Specification**: 3.1.1
 - **Go Version**: 1.24

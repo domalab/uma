@@ -12,13 +12,13 @@ type Router struct {
 	mux *http.ServeMux
 
 	// Handlers
-	systemHandler            *handlers.SystemHandler
-	storageHandler           *handlers.StorageHandler
-	dockerHandler            *handlers.DockerHandler
-	vmHandler                *handlers.VMHandler
-	authHandler              *handlers.AuthHandler
-	healthHandler            *handlers.HealthHandler
-	docsHandler              *handlers.DocsHandler
+	systemHandler  *handlers.SystemHandler
+	storageHandler *handlers.StorageHandler
+	dockerHandler  *handlers.DockerHandler
+	vmHandler      *handlers.VMHandler
+	authHandler    *handlers.AuthHandler
+	healthHandler  *handlers.HealthHandler
+
 	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler
 	notificationHandler      *handlers.NotificationHandler
 	asyncHandler             *handlers.AsyncHandler
@@ -28,8 +28,7 @@ type Router struct {
 	diagnosticsHandler       *handlers.DiagnosticsHandler
 	mcpHandler               *handlers.MCPHandler
 
-	// Legacy handlers for gradual migration
-	httpServer interface{} // Will be *HTTPServer during transition
+	// Removed httpServer field - no longer needed for OpenAPI
 }
 
 // NewRouter creates a new router with all handlers
@@ -40,7 +39,6 @@ func NewRouter(
 	vmHandler *handlers.VMHandler,
 	authHandler *handlers.AuthHandler,
 	healthHandler *handlers.HealthHandler,
-	docsHandler *handlers.DocsHandler,
 	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler,
 	notificationHandler *handlers.NotificationHandler,
 	asyncHandler *handlers.AsyncHandler,
@@ -49,7 +47,6 @@ func NewRouter(
 	scriptHandler *handlers.ScriptHandler,
 	diagnosticsHandler *handlers.DiagnosticsHandler,
 	mcpHandler *handlers.MCPHandler,
-	httpServer interface{}, // Legacy server for transition
 ) *Router {
 	return &Router{
 		mux:                      http.NewServeMux(),
@@ -59,7 +56,6 @@ func NewRouter(
 		vmHandler:                vmHandler,
 		authHandler:              authHandler,
 		healthHandler:            healthHandler,
-		docsHandler:              docsHandler,
 		enhancedWebSocketHandler: enhancedWebSocketHandler,
 		notificationHandler:      notificationHandler,
 		asyncHandler:             asyncHandler,
@@ -68,7 +64,6 @@ func NewRouter(
 		scriptHandler:            scriptHandler,
 		diagnosticsHandler:       diagnosticsHandler,
 		mcpHandler:               mcpHandler,
-		httpServer:               httpServer,
 	}
 }
 
@@ -76,7 +71,7 @@ func NewRouter(
 func (r *Router) RegisterRoutes() {
 	// Register routes by domain
 	r.registerHealthRoutes()
-	r.registerDocsRoutes()
+	// Removed registerDocsRoutes() - OpenAPI documentation system removed
 	r.registerAsyncRoutes()
 	r.registerRateLimitRoutes()
 	r.registerSystemRoutes()
@@ -135,11 +130,7 @@ func (r *Router) registerHealthRoutes() {
 	r.mux.HandleFunc("/api/v1/health", r.healthHandler.HandleHealth)
 }
 
-// registerDocsRoutes registers documentation endpoints
-func (r *Router) registerDocsRoutes() {
-	r.mux.HandleFunc("/api/v1/docs", r.docsHandler.SwaggerUIHandler)
-	r.mux.HandleFunc("/api/v1/openapi.json", r.docsHandler.OpenAPIHandler)
-}
+// Removed OpenAPIProvider interface and registerDocsRoutes function - OpenAPI system removed
 
 // registerAsyncRoutes registers async operation endpoints
 func (r *Router) registerAsyncRoutes() {

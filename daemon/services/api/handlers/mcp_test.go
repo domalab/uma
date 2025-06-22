@@ -35,9 +35,9 @@ func (m *MockMCPServer) GetServerStats() map[string]interface{} {
 	}
 }
 
-func (m *MockMCPServer) GetRegistry() *mcp.OpenAPIToolRegistry {
+func (m *MockMCPServer) GetRegistry() *mcp.SimpleToolRegistry {
 	// Return a mock registry for testing
-	return &mcp.OpenAPIToolRegistry{}
+	return &mcp.SimpleToolRegistry{}
 }
 
 // MockAPIWithMCP extends MockAPIInterface to include MCP server

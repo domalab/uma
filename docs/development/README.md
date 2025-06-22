@@ -271,9 +271,11 @@ ssh root@192.168.20.21 "killall uma 2>/dev/null; /tmp/uma boot --http-port 34600
 
 3. **Add OpenAPI documentation**
    ```go
-   // daemon/services/api/handlers/docs.go
-   func (h *DocsHandler) addNewPaths(paths map[string]interface{}) {
-       paths["/new/endpoint"] = h.createGetEndpoint("New", "Description", "Details", "ResponseSchema")
+   // daemon/services/api/openapi/paths/new_paths.go
+   func GetNewPaths() map[string]interface{} {
+       return map[string]interface{}{
+           "/api/v1/new/endpoint": getNewEndpointPath(),
+       }
    }
    ```
 

@@ -37,13 +37,13 @@ type HTTPServer struct {
 	validator       *validator.Validate
 
 	// Handler instances
-	systemHandler            *handlers.SystemHandler
-	storageHandler           *handlers.StorageHandler
-	dockerHandler            *handlers.DockerHandler
-	vmHandler                *handlers.VMHandler
-	authHandler              *handlers.AuthHandler
-	healthHandler            *handlers.HealthHandler
-	docsHandler              *handlers.DocsHandler
+	systemHandler  *handlers.SystemHandler
+	storageHandler *handlers.StorageHandler
+	dockerHandler  *handlers.DockerHandler
+	vmHandler      *handlers.VMHandler
+	authHandler    *handlers.AuthHandler
+	healthHandler  *handlers.HealthHandler
+
 	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler
 	notificationHandler      *handlers.NotificationHandler
 	asyncHandler             *handlers.AsyncHandler
@@ -98,8 +98,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 	httpServer.vmHandler = handlers.NewVMHandler(httpServer.apiAdapter)
 	httpServer.authHandler = handlers.NewAuthHandler(httpServer.apiAdapter)
 	httpServer.healthHandler = handlers.NewHealthHandler(httpServer.apiAdapter, api.ctx.Config.Version)
-	// Use dynamic host detection for Swagger UI - this will be updated at runtime
-	httpServer.docsHandler = handlers.NewDocsHandler(api.ctx.Config.Version, "")
+	// OpenAPI documentation is now handled directly by HTTPServer (no separate docs handler needed)
 	httpServer.enhancedWebSocketHandler = handlers.NewEnhancedWebSocketHandler(httpServer.apiAdapter, api.ctx.Hub)
 	httpServer.notificationHandler = handlers.NewNotificationHandler(httpServer.apiAdapter)
 	httpServer.asyncHandler = handlers.NewAsyncHandler(httpServer.apiAdapter)
@@ -115,7 +114,6 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 		httpServer.vmHandler,
 		httpServer.authHandler,
 		httpServer.healthHandler,
-		httpServer.docsHandler,
 		httpServer.enhancedWebSocketHandler,
 		httpServer.notificationHandler,
 		httpServer.asyncHandler,
@@ -124,7 +122,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 		httpServer.scriptHandler,
 		httpServer.diagnosticsHandler,
 		httpServer.mcpHandler,
-		httpServer, // Pass HTTPServer for legacy handlers during transition
+		// Removed httpServer parameter - OpenAPI system removed
 	)
 
 	return httpServer

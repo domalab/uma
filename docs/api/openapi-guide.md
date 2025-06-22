@@ -1,6 +1,6 @@
 # OpenAPI/Swagger Documentation Guide
 
-UMA provides comprehensive API documentation through OpenAPI 3.0.3 specification with an interactive Swagger UI interface.
+UMA provides comprehensive API documentation through OpenAPI 3.1.1 specification with an interactive Swagger UI interface.
 
 ## Accessing the Documentation
 
