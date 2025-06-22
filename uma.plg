@@ -15,6 +15,9 @@
          version="&version;"
          launch="&launch;"
          pluginURL="&pluginURL;"
+         min="6.9.0"
+         icon="cog"
+         support="https://github.com/domalab/uma"
 >
 
 <CHANGES>
@@ -107,10 +110,10 @@ killall uma 2>/dev/null
 rm -rf /usr/local/emhttp/plugins/&name;/* 2>/dev/null
 
 # Remove old 'bundle' files.
-rm -f $(ls /boot/config/plugins/&name;/&name;*.tgz 2>/dev/null | grep -v '&version;.tgz')
+rm -f $(ls /boot/config/plugins/&name;/&name;*.txz 2>/dev/null | grep -v '&version;-x86_64-1.txz')
 
 # Install the 'bundle'.
-tar -xf /boot/config/plugins/&name;/&bundle; -C /usr/local/emhttp/plugins
+tar -xJf /boot/config/plugins/&name;/&bundle; -C /usr/local/emhttp/plugins
 
 # start the plugin if it was running previously
 if [ $running -eq 1 ]; then
