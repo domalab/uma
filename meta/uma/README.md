@@ -1,3 +1,3 @@
-**OmniRaid**
+# UMA (Unraid Management Agent)
 
-OmniRaid is a comprehensive monitoring and control system for Unraid servers.
+UMA is a comprehensive monitoring and control system for Unraid servers.

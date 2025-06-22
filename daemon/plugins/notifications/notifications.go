@@ -403,7 +403,7 @@ func (nm *NotificationManager) logToSyslog(notification *Notification) {
 		priority = "crit"
 	}
 
-	message := fmt.Sprintf("OmniRaid [%s/%s]: %s - %s",
+	message := fmt.Sprintf("UMA [%s/%s]: %s - %s",
 		notification.Category, notification.Level, notification.Title, notification.Message)
 
 	// Use logger command to write to syslog
