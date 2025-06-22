@@ -1,18 +1,26 @@
 #!/bin/bash
 
 prog="uma"
-running=$(pidof $prog | wc -w)
+logfile="/var/log/uma.log"
+running=$(pidof "$prog" | wc -w)
 
-# no-op if already running
-if [ $running -ge 1 ]; then
+echo "$(date): Stopping UMA service" >> "$logfile"
+
+# stop if running
+if [ "$running" -ge 1 ]; then
+  echo "$(date): UMA is running (PID: $(pidof "$prog")), stopping..." >> "$logfile"
   TIMER=0
-  while $(killall $prog 2>/dev/null); do
+  while killall "$prog" 2>/dev/null; do
     sleep 1
     TIMER=$((TIMER + 1))
     if [ $TIMER -ge 30 ]; then
-      killall -9 $prog
+      echo "$(date): Force killing UMA after 30 seconds" >> "$logfile"
+      killall -9 "$prog"
       sleep 1
       break
     fi
   done
+  echo "$(date): UMA stopped successfully" >> "$logfile"
+else
+  echo "$(date): UMA was not running" >> "$logfile"
 fi

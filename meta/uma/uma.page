@@ -4,10 +4,13 @@ Title="UMA"
 Markdown="false"
 ---
 <style>
+/* Inherit Unraid's default font sizes and styling */
 .uma-container {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
+    font-size: inherit;
+    font-family: inherit;
 }
 .uma-status {
     background: #f5f5f5;
@@ -15,24 +18,39 @@ Markdown="false"
     padding: 15px;
     margin: 20px 0;
     border-radius: 4px;
+    font-size: inherit;
 }
 .uma-status.stopped {
     border-left-color: #ff9800;
+}
+.uma-status h3 {
+    font-size: inherit;
+    margin: 0 0 10px 0;
+}
+.uma-status p {
+    font-size: inherit;
+    margin: 5px 0;
 }
 .uma-form-group {
     margin: 15px 0;
     display: flex;
     align-items: center;
+    font-size: inherit;
 }
 .uma-form-group label {
     min-width: 150px;
     font-weight: bold;
+    font-size: inherit;
 }
 .uma-form-group input, .uma-form-group select {
     margin-left: 10px;
     padding: 5px;
     border: 1px solid #ddd;
     border-radius: 3px;
+    font-size: inherit;
+}
+.uma-form-group small {
+    font-size: 0.9em;
 }
 .uma-button {
     background-color: #4CAF50;
@@ -44,6 +62,7 @@ Markdown="false"
     margin: 5px;
     text-decoration: none;
     display: inline-block;
+    font-size: inherit;
 }
 .uma-button:hover {
     background-color: #45a049;
@@ -61,7 +80,7 @@ Markdown="false"
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: inherit;
     font-weight: bold;
     text-decoration: none;
     display: inline-block;
@@ -77,10 +96,11 @@ Markdown="false"
     border-top: 1px solid #ddd;
     padding-top: 20px;
     margin-top: 30px;
+    font-size: inherit;
 }
 .mcp-info {
     color: #666;
-    font-size: 14px;
+    font-size: 0.9em;
     margin-bottom: 15px;
     line-height: 1.4;
 }
@@ -90,6 +110,10 @@ Markdown="false"
 }
 .mcp-info a:hover {
     text-decoration: underline;
+}
+h4 {
+    font-size: inherit;
+    margin: 15px 0 10px 0;
 }
 </style>
 <?php
@@ -103,27 +127,52 @@ $mcp_enabled = isset($uma_cfg['MCP_ENABLED']) ? $uma_cfg['MCP_ENABLED'] : "disab
 $mcp_port = isset($uma_cfg['MCP_PORT']) ? $uma_cfg['MCP_PORT'] : "34800";
 $mcp_max_connections = isset($uma_cfg['MCP_MAX_CONNECTIONS']) ? $uma_cfg['MCP_MAX_CONNECTIONS'] : "100";
 
-$uma_running = trim(shell_exec("pidof uma | wc -w"));
+// Get process count and validate
+$uma_running = (int)trim(shell_exec("pidof uma 2>/dev/null | wc -w"));
 $uma_version = trim(shell_exec("cat /usr/local/emhttp/plugins/uma/VERSION 2>/dev/null || echo '2025.06.22'"));
 $server_ip = $_SERVER['SERVER_ADDR'];
+
+// Debug logging
+error_log("UMA Debug: Process count = $uma_running, Port = $uma_port, Service = $uma_service");
 
 // Check if UMA is actually running and responding
 $uma_api_responsive = false;
 $mcp_status = "";
+
 if ($uma_running >= 1) {
-    // Test if API is responsive
-    $context = stream_context_create(['http' => ['timeout' => 2]]);
-    $health_response = @file_get_contents("http://localhost:$uma_port/api/v1/health", false, $context);
-    $uma_api_responsive = ($health_response !== false);
+    // Give the service a moment to fully start if it was just started
+    if (isset($_POST['SERVICE']) && $_POST['SERVICE'] == 'enable') {
+        sleep(2);
+    }
+
+    // Test if API is responsive with longer timeout
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 5,
+            'ignore_errors' => true,
+            'method' => 'GET'
+        ]
+    ]);
+
+    $health_url = "http://localhost:$uma_port/api/v1/health";
+    error_log("UMA Debug: Testing health endpoint: $health_url");
+
+    $health_response = @file_get_contents($health_url, false, $context);
+    $uma_api_responsive = ($health_response !== false && !empty($health_response));
+
+    error_log("UMA Debug: Health response = " . ($health_response ? "SUCCESS" : "FAILED"));
 
     // Check MCP status if UMA is running and responsive
     if ($uma_api_responsive && $mcp_enabled == "enable") {
-        $mcp_status_json = @file_get_contents("http://localhost:$uma_port/api/v1/mcp/config", false, $context);
+        $mcp_config_url = "http://localhost:$uma_port/api/v1/mcp/config";
+        $mcp_status_json = @file_get_contents($mcp_config_url, false, $context);
         if ($mcp_status_json) {
             $mcp_status_data = json_decode($mcp_status_json, true);
             $mcp_status = isset($mcp_status_data['data']['enabled']) && $mcp_status_data['data']['enabled'] ? "running" : "disabled";
         }
     }
+} else {
+    error_log("UMA Debug: No UMA processes found");
 }
 ?>
 
@@ -227,6 +276,13 @@ $(function(){
 	showStatus('<?=$sName;?>');
 	checkRUNNING(document.uma_settings);
 	checkMCPSettings(document.uma_settings);
+
+	// Auto-refresh status every 10 seconds if service was just started
+	if (window.location.search.includes('refresh=1')) {
+		setTimeout(function() {
+			window.location.href = window.location.pathname;
+		}, 3000);
+	}
 });
 
 function isNumber(value) {
@@ -322,5 +378,14 @@ function verifyDATA(form) {
 		form.MCP_PORT.value = parseInt(form.MCP_PORT.value).toString();
 		form.MCP_MAX_CONNECTIONS.value = parseInt(form.MCP_MAX_CONNECTIONS.value).toString();
 	}
+
+	// If enabling the service, trigger a refresh after submission
+	if (form.SERVICE.value == "enable") {
+		setTimeout(function() {
+			window.location.href = window.location.pathname + "?refresh=1";
+		}, 2000);
+	}
+
+	return true;
 }
 </script>
