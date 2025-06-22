@@ -103,39 +103,51 @@ $mcp_enabled = isset($uma_cfg['MCP_ENABLED']) ? $uma_cfg['MCP_ENABLED'] : "disab
 $mcp_port = isset($uma_cfg['MCP_PORT']) ? $uma_cfg['MCP_PORT'] : "34800";
 $mcp_max_connections = isset($uma_cfg['MCP_MAX_CONNECTIONS']) ? $uma_cfg['MCP_MAX_CONNECTIONS'] : "100";
 
-$uma_running = shell_exec("pidof uma | wc -w");
-$uma_version = shell_exec("cat /usr/local/emhttp/plugins/uma/VERSION | tr '\n' ' '");
+$uma_running = trim(shell_exec("pidof uma | wc -w"));
+$uma_version = trim(shell_exec("cat /usr/local/emhttp/plugins/uma/VERSION 2>/dev/null || echo '2025.06.22'"));
 $server_ip = $_SERVER['SERVER_ADDR'];
 
-// Check MCP status if UMA is running
+// Check if UMA is actually running and responding
+$uma_api_responsive = false;
 $mcp_status = "";
-if ($uma_running == 1) {
-    $mcp_status_json = @file_get_contents("http://localhost:$uma_port/api/v1/mcp/status");
-    if ($mcp_status_json) {
-        $mcp_status_data = json_decode($mcp_status_json, true);
-        $mcp_status = isset($mcp_status_data['data']['status']) ? $mcp_status_data['data']['status'] : "unknown";
+if ($uma_running >= 1) {
+    // Test if API is responsive
+    $context = stream_context_create(['http' => ['timeout' => 2]]);
+    $health_response = @file_get_contents("http://localhost:$uma_port/api/v1/health", false, $context);
+    $uma_api_responsive = ($health_response !== false);
+
+    // Check MCP status if UMA is running and responsive
+    if ($uma_api_responsive && $mcp_enabled == "enable") {
+        $mcp_status_json = @file_get_contents("http://localhost:$uma_port/api/v1/mcp/config", false, $context);
+        if ($mcp_status_json) {
+            $mcp_status_data = json_decode($mcp_status_json, true);
+            $mcp_status = isset($mcp_status_data['data']['enabled']) && $mcp_status_data['data']['enabled'] ? "running" : "disabled";
+        }
     }
 }
 ?>
 
 <div class="uma-container">
-	<div class="uma-status <?php echo ($uma_running == 1) ? '' : 'stopped'; ?>">
-		<h3>UMA (Unraid Management Agent) <?=$uma_version;?></h3>
-		<?php if ($uma_running == 1): ?>
+	<div class="uma-status <?php echo ($uma_running >= 1 && $uma_api_responsive) ? '' : 'stopped'; ?>">
+		<h3>UMA (Unraid Management Agent)</h3>
+		<?php if ($uma_running >= 1 && $uma_api_responsive): ?>
 			<p style="color: green; font-weight: bold;">✓ Service is running</p>
 			<p>HTTP API available on port <?=$uma_port;?></p>
+		<?php elseif ($uma_running >= 1 && !$uma_api_responsive): ?>
+			<p style="color: orange; font-weight: bold;">⚠ Service is starting or not responding</p>
+			<p>Please wait a moment and refresh the page</p>
 			<?php if ($mcp_enabled == "enable"): ?>
 				<?php if ($mcp_status == "running"): ?>
 					<p style="color: green;">✓ MCP Server is running on port <?=$mcp_port;?></p>
 				<?php elseif ($mcp_status == "disabled"): ?>
-					<p style="color: orange;">⚠ MCP Server is disabled</p>
+					<p style="color: orange;">⚠ MCP Server is disabled in configuration</p>
 				<?php else: ?>
-					<p style="color: red;">✗ MCP Server status unknown</p>
+					<p style="color: #666;">MCP Server status: checking...</p>
 				<?php endif; ?>
 			<?php else: ?>
 				<p style="color: #666;">MCP Server is disabled</p>
 			<?php endif; ?>
-			<p>Phase 3 Enhanced Features: JWT Authentication, Chi Router, Viper Configuration, MCP Protocol</p>
+			<p>Features: REST API, WebSocket Streaming, MCP Protocol, Optimized Logging</p>
 			<a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
 				🚀 Open Web UI (Swagger API Documentation)
 			</a>
@@ -193,7 +205,7 @@ if ($uma_running == 1) {
 
 
 
-		<?php if ($uma_running == 1): ?>
+		<?php if ($uma_running >= 1 && $uma_api_responsive): ?>
 		<div class="uma-form-group">
 			<label>Quick Access:</label>
 			<a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
@@ -231,7 +243,8 @@ function resetDATA(form) {
 }
 
 function checkRUNNING(form) {
-	if (<?=$uma_running;?> == 1)
+	var isRunning = <?=$uma_running;?> >= 1 && <?=$uma_api_responsive ? 'true' : 'false';?>;
+	if (isRunning)
 	{
 		$(".stopped").prop("disabled", true);
 		form.btnApply.disabled = "disabled";

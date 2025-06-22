@@ -7,7 +7,7 @@
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY pluginURL   "https://github.com/domalab/uma/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;-x86_64-1.txz">
-<!ENTITY md5         "a4fd3b5d0886ef00793ec413ef3399ac">
+<!ENTITY md5         "530ea003daff6c291e197e09ba5c3069">
 ]>
 
 <PLUGIN  name="&name;"
@@ -16,8 +16,9 @@
          launch="&launch;"
          pluginURL="&pluginURL;"
          min="6.9.0"
-         icon="cog"
+         icon="uma.png"
          support="https://github.com/domalab/uma"
+         category="Utilities"
 >
 
 <CHANGES>
