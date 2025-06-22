@@ -1,0 +1,120 @@
+🔍 Validating API schemas against live endpoints...
+Base URL: http://192.168.20.21:34600
+Total endpoints to validate: 33
+
+[1/33] Validating /api/v1/system/cpu...
+  📝 CPU information and performance metrics
+  ❌ Error: failed to get schema for CPUInfo: schema CPUInfo not found
+[2/33] Validating /api/v1/system/memory...
+  📝 System memory information
+  ❌ Error: failed to get schema for MemoryInfo: schema MemoryInfo not found
+[3/33] Validating /api/v1/system/temperature...
+  📝 Temperature sensors data
+  ❌ Error: failed to get schema for TemperatureInfo: no components found in spec
+[4/33] Validating /api/v1/system/network...
+  📝 Network interface information
+  ❌ Error: failed to get schema for NetworkInfo: no components found in spec
+[5/33] Validating /api/v1/system/ups...
+  📝 UPS status and information
+  ❌ Error: failed to get schema for UPSInfo: no components found in spec
+[6/33] Validating /api/v1/system/gpu...
+  📝 GPU information and statistics
+  ❌ Error: failed to get schema for GPUInfo: no components found in spec
+[7/33] Validating /api/v1/system/fans...
+  📝 Fan speed and status data
+  ❌ Error: failed to get schema for FanInfo: no components found in spec
+[8/33] Validating /api/v1/system/resources...
+  📝 Combined system resources
+  ❌ Error: failed to get schema for SystemResources: no components found in spec
+[9/33] Validating /api/v1/system/filesystems...
+  📝 Filesystem information
+  ❌ Error: failed to get schema for FilesystemInfo: no components found in spec
+[10/33] Validating /api/v1/system/info...
+  📝 General system information
+  ❌ Error: failed to get schema for SystemInfo: no components found in spec
+[11/33] Validating /api/v1/system/logs...
+  📝 System log entries
+  ❌ Error: failed to get schema for SystemLogs: no components found in spec
+[12/33] Validating /api/v1/system/parity/disk...
+  📝 Parity disk information
+  ❌ Error: failed to get schema for ParityDiskInfo: no components found in spec
+[13/33] Validating /api/v1/system/parity/check...
+  📝 Parity check status
+  ❌ Error: failed to get schema for ParityCheckStatus: no components found in spec
+[14/33] Validating /api/v1/storage/array...
+  📝 Storage array information
+  ❌ Error: failed to get schema for ArrayInfo: no components found in spec
+[15/33] Validating /api/v1/storage/disks...
+  📝 List of storage disks
+  ❌ Error: failed to get schema for DiskList: no components found in spec
+[16/33] Validating /api/v1/storage/boot...
+  📝 Boot device information
+  ❌ Error: failed to get schema for BootInfo: no components found in spec
+[17/33] Validating /api/v1/storage/cache...
+  📝 Cache storage information
+  ❌ Error: failed to get schema for CacheInfo: no components found in spec
+[18/33] Validating /api/v1/storage/general...
+  📝 General storage information
+  ❌ Error: failed to get schema for StorageGeneral: no components found in spec
+[19/33] Validating /api/v1/storage/zfs...
+  📝 ZFS storage information
+  ❌ Error: failed to get schema for ZFSInfo: no components found in spec
+[20/33] Validating /api/v1/docker/containers...
+  📝 List of Docker containers
+  ❌ Error: failed to get schema for DockerContainerList: no components found in spec
+[21/33] Validating /api/v1/docker/info...
+  📝 Docker system information
+  ❌ Error: failed to get schema for DockerInfo: no components found in spec
+[22/33] Validating /api/v1/docker/images...
+  📝 List of Docker images
+  ❌ Error: failed to get schema for DockerImageList: no components found in spec
+[23/33] Validating /api/v1/docker/networks...
+  📝 List of Docker networks
+  ❌ Error: failed to get schema for DockerNetworkList: no components found in spec
+[24/33] Validating /api/v1/vms...
+  📝 List of virtual machines
+  ❌ Error: failed to get schema for VMList: no components found in spec
+[25/33] Validating /api/v1/health...
+  📝 API health status
+  ❌ Error: failed to get schema for HealthResponse: no components found in spec
+[26/33] Validating /api/v1/diagnostics/health...
+  📝 System diagnostics health
+  ❌ Error: failed to get schema for DiagnosticsHealth: no components found in spec
+[27/33] Validating /api/v1/diagnostics/info...
+  📝 Diagnostics information
+  ❌ Error: failed to get schema for DiagnosticsInfo: no components found in spec
+[28/33] Validating /api/v1/operations...
+  📝 List of async operations
+  ❌ Error: failed to get schema for OperationList: no components found in spec
+[29/33] Validating /api/v1/operations/stats...
+  📝 Operation statistics
+  ❌ Error: failed to get schema for OperationStats: no components found in spec
+[30/33] Validating /api/v1/notifications...
+  📝 List of notifications
+  ❌ Error: failed to get schema for NotificationList: no components found in spec
+[31/33] Validating /api/v1/notifications/stats...
+  📝 Notification statistics
+  ❌ Error: failed to get schema for NotificationStats: no components found in spec
+[32/33] Validating /api/v1/metrics...
+  📝 Prometheus metrics endpoint
+  ❌ Error: failed to get schema for StandardResponse: no components found in spec
+[33/33] Validating /api/v1/ws...
+  📝 Unified WebSocket with subscription management
+  ❌ Error: failed to get schema for UnifiedWebSocketStream: no components found in spec
+
+📊 Validation Summary:
+✅ Successfully validated: 0
+❌ Validation errors: 33
+⏭️  Skipped: 0
+📈 Coverage: 0.0% (0/33)
+
+🔍 API-Schema Validation Report
+=====================================
+🚨 Critical Issues: 0
+⚠️  Warnings: 0
+ℹ️  Info: 0
+
+📄 Detailed report saved to schema-validation-report.json
+
+📋 Generating coverage report...
+2025/06/22 18:34:19 Failed to generate coverage report: no paths found in OpenAPI spec

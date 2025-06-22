@@ -1,0 +1,870 @@
+{
+  "total_routes": 75,
+  "categories": {
+    "Authentication": 3,
+    "Diagnostics": 3,
+    "Docker": 8,
+    "Documentation": 1,
+    "Health": 1,
+    "Notifications": 5,
+    "Operations": 3,
+    "Other": 14,
+    "Rate Limiting": 2,
+    "Scripts": 2,
+    "Shares": 2,
+    "Storage": 8,
+    "System": 20,
+    "VMs": 2,
+    "WebSocket": 1
+  },
+  "routes": [
+    {
+      "path": "/api/v1/auth/login",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.authHandler.HandleAuthLogin",
+      "file": "daemon/services/api/routes/auth.go",
+      "line": 6,
+      "category": "Authentication",
+      "description": "auth Handler endpoint"
+    },
+    {
+      "path": "/api/v1/auth/stats",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.authHandler.HandleAuthStats",
+      "file": "daemon/services/api/routes/auth.go",
+      "line": 8,
+      "category": "Authentication",
+      "description": "auth Handler endpoint"
+    },
+    {
+      "path": "/api/v1/auth/users",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.authHandler.HandleAuthUsers",
+      "file": "daemon/services/api/routes/auth.go",
+      "line": 7,
+      "category": "Authentication",
+      "description": "auth Handler endpoint"
+    },
+    {
+      "path": "/api/v1/diagnostics/health",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.diagnosticsHandler.HandleDiagnosticsHealth",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 183,
+      "category": "Diagnostics",
+      "description": "diagnostics Handler endpoint"
+    },
+    {
+      "path": "/api/v1/diagnostics/info",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.diagnosticsHandler.HandleDiagnosticsInfo",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 184,
+      "category": "Diagnostics",
+      "description": "diagnostics Handler endpoint"
+    },
+    {
+      "path": "/api/v1/diagnostics/repair",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.diagnosticsHandler.HandleDiagnosticsRepair",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 185,
+      "category": "Diagnostics",
+      "description": "diagnostics Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/containers",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.dockerHandler.HandleDockerContainers",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 6,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/containers/",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.dockerHandler.HandleDockerContainer",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 17,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/containers/bulk/restart",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.dockerHandler.HandleDockerBulkRestart",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 14,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/containers/bulk/start",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.dockerHandler.HandleDockerBulkStart",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 12,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/containers/bulk/stop",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.dockerHandler.HandleDockerBulkStop",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 13,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/images",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.dockerHandler.HandleDockerImages",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 8,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/info",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.dockerHandler.HandleDockerInfo",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 9,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docker/networks",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.dockerHandler.HandleDockerNetworks",
+      "file": "daemon/services/api/routes/docker.go",
+      "line": 7,
+      "category": "Docker",
+      "description": "docker Handler endpoint"
+    },
+    {
+      "path": "/api/v1/docs",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.docsHandler.SwaggerUIHandler",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 140,
+      "category": "Documentation",
+      "description": "docs Handler endpoint"
+    },
+    {
+      "path": "/api/v1/gpu",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleGPU",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 22,
+      "category": "Other",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/health",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.healthHandler.HandleHealth",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 135,
+      "category": "Health",
+      "description": "health Handler endpoint"
+    },
+    {
+      "path": "/api/v1/notifications",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.notificationHandler.HandleNotifications",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 162,
+      "category": "Notifications",
+      "description": "notification Handler endpoint"
+    },
+    {
+      "path": "/api/v1/notifications/",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.notificationHandler.HandleNotification",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 163,
+      "category": "Notifications",
+      "description": "notification Handler endpoint"
+    },
+    {
+      "path": "/api/v1/notifications/clear",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.notificationHandler.HandleNotificationsClear",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 164,
+      "category": "Notifications",
+      "description": "notification Handler endpoint"
+    },
+    {
+      "path": "/api/v1/notifications/mark-all-read",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.notificationHandler.HandleNotificationsMarkAllRead",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 166,
+      "category": "Notifications",
+      "description": "notification Handler endpoint"
+    },
+    {
+      "path": "/api/v1/notifications/stats",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.notificationHandler.HandleNotificationsStats",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 165,
+      "category": "Notifications",
+      "description": "notification Handler endpoint"
+    },
+    {
+      "path": "/api/v1/openapi.json",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.docsHandler.OpenAPIHandler",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 141,
+      "category": "Other",
+      "description": "docs Handler endpoint"
+    },
+    {
+      "path": "/api/v1/operations",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.asyncHandler.HandleAsyncOperations",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 146,
+      "category": "Operations",
+      "description": "async Handler endpoint"
+    },
+    {
+      "path": "/api/v1/operations/",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.asyncHandler.HandleAsyncOperation",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 147,
+      "category": "Operations",
+      "description": "async Handler endpoint"
+    },
+    {
+      "path": "/api/v1/operations/stats",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.asyncHandler.HandleAsyncStats",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 148,
+      "category": "Operations",
+      "description": "async Handler endpoint"
+    },
+    {
+      "path": "/api/v1/rate-limits/config",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.rateLimitHandler.HandleRateLimitConfig",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 154,
+      "category": "Rate Limiting",
+      "description": "rate Limit Handler endpoint"
+    },
+    {
+      "path": "/api/v1/rate-limits/stats",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.rateLimitHandler.HandleRateLimitStats",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 153,
+      "category": "Rate Limiting",
+      "description": "rate Limit Handler endpoint"
+    },
+    {
+      "path": "/api/v1/scripts",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.scriptHandler.HandleScriptsList",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 177,
+      "category": "Scripts",
+      "description": "script Handler endpoint"
+    },
+    {
+      "path": "/api/v1/scripts/",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.scriptHandler.HandleScript",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 178,
+      "category": "Scripts",
+      "description": "script Handler endpoint"
+    },
+    {
+      "path": "/api/v1/shares",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.shareHandler.HandleShares",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 171,
+      "category": "Shares",
+      "description": "share Handler endpoint"
+    },
+    {
+      "path": "/api/v1/shares/",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.shareHandler.HandleShare",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 172,
+      "category": "Shares",
+      "description": "share Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/array",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.storageHandler.HandleStorageArray",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 7,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/array/start",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.storageHandler.HandleArrayStart",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 14,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/array/stop",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.storageHandler.HandleArrayStop",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 15,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/boot",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.storageHandler.HandleStorageBoot",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 9,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/cache",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.storageHandler.HandleStorageCache",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 8,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/disks",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.storageHandler.HandleStorageDisks",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 6,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/general",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.storageHandler.HandleStorageGeneral",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 11,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/storage/zfs",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.storageHandler.HandleStorageZFS",
+      "file": "daemon/services/api/routes/storage.go",
+      "line": 10,
+      "category": "Storage",
+      "description": "storage Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/cpu",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemCPU",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 7,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/execute",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.systemHandler.HandleSystemExecute",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 26,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/fans",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemFans",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 9,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/filesystems",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemFilesystems",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 15,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/gpu",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemGPU",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 11,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/info",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemInfo",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 6,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/logs",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemLogs",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 29,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/logs/all",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemLogsAll",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 30,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/memory",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemMemory",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 8,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/network",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemNetwork",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 13,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/parity/check",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleParityCheck",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 19,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/parity/disk",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleParityDisk",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 18,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/reboot",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.systemHandler.HandleSystemReboot",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 27,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/resources",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemResources",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 14,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/scripts",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemScripts",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 25,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/shutdown",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "handler": "r.systemHandler.HandleSystemShutdown",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 28,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/temperature",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemTemperature",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 10,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/temperature/alerts",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleTemperatureAlerts",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 34,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/temperature/thresholds",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleTemperatureThresholds",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 33,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/system/ups",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.systemHandler.HandleSystemUPS",
+      "file": "daemon/services/api/routes/system.go",
+      "line": 12,
+      "category": "System",
+      "description": "system Handler endpoint"
+    },
+    {
+      "path": "/api/v1/vms",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.vmHandler.HandleVMList",
+      "file": "daemon/services/api/routes/vm.go",
+      "line": 6,
+      "category": "VMs",
+      "description": "vm Handler endpoint"
+    },
+    {
+      "path": "/api/v1/vms/",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.vmHandler.HandleVM",
+      "file": "daemon/services/api/routes/vm.go",
+      "line": 7,
+      "category": "VMs",
+      "description": "vm Handler endpoint"
+    },
+    {
+      "path": "/api/v1/ws",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.enhancedWebSocketHandler.HandleUnifiedWebSocket",
+      "file": "daemon/services/api/routes/websocket.go",
+      "line": 6,
+      "category": "WebSocket",
+      "description": "enhanced Web Socket Handler endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/config",
+      "methods": [
+        "GET"
+      ],
+      "handler": "mcpHandler.GetMCPConfig",
+      "file": "daemon/services/api/routes/mcp.go",
+      "line": 16,
+      "category": "Other",
+      "description": "Get MCPConfig endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/config",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.mcpHandler.GetMCPConfig",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 192,
+      "category": "Other",
+      "description": "mcp Handler endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/status",
+      "methods": [
+        "GET"
+      ],
+      "handler": "mcpHandler.GetMCPStatus",
+      "file": "daemon/services/api/routes/mcp.go",
+      "line": 15,
+      "category": "Other",
+      "description": "Get MCPStatus endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/status",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.mcpHandler.GetMCPStatus",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 191,
+      "category": "Other",
+      "description": "mcp Handler endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/tools",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.mcpHandler.GetMCPTools",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 196,
+      "category": "Other",
+      "description": "mcp Handler endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/tools",
+      "methods": [
+        "GET"
+      ],
+      "handler": "mcpHandler.GetMCPTools",
+      "file": "daemon/services/api/routes/mcp.go",
+      "line": 20,
+      "category": "Other",
+      "description": "Get MCPTools endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/tools/categories",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.mcpHandler.GetMCPToolsByCategory",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 197,
+      "category": "Other",
+      "description": "mcp Handler endpoint"
+    },
+    {
+      "path": "GET /api/v1/mcp/tools/categories",
+      "methods": [
+        "GET"
+      ],
+      "handler": "mcpHandler.GetMCPToolsByCategory",
+      "file": "daemon/services/api/routes/mcp.go",
+      "line": 21,
+      "category": "Other",
+      "description": "Get MCPTools By Category endpoint"
+    },
+    {
+      "path": "POST /api/v1/mcp/tools/refresh",
+      "methods": [
+        "GET"
+      ],
+      "handler": "r.mcpHandler.RefreshMCPTools",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 198,
+      "category": "Other",
+      "description": "mcp Handler endpoint"
+    },
+    {
+      "path": "POST /api/v1/mcp/tools/refresh",
+      "methods": [
+        "GET"
+      ],
+      "handler": "mcpHandler.RefreshMCPTools",
+      "file": "daemon/services/api/routes/mcp.go",
+      "line": 22,
+      "category": "Other",
+      "description": "Refresh MCPTools endpoint"
+    },
+    {
+      "path": "PUT /api/v1/mcp/config",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "handler": "mcpHandler.UpdateMCPConfig",
+      "file": "daemon/services/api/routes/mcp.go",
+      "line": 17,
+      "category": "Other",
+      "description": "Update MCPConfig endpoint"
+    },
+    {
+      "path": "PUT /api/v1/mcp/config",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "handler": "r.mcpHandler.UpdateMCPConfig",
+      "file": "daemon/services/api/routes/router.go",
+      "line": 193,
+      "category": "Other",
+      "description": "mcp Handler endpoint"
+    }
+  ],
+  "websocket_paths": [],
+  "plugin_routes": [],
+  "summary": {
+    "api_routes": 75,
+    "categories": 15,
+    "plugin_routes": 0,
+    "total_endpoints": 75,
+    "websocket_paths": 0
+  }
+}
