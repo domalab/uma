@@ -4,88 +4,257 @@ Title="UMA"
 Markdown="false"
 ---
 <style>
-/* Ultra-minimal CSS - Match Community Applications pattern */
+/* Unraid-compatible styling - matches standard plugin appearance */
+.uma-container {
+    font-family: inherit;
+    line-height: inherit;
+}
+
 .uma-status {
-    background: #f5f5f5;
-    border-left: 4px solid #4CAF50;
-    padding: 15px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-left: 4px solid #28a745;
+    padding: 20px;
     margin: 20px 0;
-    border-radius: 4px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+
 .uma-status.stopped {
-    border-left-color: #ff9800;
+    border-left-color: #ffc107;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
 }
+
+.uma-status.error {
+    border-left-color: #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #f1aeb5 100%);
+}
+
+.uma-status h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.uma-status-text {
+    margin: 8px 0;
+}
+
+.uma-status-text.success {
+    color: #155724;
+    font-weight: 600;
+}
+
+.uma-status-text.warning {
+    color: #856404;
+    font-weight: 600;
+}
+
+.uma-status-text.info {
+    color: #0c5460;
+}
+
+/* Form styling to match Unraid standards */
+.uma-form-section {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 25px;
+    margin: 20px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.uma-form-section h4 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
 .uma-form-group {
-    margin: 15px 0;
+    margin: 18px 0;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
 }
+
 .uma-form-group label {
-    min-width: 150px;
-    font-weight: bold;
+    min-width: 160px;
+    font-weight: 600;
+    color: #495057;
+    margin-right: 15px;
 }
-.uma-form-group input, .uma-form-group select {
-    margin-left: 10px;
-    padding: 5px;
-    border: 1px solid #ddd;
-    border-radius: 3px;
+
+.uma-form-group input,
+.uma-form-group select {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background-color: #fff;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
+
+.uma-form-group input:focus, 
+.uma-form-group select:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.uma-form-group small {
+    margin-left: 15px;
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Button styling */
+.uma-button-group {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #dee2e6;
+    text-align: left;
+}
+
 .uma-button {
-    background-color: #4CAF50;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     color: white;
     padding: 10px 20px;
     border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    margin: 5px;
-    text-decoration: none;
-    display: inline-block;
-}
-.uma-button:hover {
-    background-color: #45a049;
-}
-.uma-button.secondary {
-    background-color: #2196F3;
-}
-.uma-button.secondary:hover {
-    background-color: #1976D2;
-}
-.uma-web-ui-link {
-    background-color: #2196F3;
-    color: white;
-    padding: 12px 24px;
-    border: none;
     border-radius: 6px;
     cursor: pointer;
-    font-weight: bold;
+    margin: 5px 10px 5px 0;
     text-decoration: none;
     display: inline-block;
-    margin: 10px 0;
-    transition: background-color 0.3s;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+
+.uma-button:hover {
+    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.uma-button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.uma-button.success {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+}
+
+.uma-button.success:hover {
+    background: linear-gradient(135deg, #1e7e34 0%, #155724 100%);
+}
+
+.uma-button.secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+}
+
+.uma-button.secondary:hover {
+    background: linear-gradient(135deg, #495057 0%, #343a40 100%);
+}
+
+.uma-web-ui-link {
+    background: linear-gradient(135deg, #17a2b8 0%, #117a8b 100%);
+    color: white !important;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: none !important;
+    display: inline-block;
+    margin: 15px 0;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+}
+
 .uma-web-ui-link:hover {
-    background-color: #1976D2;
-    color: white;
-    text-decoration: none;
+    background: linear-gradient(135deg, #117a8b 0%, #0c5460 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+    color: white !important;
 }
+
+/* MCP Section */
 .mcp-section {
-    border-top: 1px solid #ddd;
-    padding-top: 20px;
-    margin-top: 30px;
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
 }
+
 .mcp-info {
-    color: #666;
-    margin-bottom: 15px;
-    line-height: 1.4;
+    background: #e7f3ff;
+    border: 1px solid #b8daff;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+    line-height: 1.5;
+    color: #004085;
 }
+
 .mcp-info a {
-    color: #2196F3;
+    color: #0056b3;
     text-decoration: none;
+    font-weight: 600;
 }
+
 .mcp-info a:hover {
     text-decoration: underline;
 }
+
+/* Status icons */
+.status-icon {
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.status-icon.success {
+    color: #28a745;
+}
+
+.status-icon.warning {
+    color: #ffc107;
+}
+
+.status-icon.error {
+    color: #dc3545;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .uma-form-group {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .uma-form-group label {
+        min-width: auto;
+        margin-bottom: 8px;
+        margin-right: 0;
+    }
+    
+    .uma-form-group small {
+        margin-left: 0;
+        margin-top: 5px;
+    }
+}
+
+/* Hide MCP fields when disabled */
+.mcp-field-hidden {
+    display: none !important;
+}
 </style>
+
+<div class="uma-container">
 <?php
 $sName = "uma";
 $uma_cfg = parse_plugin_cfg("uma");
@@ -146,216 +315,230 @@ if ($uma_running >= 1) {
 }
 ?>
 
-<div>
-	<div class="uma-status <?php echo ($uma_running >= 1 && $uma_api_responsive) ? '' : 'stopped'; ?>">
-		<h3>UMA (Unraid Management Agent)</h3>
-		<?php if ($uma_running >= 1 && $uma_api_responsive): ?>
-			<p style="color: green; font-weight: bold;">✓ Service is running</p>
-			<p>HTTP API available on port <?=$uma_port;?></p>
-		<?php elseif ($uma_running >= 1 && !$uma_api_responsive): ?>
-			<p style="color: orange; font-weight: bold;">⚠ Service is starting or not responding</p>
-			<p>Please wait a moment and refresh the page</p>
-			<?php if ($mcp_enabled == "enable"): ?>
-				<?php if ($mcp_status == "running"): ?>
-					<p style="color: green;">✓ MCP Server is running on port <?=$mcp_port;?></p>
-				<?php elseif ($mcp_status == "disabled"): ?>
-					<p style="color: orange;">⚠ MCP Server is disabled in configuration</p>
-				<?php else: ?>
-					<p style="color: #666;">MCP Server status: checking...</p>
-				<?php endif; ?>
-			<?php else: ?>
-				<p style="color: #666;">MCP Server is disabled</p>
-			<?php endif; ?>
-			<p>Features: REST API, WebSocket Streaming, MCP Protocol, Optimized Logging</p>
-			<a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
-				🚀 Open Web UI (Swagger API Documentation)
-			</a>
-		<?php else: ?>
-			<p style="color: orange; font-weight: bold;">⚠ Service is not running</p>
-			<p>Configure and start the service below to access the Web UI</p>
-		<?php endif; ?>
-	</div>
+    <!-- Status Section -->
+    <div class="uma-status <?php echo ($uma_running >= 1 && $uma_api_responsive) ? '' : (($uma_running >= 1) ? 'warning' : 'stopped'); ?>">
+        <h3>UMA (Unraid Management Agent)</h3>
+        
+        <?php if ($uma_running >= 1 && $uma_api_responsive): ?>
+            <p class="uma-status-text success">
+                <span class="status-icon success">✓</span>Service is running and responsive
+            </p>
+            <p class="uma-status-text info">HTTP API available on port <?=$uma_port;?></p>
+            
+            <?php if ($mcp_enabled == "enable"): ?>
+                <?php if ($mcp_status == "running"): ?>
+                    <p class="uma-status-text success">
+                        <span class="status-icon success">✓</span>MCP Server is running on port <?=$mcp_port;?>
+                    </p>
+                <?php elseif ($mcp_status == "disabled"): ?>
+                    <p class="uma-status-text warning">
+                        <span class="status-icon warning">⚠</span>MCP Server is disabled in configuration
+                    </p>
+                <?php else: ?>
+                    <p class="uma-status-text info">MCP Server status: checking...</p>
+                <?php endif; ?>
+            <?php endif; ?>
+            
+            <p class="uma-status-text info">
+                Features: REST API, WebSocket Streaming, MCP Protocol, Optimized Logging
+            </p>
+            
+            <a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
+                🚀 Open Web UI (Swagger API Documentation)
+            </a>
+            
+        <?php elseif ($uma_running >= 1 && !$uma_api_responsive): ?>
+            <p class="uma-status-text warning">
+                <span class="status-icon warning">⚠</span>Service is starting or not responding
+            </p>
+            <p class="uma-status-text info">Please wait a moment and refresh the page</p>
+            
+        <?php else: ?>
+            <p class="uma-status-text warning">
+                <span class="status-icon warning">⚠</span>Service is not running
+            </p>
+            <p class="uma-status-text info">Configure and start the service below to access the Web UI</p>
+        <?php endif; ?>
+    </div>
 
-	<form name="uma_settings" method="POST" action="/update.php" target="progressFrame" style="margin-top: 20px;">
-		<input type="hidden" name="#file" value="uma/uma.cfg" />
-		<input type="hidden" id="command" name="#command" value="" />
+    <!-- Configuration Form -->
+    <form name="uma_settings" method="POST" action="/update.php" target="progressFrame">
+        <input type="hidden" name="#file" value="uma/uma.cfg" />
+        <input type="hidden" id="command" name="#command" value="" />
 
-		<h4>Configuration Settings</h4>
+        <!-- Basic Configuration -->
+        <div class="uma-form-section">
+            <h4>Basic Configuration</h4>
 
-		<div class="uma-form-group">
-			<label for="SERVICE">Enable UMA:</label>
-			<select id="SERVICE" name="SERVICE" size="1" onChange="checkRUNNING(this.form);">
-				<?=mk_option($uma_service, "disable", "No");?>
-				<?=mk_option($uma_service, "enable", "Yes");?>
-			</select>
-		</div>
+            <div class="uma-form-group">
+                <label for="SERVICE">Enable UMA Service:</label>
+                <select id="SERVICE" name="SERVICE" size="1" onChange="checkRUNNING(this.form);">
+                    <?=mk_option($uma_service, "disable", "Disabled");?>
+                    <?=mk_option($uma_service, "enable", "Enabled");?>
+                </select>
+            </div>
 
-		<div class="uma-form-group">
-			<label for="PORT">HTTP Port:</label>
-			<input id="PORT" name="PORT" type="number" value="<?=$uma_port;?>" min="1024" max="65535" placeholder="34600" style="width:100px;" onChange="checkRUNNING(this.form);">
-			<small style="margin-left: 10px; color: #666;">Port range: 1024-65535 (default: 34600)</small>
-		</div>
+            <div class="uma-form-group">
+                <label for="PORT">HTTP Port:</label>
+                <input id="PORT" name="PORT" type="number" value="<?=$uma_port;?>" min="1024" max="65535" placeholder="34600" style="width:120px;" onChange="checkRUNNING(this.form);">
+                <small>Port range: 1024-65535 (default: 34600)</small>
+            </div>
+        </div>
 
-		<h4 class="mcp-section">MCP (Model Context Protocol) Settings</h4>
-		<p class="mcp-info">
-			MCP enables AI agents to interact with UMA through a standardized protocol.
-			<a href="https://modelcontextprotocol.io/" target="_blank">Learn more about MCP</a>
-		</p>
+        <!-- MCP Configuration -->
+        <div class="uma-form-section">
+            <h4>MCP (Model Context Protocol) Settings</h4>
+            <div class="mcp-info">
+                <strong>About MCP:</strong> MCP enables AI agents to interact with UMA through a standardized protocol.
+                <a href="https://modelcontextprotocol.io/" target="_blank">Learn more about MCP</a>
+            </div>
 
-		<div class="uma-form-group">
-			<label for="MCP_ENABLED">Enable MCP Server:</label>
-			<select id="MCP_ENABLED" name="MCP_ENABLED" size="1" onChange="checkMCPSettings(this.form);">
-				<?=mk_option($mcp_enabled, "disable", "No");?>
-				<?=mk_option($mcp_enabled, "enable", "Yes");?>
-			</select>
-		</div>
+            <div class="uma-form-group">
+                <label for="MCP_ENABLED">Enable MCP Server:</label>
+                <select id="MCP_ENABLED" name="MCP_ENABLED" size="1" onChange="checkMCPSettings(this.form);">
+                    <?=mk_option($mcp_enabled, "disable", "Disabled");?>
+                    <?=mk_option($mcp_enabled, "enable", "Enabled");?>
+                </select>
+            </div>
 
-		<div class="uma-form-group" id="mcp-port-group">
-			<label for="MCP_PORT">MCP Port:</label>
-			<input id="MCP_PORT" name="MCP_PORT" type="number" value="<?=$mcp_port;?>" min="1024" max="65535" placeholder="34800" style="width:100px;" onChange="checkRUNNING(this.form);">
-			<small style="margin-left: 10px; color: #666;">Port range: 1024-65535 (default: 34800)</small>
-		</div>
+            <div class="uma-form-group" id="mcp-port-group">
+                <label for="MCP_PORT">MCP Server Port:</label>
+                <input id="MCP_PORT" name="MCP_PORT" type="number" value="<?=$mcp_port;?>" min="1024" max="65535" placeholder="34800" style="width:120px;" onChange="checkRUNNING(this.form);">
+                <small>Port range: 1024-65535 (default: 34800)</small>
+            </div>
 
-		<div class="uma-form-group" id="mcp-connections-group">
-			<label for="MCP_MAX_CONNECTIONS">Max Connections:</label>
-			<input id="MCP_MAX_CONNECTIONS" name="MCP_MAX_CONNECTIONS" type="number" value="<?=$mcp_max_connections;?>" min="1" max="1000" placeholder="100" style="width:100px;" onChange="checkRUNNING(this.form);">
-			<small style="margin-left: 10px; color: #666;">Maximum concurrent MCP connections (default: 100)</small>
-		</div>
+            <div class="uma-form-group" id="mcp-connections-group">
+                <label for="MCP_MAX_CONNECTIONS">Max Connections:</label>
+                <input id="MCP_MAX_CONNECTIONS" name="MCP_MAX_CONNECTIONS" type="number" value="<?=$mcp_max_connections;?>" min="1" max="1000" placeholder="100" style="width:120px;" onChange="checkRUNNING(this.form);">
+                <small>Maximum concurrent MCP connections (default: 100)</small>
+            </div>
+        </div>
 
-
-
-		<?php if ($uma_running >= 1 && $uma_api_responsive): ?>
-		<div class="uma-form-group">
-			<label>Quick Access:</label>
-			<a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
-				Open Web UI
-			</a>
-		</div>
-		<?php endif; ?>
-
-		<div style="margin-top: 30px;">
-			<input id="DEFAULT" class="stopped uma-button secondary" type="submit" value="Default" onClick="resetDATA(this.form)">
-			<input id="btnApply" class="uma-button" type="submit" value="Apply" onClick="return verifyDATA(this.form)">
-			<input type="button" class="uma-button secondary" value="Done" onClick="done()">
-		</div>
-	</form>
+        <!-- Action Buttons -->
+        <div class="uma-button-group">
+            <input id="DEFAULT" class="stopped uma-button secondary" type="submit" value="Reset to Defaults" onClick="resetDATA(this.form)">
+            <input id="btnApply" class="uma-button success" type="submit" value="Apply Settings" onClick="return verifyDATA(this.form)">
+            <input type="button" class="uma-button" value="Done" onClick="done()">
+        </div>
+    </form>
 </div>
 
 <script type="text/javascript">
 $(function(){
-	showStatus('<?=$sName;?>');
-	checkRUNNING(document.uma_settings);
-	checkMCPSettings(document.uma_settings);
+    showStatus('<?=$sName;?>');
+    checkRUNNING(document.uma_settings);
+    checkMCPSettings(document.uma_settings);
 
-	// Auto-refresh status every 10 seconds if service was just started
-	if (window.location.search.includes('refresh=1')) {
-		setTimeout(function() {
-			window.location.href = window.location.pathname;
-		}, 3000);
-	}
+    // Auto-refresh status every 10 seconds if service was just started
+    if (window.location.search.includes('refresh=1')) {
+        setTimeout(function() {
+            window.location.href = window.location.pathname;
+        }, 3000);
+    }
 });
 
-function isNumber(value) {
-   return typeof value === 'number' && isFinite(value);
-}
-
 function resetDATA(form) {
-	form.SERVICE.value = "enable";
-	form.PORT.value = "34600";
-	form.MCP_ENABLED.value = "disable";
-	form.MCP_PORT.value = "34800";
-	form.MCP_MAX_CONNECTIONS.value = "100";
-	checkMCPSettings(form);
+    form.SERVICE.value = "enable";
+    form.PORT.value = "34600";
+    form.MCP_ENABLED.value = "disable";
+    form.MCP_PORT.value = "34800";
+    form.MCP_MAX_CONNECTIONS.value = "100";
+    checkMCPSettings(form);
 }
 
 function checkRUNNING(form) {
-	var isRunning = <?=$uma_running;?> >= 1 && <?=$uma_api_responsive ? 'true' : 'false';?>;
-	if (isRunning)
-	{
-		$(".stopped").prop("disabled", true);
-		form.btnApply.disabled = "disabled";
-   }
-   else
-	$(".stopped").prop("disabled", (form.SERVICE.value == "enable"));
-	if (form.SERVICE.value == "enable")
-		form.command.value = "/usr/local/emhttp/plugins/uma/scripts/start";
-	else {
-		form.command.value = "/usr/local/emhttp/plugins/uma/scripts/stop";
-		form.btnApply.disabled = (form.SERVICE.value == "enable");
-	}
+    var isRunning = <?=$uma_running;?> >= 1 && <?=$uma_api_responsive ? 'true' : 'false';?>;
+    if (isRunning) {
+        $(".stopped").prop("disabled", true);
+        form.btnApply.disabled = "disabled";
+    } else {
+        $(".stopped").prop("disabled", (form.SERVICE.value == "enable"));
+    }
+    
+    if (form.SERVICE.value == "enable") {
+        form.command.value = "/usr/local/emhttp/plugins/uma/scripts/start";
+    } else {
+        form.command.value = "/usr/local/emhttp/plugins/uma/scripts/stop";
+        form.btnApply.disabled = (form.SERVICE.value == "enable");
+    }
 }
 
 function checkMCPSettings(form) {
-	var mcpEnabled = form.MCP_ENABLED.value == "enable";
+    var mcpEnabled = form.MCP_ENABLED.value == "enable";
 
-	// Show/hide MCP configuration fields based on enabled status
-	$("#mcp-port-group").toggle(mcpEnabled);
-	$("#mcp-connections-group").toggle(mcpEnabled);
+    // Show/hide MCP configuration fields based on enabled status
+    if (mcpEnabled) {
+        $("#mcp-port-group").removeClass('mcp-field-hidden');
+        $("#mcp-connections-group").removeClass('mcp-field-hidden');
+    } else {
+        $("#mcp-port-group").addClass('mcp-field-hidden');
+        $("#mcp-connections-group").addClass('mcp-field-hidden');
+    }
 
-	// Enable/disable MCP fields
-	form.MCP_PORT.disabled = !mcpEnabled;
-	form.MCP_MAX_CONNECTIONS.disabled = !mcpEnabled;
+    // Enable/disable MCP fields
+    form.MCP_PORT.disabled = !mcpEnabled;
+    form.MCP_MAX_CONNECTIONS.disabled = !mcpEnabled;
 }
 
 function verifyDATA(form) {
-	// Validate HTTP port number
-	var port = parseInt(form.PORT.value);
-	if (isNaN(port) || port < 1024 || port > 65535) {
-		alert("HTTP Port must be a number between 1024 and 65535");
-		return false;
-	}
+    // Validate HTTP port number
+    var port = parseInt(form.PORT.value);
+    if (isNaN(port) || port < 1024 || port > 65535) {
+        alert("HTTP Port must be a number between 1024 and 65535");
+        return false;
+    }
 
-	// Validate MCP port if MCP is enabled
-	if (form.MCP_ENABLED.value == "enable") {
-		var mcpPort = parseInt(form.MCP_PORT.value);
-		if (isNaN(mcpPort) || mcpPort < 1024 || mcpPort > 65535) {
-			alert("MCP Port must be a number between 1024 and 65535");
-			return false;
-		}
+    // Validate MCP port if MCP is enabled
+    if (form.MCP_ENABLED.value == "enable") {
+        var mcpPort = parseInt(form.MCP_PORT.value);
+        if (isNaN(mcpPort) || mcpPort < 1024 || mcpPort > 65535) {
+            alert("MCP Port must be a number between 1024 and 65535");
+            return false;
+        }
 
-		// Check if MCP port conflicts with HTTP port
-		if (mcpPort == port) {
-			alert("MCP Port cannot be the same as HTTP Port");
-			return false;
-		}
+        // Check if MCP port conflicts with HTTP port
+        if (mcpPort == port) {
+            alert("MCP Port cannot be the same as HTTP Port");
+            return false;
+        }
 
-		// Validate max connections
-		var maxConnections = parseInt(form.MCP_MAX_CONNECTIONS.value);
-		if (isNaN(maxConnections) || maxConnections < 1 || maxConnections > 1000) {
-			alert("Max Connections must be a number between 1 and 1000");
-			return false;
-		}
-	}
+        // Validate max connections
+        var maxConnections = parseInt(form.MCP_MAX_CONNECTIONS.value);
+        if (isNaN(maxConnections) || maxConnections < 1 || maxConnections > 1000) {
+            alert("Max Connections must be a number between 1 and 1000");
+            return false;
+        }
+    }
 
-	// Check for common reserved ports
-	var reservedPorts = [22, 23, 25, 53, 80, 110, 143, 443, 993, 995, 3389, 5432, 3306];
-	if (reservedPorts.includes(port)) {
-		if (!confirm("Port " + port + " is commonly used by other services. Are you sure you want to use this port?")) {
-			return false;
-		}
-	}
+    // Check for common reserved ports
+    var reservedPorts = [22, 23, 25, 53, 80, 110, 143, 443, 993, 995, 3389, 5432, 3306];
+    if (reservedPorts.includes(port)) {
+        if (!confirm("Port " + port + " is commonly used by other services. Are you sure you want to use this port?")) {
+            return false;
+        }
+    }
 
-	if (form.MCP_ENABLED.value == "enable" && reservedPorts.includes(parseInt(form.MCP_PORT.value))) {
-		if (!confirm("MCP Port " + form.MCP_PORT.value + " is commonly used by other services. Are you sure you want to use this port?")) {
-			return false;
-		}
-	}
+    if (form.MCP_ENABLED.value == "enable" && reservedPorts.includes(parseInt(form.MCP_PORT.value))) {
+        if (!confirm("MCP Port " + form.MCP_PORT.value + " is commonly used by other services. Are you sure you want to use this port?")) {
+            return false;
+        }
+    }
 
-	form.SERVICE.value = form.SERVICE.value.replace(/ /g,"_");
-	form.PORT.value = port.toString();
-	form.MCP_ENABLED.value = form.MCP_ENABLED.value.replace(/ /g,"_");
-	if (form.MCP_ENABLED.value == "enable") {
-		form.MCP_PORT.value = parseInt(form.MCP_PORT.value).toString();
-		form.MCP_MAX_CONNECTIONS.value = parseInt(form.MCP_MAX_CONNECTIONS.value).toString();
-	}
+    form.SERVICE.value = form.SERVICE.value.replace(/ /g,"_");
+    form.PORT.value = port.toString();
+    form.MCP_ENABLED.value = form.MCP_ENABLED.value.replace(/ /g,"_");
+    if (form.MCP_ENABLED.value == "enable") {
+        form.MCP_PORT.value = parseInt(form.MCP_PORT.value).toString();
+        form.MCP_MAX_CONNECTIONS.value = parseInt(form.MCP_MAX_CONNECTIONS.value).toString();
+    }
 
-	// If enabling the service, trigger a refresh after submission
-	if (form.SERVICE.value == "enable") {
-		setTimeout(function() {
-			window.location.href = window.location.pathname + "?refresh=1";
-		}, 2000);
-	}
+    // If enabling the service, trigger a refresh after submission
+    if (form.SERVICE.value == "enable") {
+        setTimeout(function() {
+            window.location.href = window.location.pathname + "?refresh=1";
+        }, 2000);
+    }
 
-	return true;
+    return true;
 }
 </script>
