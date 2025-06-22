@@ -19,7 +19,7 @@
 
 <CHANGES>
 
-###2025.06.21
+###2025.06.22
 - Added Model Context Protocol (MCP) Server Support
 - 50+ auto-discovered MCP tools from REST API endpoints
 - JSON-RPC 2.0 over WebSocket on configurable port (default: 34800)
