@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/domalab/uma/daemon/domain"
-	"github.com/domalab/uma/daemon/services/auth"
 	"github.com/domalab/uma/daemon/services/config"
 )
 
@@ -34,14 +33,6 @@ func (c *ConfigShowCmd) Run(ctx *domain.Context) error {
 	fmt.Printf("  Host: %s\n", cfg.HTTPServer.Host)
 	fmt.Printf("  Port: %d\n", cfg.HTTPServer.Port)
 	fmt.Printf("\n")
-	fmt.Printf("Authentication:\n")
-	fmt.Printf("  Enabled: %t\n", cfg.Auth.Enabled)
-	if cfg.Auth.APIKey != "" {
-		fmt.Printf("  API Key: %s...\n", cfg.Auth.APIKey[:8])
-	} else {
-		fmt.Printf("  API Key: (not set)\n")
-	}
-	fmt.Printf("\n")
 	fmt.Printf("Logging:\n")
 	fmt.Printf("  Level: %s\n", cfg.Logging.Level)
 	fmt.Printf("  Max Size: %d MB\n", cfg.Logging.MaxSize)
@@ -55,8 +46,6 @@ func (c *ConfigShowCmd) Run(ctx *domain.Context) error {
 type ConfigSetCmd struct {
 	HTTPEnabled *bool   `help:"Enable/disable HTTP server"`
 	Port        *int    `name:"port" help:"Set HTTP server port"`
-	AuthEnabled *bool   `help:"Enable/disable authentication"`
-	APIKey      *string `help:"Set API key"`
 	LogLevel    *string `help:"Set log level"`
 }
 
@@ -84,18 +73,6 @@ func (c *ConfigSetCmd) Run(ctx *domain.Context) error {
 		fmt.Printf("HTTP server port: %d\n", *c.Port)
 	}
 
-	if c.AuthEnabled != nil {
-		cfg.Auth.Enabled = *c.AuthEnabled
-		changed = true
-		fmt.Printf("Authentication enabled: %t\n", *c.AuthEnabled)
-	}
-
-	if c.APIKey != nil {
-		cfg.Auth.APIKey = *c.APIKey
-		changed = true
-		fmt.Printf("API key updated\n")
-	}
-
 	if c.LogLevel != nil {
 		cfg.Logging.Level = *c.LogLevel
 		changed = true
@@ -117,22 +94,10 @@ func (c *ConfigSetCmd) Run(ctx *domain.Context) error {
 
 // ConfigGenerateCmd generates configuration values
 type ConfigGenerateCmd struct {
-	APIKey bool `help:"Generate a new API key"`
+	// No generation options available - authentication removed
 }
 
 func (c *ConfigGenerateCmd) Run(ctx *domain.Context) error {
-	if c.APIKey {
-		authService := auth.NewAuthService(domain.AuthConfig{})
-		apiKey, err := authService.GenerateAPIKey()
-		if err != nil {
-			return fmt.Errorf("failed to generate API key: %w", err)
-		}
-
-		fmt.Printf("Generated API key: %s\n", apiKey)
-		fmt.Printf("\nTo set this as the active API key, run:\n")
-		fmt.Printf("  uma config set --api-key=%s\n", apiKey)
-		return nil
-	}
-
-	return fmt.Errorf("no generation option specified")
+	fmt.Println("No generation options available - authentication has been removed from UMA")
+	return nil
 }

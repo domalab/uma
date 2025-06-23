@@ -86,12 +86,6 @@ func (c *ViperConfigService) setDefaults() {
 	c.viper.SetDefault("http.read_timeout", "30s")
 	c.viper.SetDefault("http.write_timeout", "30s")
 
-	// Authentication defaults
-	c.viper.SetDefault("auth.enabled", false)
-	c.viper.SetDefault("auth.api_key", "")
-	c.viper.SetDefault("auth.jwt_secret", "")
-	c.viper.SetDefault("auth.token_expiry", "24h")
-
 	// Logging defaults - optimized for minimal disk usage
 	c.viper.SetDefault("logging.level", "info")
 	c.viper.SetDefault("logging.format", "console")
@@ -230,16 +224,6 @@ func (c *ViperConfigService) GetHTTPConfig() HTTPConfig {
 	}
 }
 
-// GetAuthConfig returns authentication configuration
-func (c *ViperConfigService) GetAuthConfig() AuthConfig {
-	return AuthConfig{
-		Enabled:     c.GetBool("auth.enabled"),
-		APIKey:      c.GetString("auth.api_key"),
-		JWTSecret:   c.GetString("auth.jwt_secret"),
-		TokenExpiry: c.GetDuration("auth.token_expiry"),
-	}
-}
-
 // GetLoggingConfig returns logging configuration
 func (c *ViperConfigService) GetLoggingConfig() LoggingConfig {
 	return LoggingConfig{
@@ -280,13 +264,6 @@ type HTTPConfig struct {
 	Timeout      time.Duration
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
-}
-
-type AuthConfig struct {
-	Enabled     bool
-	APIKey      string
-	JWTSecret   string
-	TokenExpiry time.Duration
 }
 
 type LoggingConfig struct {

@@ -388,7 +388,7 @@ List all available user scripts.
 
 **Example Request:**
 ```bash
-curl -H "Authorization: Bearer your-jwt-token" \
+curl -H "X-Request-ID: scripts-list-123" \
      http://your-unraid-ip:34600/api/v1/system/scripts
 ```
 
@@ -421,7 +421,6 @@ Execute a user script.
 ```bash
 curl -X POST \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer your-jwt-token" \
      -H "X-Request-ID: script-exec-601" \
      -d '{"script_name": "backup-script", "background": true}' \
      http://your-unraid-ip:34600/api/v1/system/scripts
@@ -452,7 +451,6 @@ Safely reboot the system.
 ```bash
 curl -X POST \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer your-jwt-token" \
      -H "X-Request-ID: system-reboot-701" \
      -d '{"delay": 30, "message": "Scheduled maintenance"}' \
      http://your-unraid-ip:34600/api/v1/system/reboot
@@ -484,7 +482,6 @@ Safely shutdown the system.
 ```bash
 curl -X POST \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer your-jwt-token" \
      -H "X-Request-ID: system-shutdown-801" \
      -d '{"delay": 60, "message": "Scheduled maintenance"}' \
      http://your-unraid-ip:34600/api/v1/system/shutdown
@@ -500,7 +497,7 @@ Retrieve system logs with filtering.
 
 **Example Request:**
 ```bash
-curl -H "Authorization: Bearer your-jwt-token" \
+curl -H "X-Request-ID: logs-query-123" \
      "http://your-unraid-ip:34600/api/v1/system/logs?type=system&lines=50&since=2025-06-16T12:00:00Z"
 ```
 

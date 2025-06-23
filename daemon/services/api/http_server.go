@@ -15,7 +15,6 @@ import (
 	"github.com/domalab/uma/daemon/services/api/routes"
 	"github.com/domalab/uma/daemon/services/api/services"
 	"github.com/domalab/uma/daemon/services/api/utils"
-	"github.com/domalab/uma/daemon/services/auth"
 	"github.com/domalab/uma/daemon/services/command"
 	"github.com/domalab/uma/daemon/services/config"
 	"github.com/getsentry/sentry-go"
@@ -32,7 +31,6 @@ type HTTPServer struct {
 	port            int
 	commandExecutor *command.CommandExecutor
 	cacheService    *services.CacheService
-	authService     *auth.AuthService
 	configService   *config.ViperConfigService
 	validator       *validator.Validate
 
@@ -41,13 +39,11 @@ type HTTPServer struct {
 	storageHandler *handlers.StorageHandler
 	dockerHandler  *handlers.DockerHandler
 	vmHandler      *handlers.VMHandler
-	authHandler    *handlers.AuthHandler
 	healthHandler  *handlers.HealthHandler
 
-	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler
-	notificationHandler      *handlers.NotificationHandler
-	asyncHandler             *handlers.AsyncHandler
-	rateLimitHandler         *handlers.RateLimitHandler
+	webSocketHandler    *handlers.WebSocketHandler
+	notificationHandler *handlers.NotificationHandler
+	asyncHandler        *handlers.AsyncHandler
 
 	// Router for modular route management
 	router *routes.Router
@@ -73,7 +69,6 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 		port:            port,
 		commandExecutor: command.NewCommandExecutor(),
 		cacheService:    services.NewCacheService(),
-		authService:     api.authService, // Use auth service from API
 		configService:   config.NewViperConfigService(),
 		validator:       validator.New(),
 	}
@@ -96,13 +91,11 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 	httpServer.storageHandler = handlers.NewStorageHandler(httpServer.apiAdapter)
 	httpServer.dockerHandler = handlers.NewDockerHandler(httpServer.apiAdapter)
 	httpServer.vmHandler = handlers.NewVMHandler(httpServer.apiAdapter)
-	httpServer.authHandler = handlers.NewAuthHandler(httpServer.apiAdapter)
 	httpServer.healthHandler = handlers.NewHealthHandler(httpServer.apiAdapter, api.ctx.Config.Version)
 	// OpenAPI documentation is now handled directly by HTTPServer (no separate docs handler needed)
-	httpServer.enhancedWebSocketHandler = handlers.NewEnhancedWebSocketHandler(httpServer.apiAdapter, api.ctx.Hub)
+	httpServer.webSocketHandler = handlers.NewWebSocketHandler(httpServer.apiAdapter, api.ctx.Hub)
 	httpServer.notificationHandler = handlers.NewNotificationHandler(httpServer.apiAdapter)
 	httpServer.asyncHandler = handlers.NewAsyncHandler(httpServer.apiAdapter)
-	httpServer.rateLimitHandler = handlers.NewRateLimitHandler(httpServer.apiAdapter)
 
 	// Legacy handlers removed - functionality moved to modular handlers
 
@@ -112,12 +105,10 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 		httpServer.storageHandler,
 		httpServer.dockerHandler,
 		httpServer.vmHandler,
-		httpServer.authHandler,
 		httpServer.healthHandler,
-		httpServer.enhancedWebSocketHandler,
+		httpServer.webSocketHandler,
 		httpServer.notificationHandler,
 		httpServer.asyncHandler,
-		httpServer.rateLimitHandler,
 		httpServer.shareHandler,
 		httpServer.scriptHandler,
 		httpServer.diagnosticsHandler,

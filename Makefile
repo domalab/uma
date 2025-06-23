@@ -21,13 +21,11 @@ default: test
 clean:
 	go clean
 
-local: clean version-sync
-	go build fmt
-	go build -ldflags "-X main.Version=$(shell cat VERSION)" -v -o ${PROG}
+local: clean
+	./scripts/build.sh build ${PROG}
 
-release: clean version-sync
-	go build fmt
-	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(shell cat VERSION)" -v -o ${PROG}
+release: clean
+	./scripts/build.sh linux ${PROG}
 
 # run unit tests with code coverage
 test:
@@ -53,7 +51,7 @@ publish: build
 # Version management targets
 version-sync:
 	@echo "Synchronizing version across all files..."
-	@./scripts/update-version.sh sync
+	@./scripts/build.sh update-plg
 
 version-set:
 	@if [ -z "$(VERSION)" ]; then \
@@ -61,14 +59,15 @@ version-set:
 		exit 1; \
 	fi
 	@echo "Setting new version: $(VERSION)"
-	@./scripts/update-version.sh set $(VERSION)
+	@echo "$(VERSION)" > VERSION
+	@./scripts/build.sh update-plg
 
 version-verify:
 	@echo "Verifying version consistency..."
-	@./scripts/update-version.sh verify
+	@./scripts/build.sh version
 
 version-current:
-	@./scripts/update-version.sh current
+	@./scripts/build.sh version
 
 version-help:
 	@echo "UMA Version Management System"

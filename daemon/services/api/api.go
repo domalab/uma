@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 
 	"github.com/domalab/uma/daemon/common"
 	"github.com/domalab/uma/daemon/domain"
@@ -22,7 +21,6 @@ import (
 	"github.com/domalab/uma/daemon/plugins/vm"
 	"github.com/domalab/uma/daemon/services/api/events"
 	"github.com/domalab/uma/daemon/services/async"
-	"github.com/domalab/uma/daemon/services/auth"
 	"github.com/domalab/uma/daemon/services/cache"
 	"github.com/domalab/uma/daemon/services/config"
 	"github.com/domalab/uma/daemon/services/mcp"
@@ -42,12 +40,9 @@ type Api struct {
 	mcpServer *mcp.Server
 
 	// Services
-	configManager        *config.Manager
-	authService          *auth.AuthService
-	rateLimiter          *auth.RateLimiter
-	operationRateLimiter *auth.OperationRateLimiter
-	asyncManager         *async.AsyncManager
-	eventManager         *events.EventManager
+	configManager *config.Manager
+	asyncManager  *async.AsyncManager
+	eventManager  *events.EventManager
 
 	// Data providers
 	origin        *dto.Origin
@@ -77,25 +72,13 @@ func Create(ctx *domain.Context) *Api {
 		ctx.Config.Version = loadedConfig.Version
 	}
 
-	// Initialize authentication service
-	authService := auth.NewAuthService(loadedConfig.Auth)
-
-	// Initialize rate limiter (100 requests per minute)
-	rateLimiter := auth.NewRateLimiter(100, time.Minute)
-
-	// Initialize operation-specific rate limiter
-	operationRateLimiter := auth.NewOperationRateLimiter()
-
 	// Initialize async manager
 	asyncManager := async.NewAsyncManager()
 
 	api := &Api{
-		ctx:                  ctx,
-		configManager:        configManager,
-		authService:          authService,
-		rateLimiter:          rateLimiter,
-		operationRateLimiter: operationRateLimiter,
-		asyncManager:         asyncManager,
+		ctx:           ctx,
+		configManager: configManager,
+		asyncManager:  asyncManager,
 	}
 
 	// Initialize HTTP server if enabled
@@ -147,9 +130,9 @@ func (a *Api) Run() error {
 	// Register async operation executors
 	a.registerAsyncExecutors()
 
-	// Initialize and start event manager for enhanced WebSocket functionality
-	if a.httpServer != nil && a.httpServer.enhancedWebSocketHandler != nil {
-		a.eventManager = events.NewEventManager(a.httpServer.apiAdapter, a.ctx.Hub, a.httpServer.enhancedWebSocketHandler)
+	// Initialize and start event manager for WebSocket functionality
+	if a.httpServer != nil && a.httpServer.webSocketHandler != nil {
+		a.eventManager = events.NewEventManager(a.httpServer.apiAdapter, a.ctx.Hub, a.httpServer.webSocketHandler)
 		a.eventManager.Start()
 		logger.Green("Event Manager started for real-time monitoring")
 	}

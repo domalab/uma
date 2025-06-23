@@ -8,7 +8,7 @@ type APIInterface interface {
 	GetStorage() StorageInterface
 	GetDocker() DockerInterface
 	GetVM() VMInterface
-	GetAuth() AuthInterface
+
 	GetNotifications() NotificationInterface
 	GetUPSDetector() UPSDetectorInterface
 }
@@ -59,14 +59,6 @@ type VMInterface interface {
 	GetVMStats(name string) (interface{}, error)
 	GetVMConsole(name string) (interface{}, error)
 	SetVMAutostart(name string, autostart bool) error
-}
-
-// AuthInterface defines the interface for authentication operations
-type AuthInterface interface {
-	Login(username, password string) (interface{}, error)
-	GetUsers() (interface{}, error)
-	GetStats() (interface{}, error)
-	IsEnabled() bool
 }
 
 // NotificationInterface defines the interface for notification operations

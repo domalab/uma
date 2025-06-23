@@ -52,11 +52,6 @@ func (a *APIAdapter) GetVM() utils.VMInterface {
 	return NewVMAdapter(a.api)
 }
 
-// GetAuth returns the auth interface
-func (a *APIAdapter) GetAuth() utils.AuthInterface {
-	return &AuthAdapter{api: a.api}
-}
-
 // GetNotifications returns the notification interface
 func (a *APIAdapter) GetNotifications() utils.NotificationInterface {
 	return &NotificationAdapter{api: a.api}
@@ -471,32 +466,6 @@ func (v *VMAdapter) GetVMConsole(name string) (interface{}, error) {
 
 func (v *VMAdapter) SetVMAutostart(name string, autostart bool) error {
 	return nil
-}
-
-// AuthAdapter adapts auth operations
-type AuthAdapter struct {
-	api interface{}
-}
-
-func (a *AuthAdapter) Login(username, password string) (interface{}, error) {
-	// Authentication is not implemented in UMA
-	return nil, fmt.Errorf("authentication is not implemented - UMA operates without authentication")
-}
-
-func (a *AuthAdapter) GetUsers() (interface{}, error) {
-	return []interface{}{}, nil
-}
-
-func (a *AuthAdapter) GetStats() (interface{}, error) {
-	return map[string]interface{}{
-		"total_users":    0,
-		"active_users":   0,
-		"total_sessions": 0,
-	}, nil
-}
-
-func (a *AuthAdapter) IsEnabled() bool {
-	return false // Authentication is not implemented in UMA
 }
 
 // NotificationAdapter adapts notification operations

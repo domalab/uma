@@ -243,34 +243,11 @@ func (h *HealthHandler) checkDockerHealth() responses.HealthCheck {
 }
 
 func (h *HealthHandler) checkAuthHealth() responses.HealthCheck {
-	start := time.Now()
-	duration := time.Since(start)
-
-	if !h.api.GetAuth().IsEnabled() {
-		return responses.HealthCheck{
-			Status:    "pass",
-			Message:   "Auth service disabled",
-			Timestamp: time.Now().UTC(),
-			Duration:  duration.String(),
-		}
-	}
-
-	// Try to get auth stats
-	_, err := h.api.GetAuth().GetStats()
-	if err != nil {
-		return responses.HealthCheck{
-			Status:    "warn",
-			Message:   "Auth service not responding",
-			Timestamp: time.Now().UTC(),
-			Duration:  duration.String(),
-		}
-	}
-
 	return responses.HealthCheck{
 		Status:    "pass",
-		Message:   "Auth service healthy",
+		Message:   "Authentication not implemented - UMA operates without authentication",
 		Timestamp: time.Now().UTC(),
-		Duration:  duration.String(),
+		Duration:  "0ms",
 	}
 }
 

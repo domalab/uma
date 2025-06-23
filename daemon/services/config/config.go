@@ -172,18 +172,6 @@ func (m *Manager) SetHTTPPort(port int) error {
 	return m.Save()
 }
 
-// SetAuthEnabled enables or disables authentication
-func (m *Manager) SetAuthEnabled(enabled bool) error {
-	m.config.Auth.Enabled = enabled
-	return m.Save()
-}
-
-// SetAPIKey sets the API key for authentication
-func (m *Manager) SetAPIKey(apiKey string) error {
-	m.config.Auth.APIKey = apiKey
-	return m.Save()
-}
-
 // GetHTTPPort returns the configured HTTP port
 func (m *Manager) GetHTTPPort() int {
 	return m.config.HTTPServer.Port
@@ -192,11 +180,6 @@ func (m *Manager) GetHTTPPort() int {
 // IsHTTPEnabled returns whether HTTP server is enabled
 func (m *Manager) IsHTTPEnabled() bool {
 	return m.config.HTTPServer.Enabled
-}
-
-// IsAuthEnabled returns whether authentication is enabled
-func (m *Manager) IsAuthEnabled() bool {
-	return m.config.Auth.Enabled
 }
 
 // SetMCPEnabled enables or disables the MCP server

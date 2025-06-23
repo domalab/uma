@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,48 +71,155 @@ type WebSocketConnection struct {
 	mutex         sync.RWMutex
 	ctx           context.Context
 	cancel        context.CancelFunc
+	clientIP      string
+	messageCount  int
+	lastMessage   time.Time
 }
 
-// EnhancedWebSocketHandler handles WebSocket connections with pubsub integration
-type EnhancedWebSocketHandler struct {
+// WebSocketHandler handles WebSocket connections with pubsub integration
+type WebSocketHandler struct {
 	api         utils.APIInterface
 	upgrader    websocket.Upgrader
 	hub         *pubsub.PubSub
 	connections map[string]*WebSocketConnection
 	mutex       sync.RWMutex
+
+	// Security configuration
+	maxConnections    int
+	maxMessageSize    int64
+	messagesPerMinute int
 }
 
-// NewEnhancedWebSocketHandler creates a new enhanced WebSocket handler
-func NewEnhancedWebSocketHandler(api utils.APIInterface, hub *pubsub.PubSub) *EnhancedWebSocketHandler {
-	return &EnhancedWebSocketHandler{
+// NewWebSocketHandler creates a new WebSocket handler
+func NewWebSocketHandler(api utils.APIInterface, hub *pubsub.PubSub) *WebSocketHandler {
+	return &WebSocketHandler{
 		api: api,
 		hub: hub,
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				// Allow all origins for now - should be configurable in production
-				return true
-			},
+			CheckOrigin:     isValidOrigin,
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
 		},
-		connections: make(map[string]*WebSocketConnection),
+		connections:       make(map[string]*WebSocketConnection),
+		maxConnections:    50,          // Reasonable limit for internal network usage
+		maxMessageSize:    1024 * 1024, // 1MB message size limit
+		messagesPerMinute: 100,         // 100 messages per minute per connection
 	}
 }
 
-// HandleUnifiedWebSocket handles unified WebSocket connections with subscription management
-func (h *EnhancedWebSocketHandler) HandleUnifiedWebSocket(w http.ResponseWriter, r *http.Request) {
-	logger.Blue("Enhanced WebSocket connection attempt")
+// isValidOrigin validates WebSocket connection origins for local network usage
+func isValidOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// Allow connections without origin header (e.g., direct WebSocket clients)
+		return true
+	}
+
+	// Parse the origin URL
+	if !strings.HasPrefix(origin, "http://") && !strings.HasPrefix(origin, "https://") {
+		return false
+	}
+
+	// Extract host from origin
+	var host string
+	if strings.HasPrefix(origin, "http://") {
+		host = strings.TrimPrefix(origin, "http://")
+	} else {
+		host = strings.TrimPrefix(origin, "https://")
+	}
+
+	// Remove port if present
+	if colonIndex := strings.Index(host, ":"); colonIndex != -1 {
+		host = host[:colonIndex]
+	}
+
+	// Allow localhost and local network ranges
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return true
+	}
+
+	// Parse IP address
+	ip := net.ParseIP(host)
+	if ip != nil {
+		// Allow private IP ranges (RFC 1918)
+		return isPrivateIP(ip)
+	}
+
+	// Allow local domain names (no dots or ending with .local)
+	if !strings.Contains(host, ".") || strings.HasSuffix(host, ".local") {
+		return true
+	}
+
+	// Reject all other origins
+	logger.Yellow("WebSocket connection rejected from origin: %s", origin)
+	return false
+}
+
+// isPrivateIP checks if an IP address is in a private range
+func isPrivateIP(ip net.IP) bool {
+	// Private IPv4 ranges
+	private4 := []string{
+		"10.0.0.0/8",     // Class A private
+		"172.16.0.0/12",  // Class B private
+		"192.168.0.0/16", // Class C private
+	}
+
+	for _, cidr := range private4 {
+		_, network, _ := net.ParseCIDR(cidr)
+		if network.Contains(ip) {
+			return true
+		}
+	}
+
+	// Private IPv6 ranges
+	if ip.To4() == nil { // IPv6
+		// Link-local addresses (fe80::/10)
+		if ip[0] == 0xfe && (ip[1]&0xc0) == 0x80 {
+			return true
+		}
+		// Unique local addresses (fc00::/7)
+		if (ip[0] & 0xfe) == 0xfc {
+			return true
+		}
+	}
+
+	return false
+}
+
+// HandleWebSocket handles WebSocket connections with subscription management
+func (h *WebSocketHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	logger.Blue("WebSocket connection attempt from %s", r.RemoteAddr)
 
 	// Check if API adapter is available
 	if h.api == nil {
-		logger.Red("Enhanced WebSocket handler: API adapter is nil")
+		logger.Red("WebSocket handler: API adapter is nil")
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	// Check connection limit
+	h.mutex.RLock()
+	connectionCount := len(h.connections)
+	h.mutex.RUnlock()
+
+	if connectionCount >= h.maxConnections {
+		logger.Yellow("WebSocket connection rejected: maximum connections (%d) reached", h.maxConnections)
+		http.Error(w, "Maximum connections reached", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Set message size limit
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Red("WebSocket upgrade failed: %v", err)
 		return
 	}
+
+	// Set read limit for message size
+	conn.SetReadLimit(h.maxMessageSize)
+
+	// Get client IP
+	clientIP := getClientIP(r)
 
 	// Create connection context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -121,6 +230,9 @@ func (h *EnhancedWebSocketHandler) HandleUnifiedWebSocket(w http.ResponseWriter,
 		subscriptions: make(map[EventType]bool),
 		ctx:           ctx,
 		cancel:        cancel,
+		clientIP:      clientIP,
+		messageCount:  0,
+		lastMessage:   time.Now(),
 	}
 
 	// Generate connection ID
@@ -131,7 +243,7 @@ func (h *EnhancedWebSocketHandler) HandleUnifiedWebSocket(w http.ResponseWriter,
 	h.connections[connID] = wsConn
 	h.mutex.Unlock()
 
-	logger.Green("Enhanced WebSocket connection established: %s", connID)
+	logger.Green("WebSocket connection established: %s from %s", connID, clientIP)
 
 	// Handle connection cleanup
 	defer func() {
@@ -140,7 +252,7 @@ func (h *EnhancedWebSocketHandler) HandleUnifiedWebSocket(w http.ResponseWriter,
 		h.mutex.Unlock()
 		cancel()
 		conn.Close()
-		logger.Blue("Enhanced WebSocket connection closed: %s", connID)
+		logger.Blue("WebSocket connection closed: %s", connID)
 	}()
 
 	// Start message handler
@@ -150,8 +262,32 @@ func (h *EnhancedWebSocketHandler) HandleUnifiedWebSocket(w http.ResponseWriter,
 	h.startEventBroadcaster(wsConn)
 }
 
+// getClientIP extracts the client IP address from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header first
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP in the list
+		if commaIndex := strings.Index(xff, ","); commaIndex != -1 {
+			return strings.TrimSpace(xff[:commaIndex])
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// Fall back to RemoteAddr
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
 // handleMessages handles incoming WebSocket messages
-func (h *EnhancedWebSocketHandler) handleMessages(wsConn *WebSocketConnection) {
+func (h *WebSocketHandler) handleMessages(wsConn *WebSocketConnection) {
 	for {
 		select {
 		case <-wsConn.ctx.Done():
@@ -173,7 +309,12 @@ func (h *EnhancedWebSocketHandler) handleMessages(wsConn *WebSocketConnection) {
 }
 
 // processMessage processes incoming WebSocket messages
-func (h *EnhancedWebSocketHandler) processMessage(wsConn *WebSocketConnection, data []byte) error {
+func (h *WebSocketHandler) processMessage(wsConn *WebSocketConnection, data []byte) error {
+	// Check rate limiting
+	if !h.checkRateLimit(wsConn) {
+		return fmt.Errorf("rate limit exceeded")
+	}
+
 	var message map[string]interface{}
 	if err := json.Unmarshal(data, &message); err != nil {
 		return err
@@ -198,8 +339,31 @@ func (h *EnhancedWebSocketHandler) processMessage(wsConn *WebSocketConnection, d
 	return nil
 }
 
+// checkRateLimit checks if the connection is within rate limits
+func (h *WebSocketHandler) checkRateLimit(wsConn *WebSocketConnection) bool {
+	now := time.Now()
+
+	// Reset counter if more than a minute has passed
+	if now.Sub(wsConn.lastMessage) > time.Minute {
+		wsConn.messageCount = 0
+		wsConn.lastMessage = now
+	}
+
+	// Increment message count
+	wsConn.messageCount++
+
+	// Check if rate limit is exceeded
+	if wsConn.messageCount > h.messagesPerMinute {
+		logger.Yellow("Rate limit exceeded for WebSocket connection from %s: %d messages in last minute",
+			wsConn.clientIP, wsConn.messageCount)
+		return false
+	}
+
+	return true
+}
+
 // handlePing responds to ping messages
-func (h *EnhancedWebSocketHandler) handlePing(wsConn *WebSocketConnection) error {
+func (h *WebSocketHandler) handlePing(wsConn *WebSocketConnection) error {
 	response := map[string]interface{}{
 		"type":      "pong",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -208,7 +372,7 @@ func (h *EnhancedWebSocketHandler) handlePing(wsConn *WebSocketConnection) error
 }
 
 // handleSubscribe handles subscription requests
-func (h *EnhancedWebSocketHandler) handleSubscribe(wsConn *WebSocketConnection, message map[string]interface{}) error {
+func (h *WebSocketHandler) handleSubscribe(wsConn *WebSocketConnection, message map[string]interface{}) error {
 	channels, ok := message["channels"].([]interface{})
 	if !ok {
 		return fmt.Errorf("invalid channels format")
@@ -237,7 +401,7 @@ func (h *EnhancedWebSocketHandler) handleSubscribe(wsConn *WebSocketConnection, 
 }
 
 // handleUnsubscribe handles unsubscription requests
-func (h *EnhancedWebSocketHandler) handleUnsubscribe(wsConn *WebSocketConnection, message map[string]interface{}) error {
+func (h *WebSocketHandler) handleUnsubscribe(wsConn *WebSocketConnection, message map[string]interface{}) error {
 	channels, ok := message["channels"].([]interface{})
 	if !ok {
 		return fmt.Errorf("invalid channels format")
@@ -266,7 +430,7 @@ func (h *EnhancedWebSocketHandler) handleUnsubscribe(wsConn *WebSocketConnection
 }
 
 // startEventBroadcaster starts the event broadcasting for a connection
-func (h *EnhancedWebSocketHandler) startEventBroadcaster(wsConn *WebSocketConnection) {
+func (h *WebSocketHandler) startEventBroadcaster(wsConn *WebSocketConnection) {
 	// Subscribe to all event types from pubsub
 	eventTypes := []string{
 		// System Events
@@ -330,7 +494,7 @@ func (h *EnhancedWebSocketHandler) startEventBroadcaster(wsConn *WebSocketConnec
 }
 
 // broadcastEvent broadcasts an event to a WebSocket connection if subscribed
-func (h *EnhancedWebSocketHandler) broadcastEvent(wsConn *WebSocketConnection, event interface{}) error {
+func (h *WebSocketHandler) broadcastEvent(wsConn *WebSocketConnection, event interface{}) error {
 	eventData, ok := event.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("invalid event format")
@@ -353,7 +517,7 @@ func (h *EnhancedWebSocketHandler) broadcastEvent(wsConn *WebSocketConnection, e
 }
 
 // BroadcastEvent broadcasts an event to all connected clients
-func (h *EnhancedWebSocketHandler) BroadcastEvent(eventType EventType, data interface{}) {
+func (h *WebSocketHandler) BroadcastEvent(eventType EventType, data interface{}) {
 	event := map[string]interface{}{
 		"event_type": string(eventType),
 		"data":       data,

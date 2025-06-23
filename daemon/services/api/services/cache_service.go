@@ -1,116 +1,96 @@
 package services
 
 import (
-	"sync"
 	"time"
 
-	"github.com/domalab/uma/daemon/services/api/types/models"
+	"github.com/domalab/uma/daemon/services/api/cache"
 )
 
-// CacheService handles caching operations for the API
+// CacheService handles caching operations for the API using unified cache
 type CacheService struct {
-	mu                sync.RWMutex
-	systemData        *models.CacheEntry
-	dockerData        *models.CacheEntry
-	vmData            *models.CacheEntry
-	cacheDuration     time.Duration
-	lastArrayInfoHash string
+	unifiedCache *cache.UnifiedCache
 }
 
 // NewCacheService creates a new cache service instance
 func NewCacheService() *CacheService {
 	return &CacheService{
-		cacheDuration: 30 * time.Second, // Cache for 30 seconds
+		unifiedCache: cache.GetDefaultUnifiedCache(),
 	}
 }
 
 // GetCachedSystemData retrieves cached system data if valid, otherwise returns nil
 func (c *CacheService) GetCachedSystemData() interface{} {
-	return c.getCachedData(&c.systemData)
+	return c.unifiedCache.GetCachedSystemData()
 }
 
 // SetCachedSystemData stores system data in cache with expiration
 func (c *CacheService) SetCachedSystemData(data interface{}) {
-	c.setCachedData(&c.systemData, data)
+	c.unifiedCache.SetCachedSystemData(data)
 }
 
 // GetCachedDockerData retrieves cached docker data if valid, otherwise returns nil
 func (c *CacheService) GetCachedDockerData() interface{} {
-	return c.getCachedData(&c.dockerData)
+	return c.unifiedCache.GetCachedDockerData()
 }
 
 // SetCachedDockerData stores docker data in cache with expiration
 func (c *CacheService) SetCachedDockerData(data interface{}) {
-	c.setCachedData(&c.dockerData, data)
+	c.unifiedCache.SetCachedDockerData(data)
 }
 
 // GetCachedVMData retrieves cached VM data if valid, otherwise returns nil
 func (c *CacheService) GetCachedVMData() interface{} {
-	return c.getCachedData(&c.vmData)
+	return c.unifiedCache.GetCachedVMData()
 }
 
 // SetCachedVMData stores VM data in cache with expiration
 func (c *CacheService) SetCachedVMData(data interface{}) {
-	c.setCachedData(&c.vmData, data)
+	c.unifiedCache.SetCachedVMData(data)
 }
 
 // GetLastArrayInfoHash returns the last array info hash
 func (c *CacheService) GetLastArrayInfoHash() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.lastArrayInfoHash
+	return c.unifiedCache.GetLastArrayInfoHash()
 }
 
 // SetLastArrayInfoHash sets the last array info hash
 func (c *CacheService) SetLastArrayInfoHash(hash string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.lastArrayInfoHash = hash
-}
-
-// getCachedData retrieves cached data if valid, otherwise returns nil
-func (c *CacheService) getCachedData(entry **models.CacheEntry) interface{} {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if *entry != nil && time.Now().Before((*entry).ExpiresAt) {
-		return (*entry).Data
-	}
-	return nil
-}
-
-// setCachedData stores data in cache with expiration
-func (c *CacheService) setCachedData(entry **models.CacheEntry, data interface{}) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	*entry = &models.CacheEntry{
-		Data:      data,
-		ExpiresAt: time.Now().Add(c.cacheDuration),
-	}
+	c.unifiedCache.SetLastArrayInfoHash(hash)
 }
 
 // ClearCache clears all cached data
 func (c *CacheService) ClearCache() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.systemData = nil
-	c.dockerData = nil
-	c.vmData = nil
-	c.lastArrayInfoHash = ""
+	c.unifiedCache.ClearCache()
 }
 
 // SetCacheDuration sets the cache duration
 func (c *CacheService) SetCacheDuration(duration time.Duration) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.cacheDuration = duration
+	c.unifiedCache.SetCacheDuration(duration)
 }
 
 // GetCacheDuration returns the current cache duration
 func (c *CacheService) GetCacheDuration() time.Duration {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.cacheDuration
+	return c.unifiedCache.GetCacheDuration()
+}
+
+// GetStats returns cache statistics
+func (c *CacheService) GetStats() map[string]interface{} {
+	return c.unifiedCache.GetStats()
+}
+
+// Advanced caching methods using unified cache
+
+// GetOrSetSystemData retrieves system data from cache or sets it using the provided function
+func (c *CacheService) GetOrSetSystemData(setter func() (interface{}, error)) (interface{}, error) {
+	return c.unifiedCache.GetOrSet(cache.SystemDataCache, "default", setter)
+}
+
+// GetOrSetDockerData retrieves docker data from cache or sets it using the provided function
+func (c *CacheService) GetOrSetDockerData(setter func() (interface{}, error)) (interface{}, error) {
+	return c.unifiedCache.GetOrSet(cache.DockerDataCache, "default", setter)
+}
+
+// GetOrSetVMData retrieves VM data from cache or sets it using the provided function
+func (c *CacheService) GetOrSetVMData(setter func() (interface{}, error)) (interface{}, error) {
+	return c.unifiedCache.GetOrSet(cache.VMDataCache, "default", setter)
 }

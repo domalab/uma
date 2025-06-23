@@ -16,17 +16,15 @@ type Router struct {
 	storageHandler *handlers.StorageHandler
 	dockerHandler  *handlers.DockerHandler
 	vmHandler      *handlers.VMHandler
-	authHandler    *handlers.AuthHandler
 	healthHandler  *handlers.HealthHandler
 
-	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler
-	notificationHandler      *handlers.NotificationHandler
-	asyncHandler             *handlers.AsyncHandler
-	rateLimitHandler         *handlers.RateLimitHandler
-	shareHandler             *handlers.ShareHandler
-	scriptHandler            *handlers.ScriptHandler
-	diagnosticsHandler       *handlers.DiagnosticsHandler
-	mcpHandler               *handlers.MCPHandler
+	webSocketHandler    *handlers.WebSocketHandler
+	notificationHandler *handlers.NotificationHandler
+	asyncHandler        *handlers.AsyncHandler
+	shareHandler        *handlers.ShareHandler
+	scriptHandler       *handlers.ScriptHandler
+	diagnosticsHandler  *handlers.DiagnosticsHandler
+	mcpHandler          *handlers.MCPHandler
 
 	// Removed httpServer field - no longer needed for OpenAPI
 }
@@ -37,33 +35,29 @@ func NewRouter(
 	storageHandler *handlers.StorageHandler,
 	dockerHandler *handlers.DockerHandler,
 	vmHandler *handlers.VMHandler,
-	authHandler *handlers.AuthHandler,
 	healthHandler *handlers.HealthHandler,
-	enhancedWebSocketHandler *handlers.EnhancedWebSocketHandler,
+	webSocketHandler *handlers.WebSocketHandler,
 	notificationHandler *handlers.NotificationHandler,
 	asyncHandler *handlers.AsyncHandler,
-	rateLimitHandler *handlers.RateLimitHandler,
 	shareHandler *handlers.ShareHandler,
 	scriptHandler *handlers.ScriptHandler,
 	diagnosticsHandler *handlers.DiagnosticsHandler,
 	mcpHandler *handlers.MCPHandler,
 ) *Router {
 	return &Router{
-		mux:                      http.NewServeMux(),
-		systemHandler:            systemHandler,
-		storageHandler:           storageHandler,
-		dockerHandler:            dockerHandler,
-		vmHandler:                vmHandler,
-		authHandler:              authHandler,
-		healthHandler:            healthHandler,
-		enhancedWebSocketHandler: enhancedWebSocketHandler,
-		notificationHandler:      notificationHandler,
-		asyncHandler:             asyncHandler,
-		rateLimitHandler:         rateLimitHandler,
-		shareHandler:             shareHandler,
-		scriptHandler:            scriptHandler,
-		diagnosticsHandler:       diagnosticsHandler,
-		mcpHandler:               mcpHandler,
+		mux:                 http.NewServeMux(),
+		systemHandler:       systemHandler,
+		storageHandler:      storageHandler,
+		dockerHandler:       dockerHandler,
+		vmHandler:           vmHandler,
+		healthHandler:       healthHandler,
+		webSocketHandler:    webSocketHandler,
+		notificationHandler: notificationHandler,
+		asyncHandler:        asyncHandler,
+		shareHandler:        shareHandler,
+		scriptHandler:       scriptHandler,
+		diagnosticsHandler:  diagnosticsHandler,
+		mcpHandler:          mcpHandler,
 	}
 }
 
@@ -73,12 +67,11 @@ func (r *Router) RegisterRoutes() {
 	r.registerHealthRoutes()
 	// Removed registerDocsRoutes() - OpenAPI documentation system removed
 	r.registerAsyncRoutes()
-	r.registerRateLimitRoutes()
+	r.registerMetricsRoutes()
 	r.registerSystemRoutes()
 	r.registerStorageRoutes()
 	r.registerDockerRoutes()
 	r.registerVMRoutes()
-	r.registerAuthRoutes()
 	r.registerWebSocketRoutes()
 	r.registerNotificationRoutes()
 	r.registerShareRoutes()
@@ -97,15 +90,13 @@ func (r *Router) GetHandler() http.Handler {
 		}
 
 		// Build middleware chain for non-WebSocket endpoints
-		handler := middleware.CORS()(r.mux)
+		handler := http.Handler(r.mux)
 		handler = middleware.RequestID()(handler)
 		handler = middleware.Versioning()(handler)
 		handler = middleware.Compression()(handler)
 		handler = middleware.Metrics()(handler)
 		handler = middleware.Logging()(handler)
 		handler = middleware.Sentry()(handler) // Add Sentry error tracking
-		// Authentication middleware ready for production (temporarily disabled for testing)
-		// handler = middleware.Auth(authService)(handler)
 
 		handler.ServeHTTP(w, req)
 	})
@@ -139,12 +130,8 @@ func (r *Router) registerAsyncRoutes() {
 	r.mux.HandleFunc("/api/v1/operations/stats", r.asyncHandler.HandleAsyncStats)
 }
 
-// registerRateLimitRoutes registers rate limiting endpoints
-func (r *Router) registerRateLimitRoutes() {
-	r.mux.HandleFunc("/api/v1/rate-limits/stats", r.rateLimitHandler.HandleRateLimitStats)
-	r.mux.HandleFunc("/api/v1/rate-limits/config", r.rateLimitHandler.HandleRateLimitConfig)
-
-	// Metrics endpoint
+// Metrics endpoint
+func (r *Router) registerMetricsRoutes() {
 	r.mux.HandleFunc("/metrics", middleware.GetMetricsHandler().ServeHTTP)
 }
 

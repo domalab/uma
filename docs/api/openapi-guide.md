@@ -16,7 +16,7 @@ http://your-unraid-ip:34600/api/v1/docs
 - Try-it-out functionality for all endpoints
 - Request/response examples
 - Schema documentation
-- Authentication testing (when applicable)
+- No authentication required - all endpoints are publicly accessible
 
 ### OpenAPI Specification (JSON)
 The machine-readable OpenAPI specification is available at:

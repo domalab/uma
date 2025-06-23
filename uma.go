@@ -12,9 +12,8 @@ import (
 	"github.com/domalab/uma/daemon/logger"
 )
 
-var Version = "2025.06.24" // Default version, can be overridden at build time
-
-// Sentry functions temporarily disabled for testing
+// Version is set at build time from VERSION file
+var Version = "dev" // Default version for development builds
 
 var cli struct {
 	LogsDir    string `default:"/var/log" help:"directory to store logs"`
@@ -27,10 +26,6 @@ var cli struct {
 
 func main() {
 	ctx := kong.Parse(&cli)
-
-	// Initialize Sentry for production error monitoring
-	// initializeSentry()
-	// defer sentry.Flush(2 * time.Second)
 
 	// Clean up any existing backup log files first
 	if err := logger.CleanupOldLogFiles(cli.LogsDir); err != nil {

@@ -49,34 +49,39 @@ func WriteError(w http.ResponseWriter, status int, message string) {
 	WriteJSON(w, status, errorResponse)
 }
 
-// WriteStandardResponse writes a standardized API response
+// WriteStandardResponse writes a standardized API response using object pooling
 func WriteStandardResponse(w http.ResponseWriter, status int, data interface{}, pagination *responses.PaginationInfo, requestID string, version string) {
-	response := responses.StandardResponse{
-		Data:       data,
-		Pagination: pagination,
-		Meta: &responses.ResponseMeta{
-			RequestID: requestID,
-			Version:   version,
-			Timestamp: time.Now().UTC(),
-		},
-	}
+	response := GetStandardResponse()
+	defer PutStandardResponse(response)
+
+	meta := GetResponseMeta()
+	defer PutResponseMeta(meta)
+
+	meta.RequestID = requestID
+	meta.Version = version
+	meta.Timestamp = time.Now().UTC()
+
+	response.Data = data
+	response.Pagination = pagination
+	response.Meta = meta
 
 	WriteJSON(w, status, response)
 }
 
-// WritePaginatedResponse writes a paginated API response
+// WritePaginatedResponse writes a paginated API response using object pooling
 func WritePaginatedResponse(w http.ResponseWriter, status int, data interface{}, total int, params *dto.PaginationParams, requestID string, version string) {
 	pagination := dto.CalculatePagination(total, params)
 
-	// Convert dto.PaginationInfo to responses.PaginationInfo
-	responsePagination := &responses.PaginationInfo{
-		Page:       pagination.Page,
-		PageSize:   pagination.PerPage,
-		TotalPages: pagination.TotalPages,
-		TotalItems: pagination.Total,
-		HasNext:    pagination.HasMore,
-		HasPrev:    pagination.Page > 1,
-	}
+	// Convert dto.PaginationInfo to responses.PaginationInfo using object pool
+	responsePagination := GetPaginationInfo()
+	defer PutPaginationInfo(responsePagination)
+
+	responsePagination.Page = pagination.Page
+	responsePagination.PageSize = pagination.PerPage
+	responsePagination.TotalPages = pagination.TotalPages
+	responsePagination.TotalItems = pagination.Total
+	responsePagination.HasNext = pagination.HasMore
+	responsePagination.HasPrev = pagination.Page > 1
 
 	WriteStandardResponse(w, status, data, responsePagination, requestID, version)
 }
@@ -93,17 +98,19 @@ func WriteVersionedResponse(w http.ResponseWriter, r *http.Request, status int, 
 	}
 }
 
-// WriteOperationResponse writes a generic operation response
+// WriteOperationResponse writes a generic operation response using object pooling
 func WriteOperationResponse(w http.ResponseWriter, status int, success bool, message string, operationID string) {
-	response := responses.OperationResponse{
-		Success:     success,
-		Message:     message,
-		OperationID: operationID,
-	}
+	response := GetOperationResponse()
+	defer PutOperationResponse(response)
+
+	response.Success = success
+	response.Message = message
+	response.OperationID = operationID
+
 	WriteJSON(w, status, response)
 }
 
-// WriteBulkOperationResponse writes a bulk operation response
+// WriteBulkOperationResponse writes a bulk operation response using object pooling
 func WriteBulkOperationResponse(w http.ResponseWriter, status int, results []responses.BulkOperationResult) {
 	total := len(results)
 	succeeded := 0
@@ -117,16 +124,15 @@ func WriteBulkOperationResponse(w http.ResponseWriter, status int, results []res
 		}
 	}
 
-	response := responses.BulkOperationResponse{
-		Success: failed == 0,
-		Message: "Bulk operation completed",
-		Results: results,
-		Summary: responses.BulkOperationSummary{
-			Total:     total,
-			Succeeded: succeeded,
-			Failed:    failed,
-		},
-	}
+	response := GetBulkOperationResponse()
+	defer PutBulkOperationResponse(response)
+
+	response.Success = failed == 0
+	response.Message = "Bulk operation completed"
+	response.Results = results
+	response.Summary.Total = total
+	response.Summary.Succeeded = succeeded
+	response.Summary.Failed = failed
 
 	WriteJSON(w, status, response)
 }

@@ -51,15 +51,7 @@ export UMA_HTTP_READ_TIMEOUT="30s"
 export UMA_HTTP_WRITE_TIMEOUT="30s"
 ```
 
-### Authentication Configuration
 
-```bash
-# Authentication (disabled by default for internal use)
-export UMA_AUTH_ENABLED=false
-export UMA_AUTH_API_KEY=""
-export UMA_AUTH_JWT_SECRET=""
-export UMA_AUTH_TOKEN_EXPIRY="24h"
-```
 
 ### Logging Configuration
 
@@ -143,12 +135,7 @@ http:
   read_timeout: "30s"
   write_timeout: "30s"
 
-# Authentication Configuration (disabled by default for internal use)
-auth:
-  enabled: false
-  api_key: ""
-  jwt_secret: ""
-  token_expiry: "24h"
+
 
 # Logging Configuration
 logging:

@@ -40,11 +40,6 @@ func (m *MockAPIInterface) GetVM() utils.VMInterface {
 	return &MockVMInterface{}
 }
 
-// GetAuth returns a mock auth interface
-func (m *MockAPIInterface) GetAuth() utils.AuthInterface {
-	return &MockAuthInterface{}
-}
-
 // GetNotifications returns a mock notification interface
 func (m *MockAPIInterface) GetNotifications() utils.NotificationInterface {
 	return &MockNotificationInterface{}
@@ -246,25 +241,6 @@ func (m *MockVMInterface) GetVMConsole(name string) (interface{}, error) {
 
 func (m *MockVMInterface) SetVMAutostart(name string, autostart bool) error {
 	return nil
-}
-
-// MockAuthInterface provides mock authentication functionality
-type MockAuthInterface struct{}
-
-func (m *MockAuthInterface) Login(username, password string) (interface{}, error) {
-	return map[string]interface{}{"token": "test-token"}, nil
-}
-
-func (m *MockAuthInterface) GetUsers() (interface{}, error) {
-	return []interface{}{}, nil
-}
-
-func (m *MockAuthInterface) GetStats() (interface{}, error) {
-	return map[string]interface{}{}, nil
-}
-
-func (m *MockAuthInterface) IsEnabled() bool {
-	return false
 }
 
 // MockNotificationInterface provides mock notification functionality

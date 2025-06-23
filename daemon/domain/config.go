@@ -4,7 +4,6 @@ package domain
 type Config struct {
 	Version    string     `json:"version"`
 	HTTPServer HTTPConfig `json:"http_server"`
-	Auth       AuthConfig `json:"auth"`
 	Logging    LogConfig  `json:"logging"`
 	MCP        MCPConfig  `json:"mcp"`
 }
@@ -14,13 +13,6 @@ type HTTPConfig struct {
 	Enabled bool   `json:"enabled"`
 	Port    int    `json:"port"`
 	Host    string `json:"host"`
-}
-
-// AuthConfig holds authentication configuration
-type AuthConfig struct {
-	Enabled   bool   `json:"enabled"`
-	APIKey    string `json:"api_key,omitempty"`
-	JWTSecret string `json:"jwt_secret,omitempty"`
 }
 
 // LogConfig holds logging configuration
@@ -46,9 +38,6 @@ func DefaultConfig() Config {
 			Enabled: true,
 			Port:    34600,
 			Host:    "0.0.0.0",
-		},
-		Auth: AuthConfig{
-			Enabled: false,
 		},
 		Logging: LogConfig{
 			Level:      "info",

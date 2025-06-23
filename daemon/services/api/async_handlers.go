@@ -12,19 +12,12 @@ import (
 
 // AsyncOperationsHandler handles GET /api/v1/operations
 func (h *HTTPServer) AsyncOperationsHandler(w http.ResponseWriter, r *http.Request) {
-	// Apply rate limiting
-	if !h.api.rateLimiter.Allow(getClientIP(r)) {
-		http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-		return
-	}
 
 	switch r.Method {
 	case "GET":
 		h.listOperations(w, r)
 	case "POST":
 		h.startOperation(w, r)
-	case "OPTIONS":
-		h.handleCORS(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -32,11 +25,6 @@ func (h *HTTPServer) AsyncOperationsHandler(w http.ResponseWriter, r *http.Reque
 
 // AsyncOperationHandler handles GET/DELETE /api/v1/operations/{id}
 func (h *HTTPServer) AsyncOperationHandler(w http.ResponseWriter, r *http.Request) {
-	// Apply rate limiting
-	if !h.api.rateLimiter.Allow(getClientIP(r)) {
-		http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-		return
-	}
 
 	// Extract operation ID from URL
 	pathParts := strings.Split(r.URL.Path, "/")
@@ -51,8 +39,6 @@ func (h *HTTPServer) AsyncOperationHandler(w http.ResponseWriter, r *http.Reques
 		h.getOperation(w, r, operationID)
 	case "DELETE":
 		h.cancelOperation(w, r, operationID)
-	case "OPTIONS":
-		h.handleCORS(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -227,17 +213,8 @@ func (h *HTTPServer) cancelOperation(w http.ResponseWriter, r *http.Request, ope
 
 // AsyncStatsHandler handles GET /api/v1/operations/stats
 func (h *HTTPServer) AsyncStatsHandler(w http.ResponseWriter, r *http.Request) {
-	// Apply rate limiting
-	if !h.api.rateLimiter.Allow(getClientIP(r)) {
-		http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-		return
-	}
 
 	if r.Method != "GET" {
-		if r.Method == "OPTIONS" {
-			h.handleCORS(w, r)
-			return
-		}
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -289,12 +266,4 @@ func getClientIP(r *http.Request) string {
 		return r.RemoteAddr[:idx]
 	}
 	return r.RemoteAddr
-}
-
-// Helper function to handle CORS
-func (h *HTTPServer) handleCORS(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
-	w.WriteHeader(http.StatusOK)
 }
