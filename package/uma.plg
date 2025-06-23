@@ -3,7 +3,7 @@
 <!ENTITY name      "uma">
 <!ENTITY displayname "Unraid Management Agent">
 <!ENTITY author    "domalab">
-<!ENTITY version   "2025.06.23">
+<!ENTITY version   "2025.06.24">
 <!ENTITY launch    "Settings/&name;">
 <!ENTITY gitURL    "https://github.com/domalab/uma">
 <!ENTITY pluginURL "&gitURL;/releases/download/v&version;/uma.plg">
@@ -11,6 +11,7 @@
 <!ENTITY plgPATH   "/boot/config/plugins/&name;">
 <!ENTITY plgNAME   "&name;-&version;">
 <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+<!ENTITY md5       "d849a9d577ecc0bfeea87062709daad0">
 ]>
 <PLUGIN name="&displayname;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://github.com/domalab/uma/issues" icon="signal">
 
@@ -50,6 +51,7 @@ echo "Preparing installation..."
 <!-- The 'source' file. -->
 <FILE Name="&plgPATH;/&plgNAME;.txz" Run="upgradepkg --install-new">
 <URL>&pkgURL;/&plgNAME;.txz</URL>
+<MD5>&md5;</MD5>
 </FILE>
 
 <!-- Install default plugin cfg -->
@@ -103,7 +105,7 @@ echo ""
 echo "-----------------------------------------------------------"
 echo " Unraid Management Agent has been installed."
 echo " Copyright (c) domalab"
-echo " Version: 2025.06.23"
+echo " Version: 2025.06.24"
 echo "-----------------------------------------------------------"
 echo ""
 ]]>

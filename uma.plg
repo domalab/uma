@@ -1,6 +1,6 @@
 <?xml version='1.0' standalone='yes'?>
 <!DOCTYPE PLUGIN [
-<!ENTITY name      "uma">
+<!ENTITY name      "Unraid Management Agent">
 <!ENTITY displayname "Unraid Management Agent">
 <!ENTITY author    "domalab">
 <!ENTITY version   "2025.06.24">

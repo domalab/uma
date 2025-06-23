@@ -1,7 +1,7 @@
 <?xml version='1.0' standalone='yes'?>
 
 <!DOCTYPE PLUGIN [
-<!ENTITY name        "uma">
+<!ENTITY name        "Unraid Management Agent">
 <!ENTITY author      "Ruaan Deysel">
 <!ENTITY version     "##version##">
 <!ENTITY launch      "Settings/&name;">

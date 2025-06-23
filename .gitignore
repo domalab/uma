@@ -27,6 +27,27 @@ coverage.out
 # Build artifacts
 dist/
 build/
+package/build/
+
+# Package files (generated during build)
+*.txz
+*.tgz
+*.tar.gz
+*.tar.xz
+
+# Plugin files (generated from templates)
+*-generated.plg
+plugin/uma.plg
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Checksums and signatures
+*.md5
+*.sha256
+*.sig
 
 # Configuration files with sensitive data
 config.local.*

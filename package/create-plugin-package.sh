@@ -19,7 +19,7 @@ else
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build"
-PACKAGE_DIR="$SCRIPT_DIR/uma"
+SRC_DIR="$SCRIPT_DIR/../src"
 
 # Colors for output
 RED='\033[0;31m'
@@ -48,11 +48,18 @@ log_error() {
 # Function to check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
-    
-    # Check if we're in the right directory
-    if [ ! -f "$PACKAGE_DIR/uma" ]; then
-        log_error "UMA binary not found at $PACKAGE_DIR/uma"
-        log_error "Please ensure you're running this script from the package directory"
+
+    # Check if modern src directory exists
+    if [ ! -d "$SRC_DIR" ]; then
+        log_error "Modern src/ directory not found at $SRC_DIR"
+        log_error "Please ensure the modern plugin structure has been created"
+        exit 1
+    fi
+
+    # Check if UMA binary exists in src structure
+    if [ ! -f "$SRC_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/uma" ]; then
+        log_error "UMA binary not found in modern structure"
+        log_error "Please build the binary first: make release"
         exit 1
     fi
     
@@ -98,17 +105,9 @@ prepare_build_dir() {
 copy_plugin_files() {
     log_info "Copying plugin files from modern src/ structure..."
 
-    # Use the new src/ directory structure
-    local src_dir="$SCRIPT_DIR/../src"
-
-    if [ -d "$src_dir" ]; then
-        log_info "Using modern src/ directory structure"
-        cp -r "$src_dir/"* "$BUILD_DIR/"
-    else
-        log_info "Falling back to legacy structure..."
-        # Copy all plugin files (legacy method)
-        cp -r "$PACKAGE_DIR"/* "$BUILD_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/"
-    fi
+    # Copy from modern src/ directory structure
+    log_info "Using modern src/ directory structure"
+    cp -r "$SRC_DIR/"* "$BUILD_DIR/"
     
     # Set proper permissions
     chmod +x "$BUILD_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/uma"
