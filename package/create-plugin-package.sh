@@ -135,6 +135,35 @@ EOF
     log_success "Plugin files copied"
 }
 
+# Function to generate plugin file from source
+generate_plugin_file() {
+    log_info "Generating plugin file from source..."
+
+    local source_plugin="$SCRIPT_DIR/../uma.plg"
+    local target_plugin="$SCRIPT_DIR/uma.plg"
+
+    if [ ! -f "$source_plugin" ]; then
+        log_error "Source plugin file not found: $source_plugin"
+        return 1
+    fi
+
+    # Copy source plugin file to package directory
+    cp "$source_plugin" "$target_plugin"
+
+    # Add MD5 entity if not present (will be updated later with actual checksum)
+    if ! grep -q "<!ENTITY md5" "$target_plugin"; then
+        # Insert MD5 entity after the emhttp entity
+        sed -i.bak '/<!ENTITY emhttp/a\
+<!ENTITY md5       "placeholder">' "$target_plugin"
+        rm -f "$target_plugin.bak"
+        log_info "Added MD5 entity placeholder to plugin file"
+    fi
+
+    log_success "Generated plugin file: $(basename "$target_plugin")"
+
+    return 0
+}
+
 # Function to create package archive
 create_package() {
     log_info "Creating package archive..."
@@ -251,6 +280,7 @@ main() {
     check_prerequisites
     prepare_build_dir
     copy_plugin_files
+    generate_plugin_file
     create_package
     
     if validate_package; then

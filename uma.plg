@@ -1,6 +1,6 @@
 <?xml version='1.0' standalone='yes'?>
 <!DOCTYPE PLUGIN [
-<!ENTITY name      "Unraid Management Agent">
+<!ENTITY name      "uma">
 <!ENTITY displayname "Unraid Management Agent">
 <!ENTITY author    "domalab">
 <!ENTITY version   "2025.06.24">
@@ -11,6 +11,7 @@
 <!ENTITY plgPATH   "/boot/config/plugins/&name;">
 <!ENTITY plgNAME   "&name;-&version;">
 <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+<!ENTITY md5       "placeholder">
 ]>
 <PLUGIN name="&displayname;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://github.com/domalab/uma/issues" icon="signal">
 

@@ -38,11 +38,14 @@ package/build/
 # Plugin files (generated from templates)
 *-generated.plg
 plugin/uma.plg
+package/uma.plg
 
 # Backup files
 *.bak
 *.backup
 *.orig
+*.plg.bak
+*.plg.backup
 
 # Checksums and signatures
 *.md5
