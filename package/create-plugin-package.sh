@@ -8,7 +8,7 @@ set -e
 
 # Configuration
 PLUGIN_NAME="uma"
-VERSION="2025.06.23"
+VERSION="2025.06.23a"
 AUTHOR="domalab"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build"
