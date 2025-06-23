@@ -1,0 +1,116 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "uma">
+<!ENTITY displayname "Unraid Management Agent">
+<!ENTITY author    "domalab">
+<!ENTITY version   "{{ env['PLUGIN_VERSION'] }}">
+<!ENTITY launch    "Settings/&name;">
+<!ENTITY gitURL    "https://github.com/domalab/uma">
+<!ENTITY pluginURL "&gitURL;/releases/download/v&version;/uma.plg">
+<!ENTITY pkgURL    "&gitURL;/releases/download/v&version;">
+<!ENTITY plgPATH   "/boot/config/plugins/&name;">
+<!ENTITY plgNAME   "&name;-&version;">
+<!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+]>
+<PLUGIN name="&displayname;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://github.com/domalab/uma/issues" icon="signal">
+
+<CHANGES>
+{{ env['PLUGIN_CHANGELOG'] }}
+</CHANGES>
+
+<!--
+Unraid Management Agent - System monitoring and management API for Unraid servers
+-->
+
+<!--
+Get the UMA package.
+-->
+<FILE Name="/boot/config/plugins/&name;/&plgNAME;.txz">
+<URL>&pkgURL;/&name;-&version;-noarch-1.txz</URL>
+<SHA256>{{ env['PLUGIN_CHECKSUM'] }}</SHA256>
+</FILE>
+
+<!--
+Install default plugin configuration.
+-->
+<FILE Name="/boot/config/plugins/&name;/&name;.cfg">
+<INLINE>
+<![CDATA[
+SERVICE="enable"
+PORT="34600"
+MCP_ENABLED="disable"
+MCP_PORT="34800"
+]]>
+</INLINE>
+</FILE>
+
+<!--
+Install the plugin.
+-->
+<FILE Run="/bin/bash">
+<INLINE>
+<![CDATA[
+echo "Installing Unraid Management Agent..."
+echo "Preparing installation..."
+
+# Remove any existing installation
+rm -rf &emhttp;
+
+# Install the package
+upgradepkg --install-new /boot/config/plugins/&name;/&plgNAME;.txz
+
+# Create symlink for plugin registration
+ln -sf /boot/config/plugins/&name;/&name;.plg /var/log/plugins/&name;.plg
+
+# Set permissions
+chmod -R 755 &emhttp;
+
+# Start the service if enabled
+if [[ -f /boot/config/plugins/&name;/&name;.cfg ]]; then
+    source /boot/config/plugins/&name;/&name;.cfg
+    if [[ "$SERVICE" == "enable" ]]; then
+        echo "Starting UMA service..."
+        &emhttp;/scripts/start
+    fi
+fi
+
+echo ""
+echo "-----------------------------------------------------------"
+echo " Unraid Management Agent has been installed."
+echo " Copyright (c) domalab"
+echo " Version: &version;"
+echo "-----------------------------------------------------------"
+echo ""
+]]>
+</INLINE>
+</FILE>
+
+<!--
+The 'remove' script.
+-->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+<![CDATA[
+# Stop the service
+&emhttp;/scripts/stop 2>/dev/null
+
+# Remove plugin files
+rm -rf &emhttp;
+rm -rf /boot/config/plugins/&name;
+rm -f /var/log/plugins/&name;.plg
+
+# Remove package
+removepkg &plgNAME; 2>/dev/null
+
+echo ""
+echo "-----------------------------------------------------------"
+echo " Unraid Management Agent has been removed."
+echo " Copyright (c) domalab"
+echo " Version: &version;"
+echo "-----------------------------------------------------------"
+echo ""
+]]>
+</INLINE>
+</FILE>
+
+</PLUGIN>

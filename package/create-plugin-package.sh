@@ -96,38 +96,42 @@ prepare_build_dir() {
 
 # Function to copy plugin files
 copy_plugin_files() {
-    log_info "Copying plugin files..."
-    
-    # Copy all plugin files
-    cp -r "$PACKAGE_DIR"/* "$BUILD_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/"
+    log_info "Copying plugin files from modern src/ structure..."
+
+    # Use the new src/ directory structure
+    local src_dir="$SCRIPT_DIR/../src"
+
+    if [ -d "$src_dir" ]; then
+        log_info "Using modern src/ directory structure"
+        cp -r "$src_dir/"* "$BUILD_DIR/"
+    else
+        log_info "Falling back to legacy structure..."
+        # Copy all plugin files (legacy method)
+        cp -r "$PACKAGE_DIR"/* "$BUILD_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/"
+    fi
     
     # Set proper permissions
     chmod +x "$BUILD_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/uma"
     chmod +x "$BUILD_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/scripts/"*
     chmod +x "$BUILD_DIR/usr/local/emhttp/plugins/$PLUGIN_NAME/event/"*
     
-    # Create slack-desc file for package
-    cat > "$BUILD_DIR/install/slack-desc" << EOF
-# HOW TO EDIT THIS FILE:
-# The "handy ruler" below makes it easier to edit a package description.
-# Line up the first '|' above the ':' following the base package name, and
-# the '|' on the right side marks the last column you can put a character in.
-# You must make exactly 11 lines for the formatting to be correct.  It's also
-# customary to leave one space after the ':' except on otherwise blank lines.
-
-    |-----handy-ruler------------------------------------------------------|
-uma: UMA (Unraid Management Agent)
+    # Create slack-desc file for package (only if not using modern src/ structure)
+    if [ ! -f "$BUILD_DIR/install/slack-desc" ]; then
+        cat > "$BUILD_DIR/install/slack-desc" << EOF
+        |-----handy-ruler------------------------------------------------------|
+uma: uma (Unraid Management Agent)
 uma:
-uma: Comprehensive system monitoring and management for Unraid servers
-uma: through a modern REST API, WebSocket streaming, and MCP protocol.
+uma: System monitoring and management API for Unraid servers
 uma:
-uma: Features: System monitoring, Docker management, VM control, UPS
-uma: monitoring, storage array monitoring, real-time data streaming,
-uma: MCP support for AI agents, optimized performance, and clean web UI.
+uma: Features:
+uma: - 75+ REST API endpoints for system monitoring
+uma: - Docker container and VM management
+uma: - Storage array and UPS monitoring
+uma: - Model Context Protocol (MCP) support
+uma: - Real-time WebSocket streaming
 uma:
-uma: Author: $AUTHOR
-uma: Version: $VERSION
 EOF
+    fi
     
     log_success "Plugin files copied"
 }
@@ -135,27 +139,38 @@ EOF
 # Function to create package archive
 create_package() {
     log_info "Creating package archive..."
-    
-    local package_file="$SCRIPT_DIR/${PLUGIN_NAME}-${VERSION}.txz"
-    
-    # Create the package
+
+    # Modern Unraid package naming convention
+    local modern_package="$SCRIPT_DIR/${PLUGIN_NAME}-${VERSION}-noarch-1.txz"
+    local legacy_package="$SCRIPT_DIR/${PLUGIN_NAME}-${VERSION}.txz"
+
+    # Create the package with modern standards
     cd "$BUILD_DIR"
-    tar -cJf "$package_file" .
+    tar --owner=0 --group=0 -cJf "$modern_package" .
+
+    # Also create legacy format for compatibility
+    tar --owner=0 --group=0 -czf "$legacy_package" .
     cd "$SCRIPT_DIR"
-    
-    # Generate MD5 checksum
+
+    # Generate SHA256 checksum (modern security standard)
+    local sha256_hash
+    sha256_hash=$(sha256sum "$modern_package" | awk '{print $1}')
+
+    # Generate MD5 for legacy compatibility
     local md5_hash
-    md5_hash=$(md5sum "$package_file" | awk '{print $1}')
-    
-    log_success "Package created: $(basename "$package_file")"
+    md5_hash=$(md5sum "$legacy_package" | awk '{print $1}')
+
+    log_success "Package created: $(basename "$modern_package")"
+    log_success "Legacy package created: $(basename "$legacy_package")"
+    log_info "SHA256 checksum: $sha256_hash"
     log_info "MD5 checksum: $md5_hash"
-    
-    # Update .plg file with correct MD5
+
+    # Update .plg file with correct MD5 (for legacy compatibility)
     if [ -f "$SCRIPT_DIR/uma.plg" ]; then
         sed -i.bak "s/<!ENTITY md5.*>/<!ENTITY md5       \"$md5_hash\">/" "$SCRIPT_DIR/uma.plg"
         log_success "Updated .plg file with MD5 checksum"
     fi
-    
+
     return 0
 }
 

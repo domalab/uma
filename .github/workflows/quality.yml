@@ -1,0 +1,122 @@
+name: Quality Assurance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  version-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Verify version consistency
+        run: |
+          chmod +x scripts/update-version.sh
+          ./scripts/update-version.sh verify
+
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          
+      - name: Run go fmt
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "Go code is not formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+          
+      - name: Run go vet
+        run: go vet ./...
+        
+      - name: Run staticcheck
+        uses: dominikh/staticcheck-action@v1.3.1
+        with:
+          version: "2024.1.1"
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          
+      - name: Test version sync and build
+        run: |
+          make version-sync
+          make local
+          
+      - name: Test package creation
+        run: |
+          cd package
+          ./create-plugin-package.sh
+          
+      - name: Validate package structure
+        run: |
+          cd package
+          # Check if modern package was created
+          if [ ! -f "uma-$(cat ../VERSION)-noarch-1.txz" ]; then
+            echo "Modern package not found"
+            exit 1
+          fi
+          
+          # Check if legacy package was created
+          if [ ! -f "uma-$(cat ../VERSION).txz" ]; then
+            echo "Legacy package not found"
+            exit 1
+          fi
+          
+          echo "Package validation passed"
+
+  plugin-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate plugin XML structure
+        run: |
+          # Install xmllint
+          sudo apt-get update
+          sudo apt-get install -y libxml2-utils
+          
+          # Validate plugin file
+          if [ -f "uma.plg" ]; then
+            xmllint --noout uma.plg
+            echo "Plugin XML validation passed"
+          fi
+          
+          # Validate template if it exists
+          if [ -f "plugin/uma.j2" ]; then
+            echo "Plugin template found"
+          fi
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Gosec Security Scanner
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: './...'
+          
+      - name: Check for hardcoded secrets
+        run: |
+          # Simple check for common secret patterns
+          if grep -r -E "(password|secret|key|token).*=.*['\"][^'\"]{8,}" --exclude-dir=.git .; then
+            echo "Potential hardcoded secrets found"
+            exit 1
+          fi
+          echo "No hardcoded secrets detected"

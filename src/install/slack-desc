@@ -1,0 +1,12 @@
+        |-----handy-ruler------------------------------------------------------|
+uma: uma (Unraid Management Agent)
+uma:
+uma: System monitoring and management API for Unraid servers
+uma:
+uma: Features:
+uma: - 75+ REST API endpoints for system monitoring
+uma: - Docker container and VM management
+uma: - Storage array and UPS monitoring
+uma: - Model Context Protocol (MCP) support
+uma: - Real-time WebSocket streaming
+uma:

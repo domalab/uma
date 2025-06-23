@@ -1,0 +1,96 @@
+name: Modern Release Pipeline
+
+on:
+  release:
+    types: [created]
+
+env:
+  PLUGIN_NAME: uma
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          path: release
+
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          path: main
+          ref: main
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build UMA binary
+        run: |
+          cd release
+          # Sync version first
+          make version-sync
+          # Build optimized binary for Unraid
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${{ github.event.release.tag_name }}" -o src/usr/local/emhttp/plugins/uma/uma .
+
+      - name: Prepare package structure
+        run: |
+          cd release
+          # The src/ structure is already in place from the modern migration
+          # Just ensure the binary is in the right place
+          if [ ! -f "src/usr/local/emhttp/plugins/uma/uma" ]; then
+            echo "Binary not found in src structure, copying..."
+            cp uma src/usr/local/emhttp/plugins/uma/uma 2>/dev/null || true
+          fi
+
+      - name: Create package
+        id: build_files
+        run: |
+          mkdir release_assets
+          cd release/src
+          
+          # Create standard Unraid package
+          tar --owner=0 --group=0 -cJf ../../release_assets/${{ env.PLUGIN_NAME }}-${{ github.event.release.tag_name }}-noarch-1.txz *
+          
+          cd ../../release_assets
+          
+          # Generate SHA256 checksum (modern standard)
+          sha256sum ${{ env.PLUGIN_NAME }}-${{ github.event.release.tag_name }}-noarch-1.txz | awk '{print $1}' > ${{ env.PLUGIN_NAME }}-${{ github.event.release.tag_name }}-noarch-1.txz.sha256
+          echo "checksum=$(cat ${{ env.PLUGIN_NAME }}-${{ github.event.release.tag_name }}-noarch-1.txz.sha256)" >> $GITHUB_OUTPUT
+
+      - name: Generate plugin file from template
+        uses: cuchi/jinja2-action@v1.2.2
+        with:
+          template: main/plugin/uma.j2
+          output_file: main/plugin/uma.plg
+        env:
+          PLUGIN_VERSION: ${{ github.event.release.tag_name }}
+          PLUGIN_CHECKSUM: ${{ steps.build_files.outputs.checksum }}
+          PLUGIN_CHANGELOG: ${{ github.event.release.body }}
+
+      - name: Upload release assets
+        uses: shogo82148/actions-upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: release_assets/*
+
+      - name: Add checksum to release description
+        uses: djn24/add-comment-to-release@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          comment: |
+            ## Package Checksum
+            `${{ env.PLUGIN_NAME }}-${{ github.event.release.tag_name }}-noarch-1.txz`: `${{ steps.build_files.outputs.checksum }}`
+
+      - name: Commit updated plugin file
+        run: |
+          cd main
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add plugin/uma.plg
+          git commit -m "release: update plugin file for ${{ github.event.release.tag_name }}" || exit 0
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
