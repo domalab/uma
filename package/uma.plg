@@ -11,7 +11,7 @@
 <!ENTITY plgPATH   "/boot/config/plugins/&name;">
 <!ENTITY plgNAME   "&name;-&version;">
 <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
-<!ENTITY md5       "d849a9d577ecc0bfeea87062709daad0">
+<!ENTITY md5       "42b48450e13d6b7b12710c40f865d196">
 ]>
 <PLUGIN name="&displayname;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://github.com/domalab/uma/issues" icon="signal">
 
