@@ -1,0 +1,172 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "uma">
+<!ENTITY author    "domalab">
+<!ENTITY version   "2025.06.22">
+<!ENTITY gitURL    "https://github.com/domalab/uma">
+<!ENTITY pluginURL "&gitURL;/releases/download/v&version;/uma.plg">
+<!ENTITY packageURL "&gitURL;/releases/download/v&version;/uma-&version;.txz">
+<!ENTITY md5       "f66f0287b343a0d5826abfcc96630df0">
+]>
+
+<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.12.0" support="&gitURL;/issues">
+
+<CHANGES>
+###2025.06.22
+- Complete Unraid plugin package with proper integration
+- Enhanced UPS detection with multiple protocol support
+- Optimized Docker monitoring with intelligent polling intervals
+- MCP (Model Context Protocol) support with SimpleToolRegistry
+- Comprehensive API with 75+ endpoints for system monitoring
+- WebSocket support for real-time data streaming
+- Performance optimizations and reduced verbose logging
+- Data quality improvements (no null values in API responses)
+- Consistent binary naming and clean deployment process
+- Full compatibility with Unraid plugin management system
+
+###2025.06.21
+- Initial release with core functionality
+- REST API for system monitoring
+- Docker container management
+- VM monitoring and control
+- Storage array monitoring
+- UPS status monitoring
+- Basic web interface
+</CHANGES>
+
+<!--
+UMA (Unraid Management Agent) provides comprehensive system monitoring and management
+capabilities through a modern REST API, WebSocket streaming, and MCP protocol support.
+
+Key Features:
+- Complete system monitoring (CPU, memory, storage, network)
+- Docker container management and monitoring
+- Virtual machine monitoring and control
+- UPS status monitoring with enhanced protocol detection
+- Storage array and disk monitoring
+- Real-time data streaming via WebSocket
+- MCP (Model Context Protocol) support for AI agent integration
+- Optimized performance with intelligent polling
+- Clean, modern web interface
+- Comprehensive API with 75+ endpoints
+
+The plugin integrates seamlessly with Unraid's plugin management system and provides
+both a web interface and programmatic API access for automation and monitoring tools.
+-->
+
+<FILE Run="/bin/bash">
+<INLINE>
+# Remove old plugin files
+rm -f $(ls /boot/config/plugins/&name;*.txz 2>/dev/null|head -1)
+rm -f $(ls /boot/config/plugins/&name;*.md5 2>/dev/null|head -1)
+</INLINE>
+</FILE>
+
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
+<URL>&packageURL;</URL>
+<MD5>&md5;</MD5>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+# Verify installation
+if [ ! -f /usr/local/emhttp/plugins/&name;/&name; ]; then
+  echo "ERROR: UMA binary not found after installation"
+  exit 1
+fi
+
+# Set proper permissions
+chmod +x /usr/local/emhttp/plugins/&name;/&name;
+chmod +x /usr/local/emhttp/plugins/&name;/scripts/start
+chmod +x /usr/local/emhttp/plugins/&name;/scripts/stop
+
+# Create configuration directory if it doesn't exist
+mkdir -p /boot/config/plugins/&name;
+
+# Create default configuration if it doesn't exist
+if [ ! -f /boot/config/plugins/&name;/&name;.cfg ]; then
+  cat > /boot/config/plugins/&name;/&name;.cfg << 'EOF'
+SERVICE="enable"
+PORT="34600"
+MCP_ENABLED="disable"
+MCP_PORT="34800"
+MCP_MAX_CONNECTIONS="100"
+UPS="enable"
+EOF
+fi
+
+# Create JSON configuration if it doesn't exist
+if [ ! -f /boot/config/plugins/&name;/&name;.json ]; then
+  cat > /boot/config/plugins/&name;/&name;.json << 'EOF'
+{
+  "version": "&version;",
+  "http_server": {
+    "enabled": true,
+    "port": 34600,
+    "host": "0.0.0.0"
+  },
+  "auth": {
+    "enabled": false
+  },
+  "logging": {
+    "level": "info",
+    "max_size": 10,
+    "max_backups": 0,
+    "max_age": 0
+  },
+  "mcp": {
+    "enabled": false,
+    "port": 34800,
+    "max_connections": 100
+  }
+}
+EOF
+fi
+
+# Create log directory
+mkdir -p /var/log
+
+# Start the service if enabled
+source /boot/config/plugins/&name;/&name;.cfg
+if [[ "$SERVICE" == "enable" ]]; then
+  echo "Starting UMA service..."
+  /usr/local/emhttp/plugins/&name;/scripts/start
+fi
+
+echo "UMA plugin installation completed successfully"
+echo "Version: &version;"
+echo "Web interface: http://$(hostname -I | awk '{print $1}'):$PORT"
+echo "API documentation: Available through web interface"
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+# Stop the service
+echo "Stopping UMA service..."
+/usr/local/emhttp/plugins/&name;/scripts/stop 2>/dev/null
+
+# Wait for service to stop
+sleep 3
+
+# Force kill any remaining processes
+killall -9 &name; 2>/dev/null
+
+# Remove plugin files
+rm -rf /usr/local/emhttp/plugins/&name;
+
+# Remove configuration (optional - user choice)
+# Uncomment the following lines to remove configuration on uninstall
+# rm -rf /boot/config/plugins/&name;
+
+# Remove log files
+rm -f /var/log/&name;.log
+
+# Remove any remaining processes
+killall -9 &name; 2>/dev/null
+
+echo "UMA plugin removed successfully"
+</INLINE>
+</FILE>
+
+</PLUGIN>
