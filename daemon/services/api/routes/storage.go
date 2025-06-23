@@ -10,6 +10,11 @@ func (r *Router) registerStorageRoutes() {
 	r.mux.HandleFunc("/api/v1/storage/zfs", r.storageHandler.HandleStorageZFS)
 	r.mux.HandleFunc("/api/v1/storage/general", r.storageHandler.HandleStorageGeneral)
 
+	// Missing endpoints implementation
+	r.mux.HandleFunc("/api/v1/storage/smart", r.storageHandler.HandleStorageSMART)
+	r.mux.HandleFunc("/api/v1/storage/array/status", r.storageHandler.HandleArrayStatus)
+	r.mux.HandleFunc("/api/v1/storage/shares", r.shareHandler.HandleShares)
+
 	// Array control endpoints with enhanced orchestration
 	r.mux.HandleFunc("/api/v1/storage/array/start", r.storageHandler.HandleArrayStart)
 	r.mux.HandleFunc("/api/v1/storage/array/stop", r.storageHandler.HandleArrayStop)

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -839,6 +841,167 @@ func (h *StorageHandler) getArrayStatus() string {
 	}
 
 	return "unknown"
+}
+
+// getSMARTData returns SMART data for all disks
+func (h *StorageHandler) getSMARTData() (interface{}, error) {
+	// Get disk information first
+	disks, err := h.api.GetStorage().GetDisks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get disk information: %v", err)
+	}
+
+	smartData := make(map[string]interface{})
+
+	// Process each disk to get SMART data
+	if diskArray, ok := disks.([]interface{}); ok {
+		for _, disk := range diskArray {
+			if diskMap, ok := disk.(map[string]interface{}); ok {
+				if name, exists := diskMap["name"]; exists {
+					if diskName, ok := name.(string); ok {
+						smartInfo := h.getDiskSMARTInfo(diskName)
+						smartData[diskName] = smartInfo
+					}
+				}
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"disks":        smartData,
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
+// getDiskSMARTInfo gets SMART information for a specific disk
+func (h *StorageHandler) getDiskSMARTInfo(diskName string) map[string]interface{} {
+	// Try to read SMART data using smartctl
+	cmd := exec.Command("smartctl", "-A", fmt.Sprintf("/dev/%s", diskName))
+	output, err := cmd.Output()
+	if err != nil {
+		return map[string]interface{}{
+			"status":      "unavailable",
+			"temperature": 0,
+			"health":      "unknown",
+			"error":       fmt.Sprintf("Failed to get SMART data: %v", err),
+		}
+	}
+
+	// Parse SMART output for key metrics
+	smartInfo := h.parseSMARTOutput(string(output))
+	smartInfo["disk"] = diskName
+	smartInfo["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+
+	return smartInfo
+}
+
+// parseSMARTOutput parses smartctl output to extract key metrics
+func (h *StorageHandler) parseSMARTOutput(output string) map[string]interface{} {
+	smartInfo := map[string]interface{}{
+		"status":      "healthy",
+		"temperature": 0,
+		"health":      "PASSED",
+		"attributes":  make(map[string]interface{}),
+	}
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Parse temperature
+		if strings.Contains(line, "Temperature_Celsius") {
+			fields := strings.Fields(line)
+			if len(fields) >= 10 {
+				if temp, err := strconv.Atoi(fields[9]); err == nil {
+					smartInfo["temperature"] = temp
+				}
+			}
+		}
+
+		// Parse other important attributes
+		if strings.Contains(line, "Reallocated_Sector_Ct") ||
+			strings.Contains(line, "Spin_Retry_Count") ||
+			strings.Contains(line, "End-to-End_Error") {
+			fields := strings.Fields(line)
+			if len(fields) >= 10 {
+				attrName := fields[1]
+				if value, err := strconv.Atoi(fields[9]); err == nil {
+					if attrs, ok := smartInfo["attributes"].(map[string]interface{}); ok {
+						attrs[attrName] = value
+					}
+				}
+			}
+		}
+	}
+
+	return smartInfo
+}
+
+// getDetailedArrayStatus returns detailed array status information
+func (h *StorageHandler) getDetailedArrayStatus() (interface{}, error) {
+	// Get basic array info
+	arrayInfo, err := h.api.GetStorage().GetArrayInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get array information: %v", err)
+	}
+
+	// Enhance with additional status details
+	detailedStatus := map[string]interface{}{
+		"basic_info":   arrayInfo,
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Add array state from mdstat if available
+	if mdstatInfo := h.getMdstatInfo(); mdstatInfo != nil {
+		detailedStatus["mdstat"] = mdstatInfo
+	}
+
+	// Add disk assignments
+	if diskAssignments := h.getDiskAssignments(); diskAssignments != nil {
+		detailedStatus["disk_assignments"] = diskAssignments
+	}
+
+	return detailedStatus, nil
+}
+
+// getMdstatInfo reads /proc/mdstat for array status
+func (h *StorageHandler) getMdstatInfo() map[string]interface{} {
+	content, err := os.ReadFile("/proc/mdstat")
+	if err != nil {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to read mdstat: %v", err),
+		}
+	}
+
+	return map[string]interface{}{
+		"content":      string(content),
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+// getDiskAssignments reads disk assignments from Unraid configuration
+func (h *StorageHandler) getDiskAssignments() map[string]interface{} {
+	assignments := make(map[string]interface{})
+
+	// Try to read from common Unraid config locations
+	configPaths := []string{
+		"/boot/config/disk.cfg",
+		"/var/local/emhttp/disks.ini",
+	}
+
+	for _, path := range configPaths {
+		if content, err := os.ReadFile(path); err == nil {
+			assignments[path] = string(content)
+			break
+		}
+	}
+
+	if len(assignments) == 0 {
+		assignments["error"] = "No disk assignment configuration found"
+	}
+
+	assignments["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+	return assignments
 }
 
 // transformZFSInfo transforms ZFS pools array to ZFS info object matching schema
