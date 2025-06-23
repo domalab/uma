@@ -8,8 +8,15 @@ set -e
 
 # Configuration
 PLUGIN_NAME="uma"
-VERSION="2025.06.23a"
 AUTHOR="domalab"
+
+# Get version from single source of truth
+if [[ -f "../VERSION" ]]; then
+    VERSION=$(cat "../VERSION" | tr -d '\n\r' | xargs)
+else
+    echo "ERROR: VERSION file not found. Run 'make version-sync' first."
+    exit 1
+fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build"
 PACKAGE_DIR="$SCRIPT_DIR/uma"

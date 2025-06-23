@@ -12,7 +12,7 @@ mb_hash := $(shell git rev-parse --short HEAD)
 PROG = uma
 
 # targets not associated with files
-.PHONY: default build test coverage clean kill restart serve validate-schemas build-validator install-schema-tools
+.PHONY: default build test coverage clean kill restart serve validate-schemas build-validator install-schema-tools version-sync version-set version-verify
 
 # default targets to run when only running `make`
 default: test
@@ -21,13 +21,13 @@ default: test
 clean:
 	go clean
 
-local: clean
+local: clean version-sync
 	go build fmt
-	go build -ldflags "-X main.Version=$(mb_date)-$(mb_hash)" -v -o ${PROG}
+	go build -ldflags "-X main.Version=$(shell cat VERSION)" -v -o ${PROG}
 
-release: clean
+release: clean version-sync
 	go build fmt
-	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(mb_date)-$(mb_hash)" -v -o ${PROG}
+	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(shell cat VERSION)" -v -o ${PROG}
 
 # run unit tests with code coverage
 test:
@@ -49,6 +49,47 @@ restart:
 
 publish: build
 	cp ./${PROG} ~/bin
+
+# Version management targets
+version-sync:
+	@echo "Synchronizing version across all files..."
+	@./scripts/update-version.sh sync
+
+version-set:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make version-set VERSION=2025.06.24"; \
+		exit 1; \
+	fi
+	@echo "Setting new version: $(VERSION)"
+	@./scripts/update-version.sh set $(VERSION)
+
+version-verify:
+	@echo "Verifying version consistency..."
+	@./scripts/update-version.sh verify
+
+version-current:
+	@./scripts/update-version.sh current
+
+version-help:
+	@echo "UMA Version Management System"
+	@echo ""
+	@echo "Commands:"
+	@echo "  make version-current          Display current version"
+	@echo "  make version-set VERSION=X    Set new version and sync all files"
+	@echo "  make version-sync             Sync current version across all files"
+	@echo "  make version-verify           Verify version consistency"
+	@echo "  make version-help             Show this help"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make version-set VERSION=2025.06.24    # Set new version"
+	@echo "  make version-sync                       # Sync existing version"
+	@echo "  make version-verify                     # Check consistency"
+	@echo ""
+	@echo "Release Management:"
+	@echo "  ./scripts/release.sh create             # Create GitHub release"
+	@echo "  ./scripts/release.sh verify             # Verify release"
+	@echo ""
+	@echo "Documentation: docs/version-management.md"
 
 # Schema validation targets
 install-schema-tools:
