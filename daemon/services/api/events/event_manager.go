@@ -109,7 +109,7 @@ func (em *EventManager) collectSystemStats() {
 func (em *EventManager) collectDockerEvents() {
 	defer em.wg.Done()
 
-	ticker := time.NewTicker(5 * time.Second) // 5-second intervals for Docker events
+	ticker := time.NewTicker(30 * time.Second) // Optimized: 30-second intervals for Docker events
 	defer ticker.Stop()
 
 	for {

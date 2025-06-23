@@ -161,14 +161,19 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 	}
 
 	output := d.cmdExecutor.GetCmdOutput("docker", args...)
-	logger.Blue("Docker ps output: %d lines", len(output))
+	if len(output) > 0 {
+		logger.Blue("Docker ps output: %d lines", len(output))
+	}
 
 	for i, line := range output {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 
-		logger.Blue("Processing line %d: %s", i, line[:min(100, len(line))])
+		// Reduced logging verbosity - only log first container for debugging
+		if i == 0 {
+			logger.Blue("Processing line %d: %s", i, line[:min(100, len(line))])
+		}
 
 		// Parse the docker ps JSON format first
 		var dockerPsData map[string]interface{}
@@ -189,7 +194,10 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 		containers = append(containers, container)
 	}
 
-	logger.Blue("Found %d containers", len(containers))
+	// Single summary log instead of verbose per-container logging
+	if len(containers) > 0 {
+		logger.Blue("Successfully retrieved and processed %d Docker containers", len(containers))
+	}
 	return containers, nil
 }
 

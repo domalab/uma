@@ -38,12 +38,26 @@ func (h *DockerHandler) HandleDockerContainers(w http.ResponseWriter, r *http.Re
 
 	containers, err := h.api.GetDocker().GetContainers()
 	if err != nil {
+		fmt.Printf("Docker handler: Failed to get containers: %v\n", err)
 		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get containers: %v", err))
 		return
 	}
 
+	fmt.Printf("Docker handler: Received containers data type: %T\n", containers)
+	if containerSlice, ok := containers.([]interface{}); ok {
+		fmt.Printf("Docker handler: Container slice length: %d\n", len(containerSlice))
+		if len(containerSlice) > 0 {
+			fmt.Printf("Docker handler: First container type: %T\n", containerSlice[0])
+		}
+	}
+
 	// Transform containers to ensure schema compliance
 	transformedContainers := h.transformContainersData(containers)
+	fmt.Printf("Docker handler: Transformed containers type: %T\n", transformedContainers)
+	if transformedSlice, ok := transformedContainers.([]interface{}); ok {
+		fmt.Printf("Docker handler: Transformed slice length: %d\n", len(transformedSlice))
+	}
+
 	utils.WriteJSON(w, http.StatusOK, transformedContainers)
 }
 
@@ -379,9 +393,17 @@ func (h *DockerHandler) transformContainersData(containers interface{}) interfac
 		// Transform array of container objects
 		transformedContainers := make([]interface{}, 0, len(v))
 		for _, container := range v {
+			// Handle both map[string]interface{} and docker.ContainerInfo structs
 			if containerMap, ok := container.(map[string]interface{}); ok {
 				transformedContainer := h.transformSingleContainer(containerMap)
 				transformedContainers = append(transformedContainers, transformedContainer)
+			} else {
+				// Convert struct to map[string]interface{} using JSON marshaling
+				transformedContainer := h.convertStructToMap(container)
+				if transformedContainer != nil {
+					finalContainer := h.transformSingleContainer(transformedContainer)
+					transformedContainers = append(transformedContainers, finalContainer)
+				}
 			}
 		}
 		return transformedContainers
@@ -477,6 +499,24 @@ func (h *DockerHandler) transformMount(mount map[string]interface{}) map[string]
 	}
 
 	return transformed
+}
+
+// convertStructToMap converts a struct to map[string]interface{} using JSON marshaling
+func (h *DockerHandler) convertStructToMap(data interface{}) map[string]interface{} {
+	// Use JSON marshaling to convert struct to map
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		fmt.Printf("Docker handler: Failed to marshal container struct: %v\n", err)
+		return nil
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		fmt.Printf("Docker handler: Failed to unmarshal container data: %v\n", err)
+		return nil
+	}
+
+	return result
 }
 
 // transformDockerInfo transforms Docker info to match OpenAPI schema field names

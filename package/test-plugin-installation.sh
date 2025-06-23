@@ -8,7 +8,7 @@ set -e
 
 # Configuration
 PLUGIN_NAME="uma"
-VERSION="2025.06.23"
+VERSION="2025.06.24"
 TEST_HOST="${UMA_TEST_HOST:-192.168.20.21}"
 TEST_PASSWORD="${UMA_TEST_PASSWORD:-tasvyh-4Gehju-ridxic}"
 

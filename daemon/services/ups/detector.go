@@ -176,6 +176,10 @@ func (d *Detector) validateUPSCommunication(upsType ups.Kind) bool {
 		return d.validateAPCCommunication()
 	case ups.NUT:
 		return d.validateNUTCommunication()
+	case ups.USB_HID:
+		return d.validateUSBHIDCommunication()
+	case ups.SNMP:
+		return d.validateSNMPCommunication()
 	default:
 		return false
 	}
@@ -227,6 +231,34 @@ func (d *Detector) validateNUTCommunication() bool {
 			contains(outputStr, "ups.load"))
 }
 
+// validateUSBHIDCommunication checks if USB HID UPS communication works
+func (d *Detector) validateUSBHIDCommunication() bool {
+	// Check if we can read from USB HID device
+	cmd := exec.Command("cat", "/sys/class/power_supply/UPS/status")
+	output, err := cmd.Output()
+	if err != nil {
+		// Try alternative method - check for hiddev devices
+		cmd = exec.Command("ls", "/dev/usb/hiddev*")
+		_, err = cmd.Output()
+		return err == nil
+	}
+
+	// Check if output contains expected UPS status
+	outputStr := string(output)
+	return len(outputStr) > 0 &&
+		(contains(outputStr, "Discharging") ||
+			contains(outputStr, "Charging") ||
+			contains(outputStr, "Full") ||
+			contains(outputStr, "Not charging"))
+}
+
+// validateSNMPCommunication checks if SNMP UPS communication works
+func (d *Detector) validateSNMPCommunication() bool {
+	// This would require SNMP tools and UPS configuration
+	// For now, return false as it requires specific setup
+	return false
+}
+
 // getUPSTypeName returns a human-readable name for the UPS type
 func (d *Detector) getUPSTypeName(upsType ups.Kind) string {
 	switch upsType {
@@ -234,6 +266,10 @@ func (d *Detector) getUPSTypeName(upsType ups.Kind) string {
 		return "APC UPS (apcupsd)"
 	case ups.NUT:
 		return "Network UPS Tools (NUT)"
+	case ups.USB_HID:
+		return "USB HID UPS"
+	case ups.SNMP:
+		return "SNMP UPS"
 	default:
 		return "Unknown"
 	}

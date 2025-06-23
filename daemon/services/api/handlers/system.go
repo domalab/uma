@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -107,7 +109,7 @@ func (h *SystemHandler) HandleSystemNetwork(w http.ResponseWriter, r *http.Reque
 	utils.WriteJSON(w, http.StatusOK, networkData)
 }
 
-// HandleSystemUPS handles GET /api/v1/system/ups
+// HandleSystemUPS handles GET /api/v1/system/ups and /api/v1/ups/status
 func (h *SystemHandler) HandleSystemUPS(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -116,6 +118,36 @@ func (h *SystemHandler) HandleSystemUPS(w http.ResponseWriter, r *http.Request) 
 
 	upsData := h.getUPSData()
 	utils.WriteJSON(w, http.StatusOK, upsData)
+}
+
+// HandleSystemLoad handles GET /api/v1/system/load
+func (h *SystemHandler) HandleSystemLoad(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Get load information from the system
+	loadData, err := h.api.GetSystem().GetLoadInfo()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, "Failed to get load information")
+		return
+	}
+
+	// Add timestamp if not present
+	if loadMap, ok := loadData.(map[string]interface{}); ok {
+		loadMap["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+		utils.WriteJSON(w, http.StatusOK, loadMap)
+	} else {
+		// Fallback response
+		response := map[string]interface{}{
+			"load1":        0.0,
+			"load5":        0.0,
+			"load15":       0.0,
+			"last_updated": time.Now().UTC().Format(time.RFC3339),
+		}
+		utils.WriteJSON(w, http.StatusOK, response)
+	}
 }
 
 // HandleSystemGPU handles GET /api/v1/system/gpu
@@ -423,45 +455,117 @@ func (h *SystemHandler) GetFilesystemData() map[string]interface{} {
 // getSystemInfo returns system information that matches the OpenAPI schema
 func (h *SystemHandler) getSystemInfo() map[string]interface{} {
 	info := map[string]interface{}{
-		"hostname":     "unraid-server",          // Default value, should be read from system
-		"kernel":       "unknown",                // Default value, should be read from system
-		"uptime":       0,                        // Default value, should be read from system
-		"load_average": []float64{0.0, 0.0, 0.0}, // Default value
+		"hostname":     h.getHostname(),
+		"kernel":       h.getKernelVersion(),
+		"uptime":       h.getUptime(),
+		"load_average": h.getLoadAverage(),
+		"cpu_cores":    h.getCPUCores(),
+		"memory_total": h.getMemoryTotal(),
+		"cpu_usage":    h.getCPUUsage(),
 		"last_updated": time.Now().UTC().Format(time.RFC3339),
 	}
 
-	// Try to get real system information
-	if systemInfo, err := h.api.GetSystem().GetCPUInfo(); err == nil {
-		if cpuMap, ok := systemInfo.(map[string]interface{}); ok {
-			if hostname, exists := cpuMap["hostname"]; exists {
-				info["hostname"] = hostname
-			}
-		}
-	}
+	return info
+}
 
-	// Get load average from system
-	if loadInfo, err := h.api.GetSystem().GetLoadInfo(); err == nil {
-		if loadMap, ok := loadInfo.(map[string]interface{}); ok {
-			if load1, exists := loadMap["load1"]; exists {
-				if load5, exists := loadMap["load5"]; exists {
-					if load15, exists := loadMap["load15"]; exists {
-						info["load_average"] = []interface{}{load1, load5, load15}
-					}
+// Helper methods for accurate system data collection
+
+// getHostname returns the actual system hostname
+func (h *SystemHandler) getHostname() string {
+	if hostname, err := os.Hostname(); err == nil {
+		return hostname
+	}
+	return "unknown"
+}
+
+// getKernelVersion returns the actual kernel version
+func (h *SystemHandler) getKernelVersion() string {
+	if output, err := exec.Command("uname", "-r").Output(); err == nil {
+		return strings.TrimSpace(string(output))
+	}
+	return "unknown"
+}
+
+// getUptime returns the system uptime in seconds
+func (h *SystemHandler) getUptime() int64 {
+	if uptimeInfo, err := h.api.GetSystem().GetUptimeInfo(); err == nil {
+		if uptimeMap, ok := uptimeInfo.(map[string]interface{}); ok {
+			if uptimeSeconds, exists := uptimeMap["uptime_seconds"]; exists {
+				switch v := uptimeSeconds.(type) {
+				case int:
+					return int64(v)
+				case int64:
+					return v
+				case float64:
+					return int64(v)
 				}
 			}
 		}
 	}
+	return 0
+}
 
-	// Get uptime from system
-	if uptimeInfo, err := h.api.GetSystem().GetUptimeInfo(); err == nil {
-		if uptimeMap, ok := uptimeInfo.(map[string]interface{}); ok {
-			if uptimeSeconds, exists := uptimeMap["uptime_seconds"]; exists {
-				info["uptime"] = uptimeSeconds
+// getLoadAverage returns the system load averages
+func (h *SystemHandler) getLoadAverage() []float64 {
+	if loadInfo, err := h.api.GetSystem().GetLoadInfo(); err == nil {
+		if loadMap, ok := loadInfo.(map[string]interface{}); ok {
+			load1, ok1 := loadMap["load1"].(float64)
+			load5, ok2 := loadMap["load5"].(float64)
+			load15, ok3 := loadMap["load15"].(float64)
+			if ok1 && ok2 && ok3 {
+				return []float64{load1, load5, load15}
 			}
 		}
 	}
+	return []float64{0.0, 0.0, 0.0}
+}
 
-	return info
+// getCPUCores returns the number of CPU cores
+func (h *SystemHandler) getCPUCores() int {
+	if cpuInfo, err := h.api.GetSystem().GetCPUInfo(); err == nil {
+		if cpuMap, ok := cpuInfo.(map[string]interface{}); ok {
+			if cores, exists := cpuMap["cores"]; exists {
+				if coresInt, ok := cores.(int); ok {
+					return coresInt
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// getMemoryTotal returns the total system memory in KB
+func (h *SystemHandler) getMemoryTotal() int64 {
+	if memInfo, err := h.api.GetSystem().GetMemoryInfo(); err == nil {
+		if memMap, ok := memInfo.(map[string]interface{}); ok {
+			if total, exists := memMap["total"]; exists {
+				// Handle both int64 and uint64 types
+				switch v := total.(type) {
+				case int64:
+					return v / 1024 // Convert bytes to KB
+				case uint64:
+					return int64(v) / 1024 // Convert bytes to KB
+				case float64:
+					return int64(v) / 1024 // Convert bytes to KB
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// getCPUUsage returns the current CPU usage percentage
+func (h *SystemHandler) getCPUUsage() float64 {
+	if cpuInfo, err := h.api.GetSystem().GetCPUInfo(); err == nil {
+		if cpuMap, ok := cpuInfo.(map[string]interface{}); ok {
+			if usage, exists := cpuMap["usage"]; exists {
+				if usageFloat, ok := usage.(float64); ok {
+					return usageFloat
+				}
+			}
+		}
+	}
+	return 0.0
 }
 
 // transformFilesystemData transforms filesystem data to match OpenAPI schema

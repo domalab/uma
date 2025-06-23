@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/domalab/uma/daemon/logger"
 	"github.com/domalab/uma/daemon/plugins/docker"
 	"github.com/domalab/uma/daemon/services/api/utils"
 	upsDetector "github.com/domalab/uma/daemon/services/ups"
@@ -195,25 +196,45 @@ type DockerAdapter struct {
 }
 
 func (d *DockerAdapter) GetContainers() (interface{}, error) {
-	// Try to cast the API to the correct type
+	// Try to cast the API to the correct type that has GetDockerManager method
 	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
 		dockerManager := apiInstance.GetDockerManager()
 		if dockerManager != nil {
-			// Call ListContainers with the correct signature
-			containers, err := dockerManager.ListContainers(false)
+			// Call ListContainers with all=true to get all containers
+			containers, err := dockerManager.ListContainers(true)
 			if err != nil {
+				logger.Yellow("Failed to get Docker containers: %v", err)
 				return []interface{}{}, err
 			}
-			// Convert to interface{} slice
+
+			// Initialize slice fields for each container to prevent null values
 			result := make([]interface{}, len(containers))
 			for i, container := range containers {
+				// Ensure slice fields are initialized
+				if container.Ports == nil {
+					container.Ports = []docker.PortMapping{}
+				}
+				if container.Mounts == nil {
+					container.Mounts = []docker.MountInfo{}
+				}
+				if container.Networks == nil {
+					container.Networks = []docker.NetworkInfo{}
+				}
+				if container.Labels == nil {
+					container.Labels = make(map[string]string)
+				}
+				if container.Environment == nil {
+					container.Environment = []string{}
+				}
 				result[i] = container
 			}
+			logger.Blue("Successfully retrieved and processed %d Docker containers", len(containers))
 			return result, nil
 		}
 	}
 
 	// Fallback to empty array if Docker manager not available
+	logger.Yellow("Docker manager not available, returning empty container list")
 	return []interface{}{}, nil
 }
 

@@ -1210,16 +1210,24 @@ func (v *VMMonitor) GetRealVMs() (interface{}, error) {
 			vmState := strings.Join(fields[2:], " ")
 
 			vm := map[string]interface{}{
-				"id":    vmId,
-				"name":  vmName,
-				"state": vmState,
-				"type":  "kvm",
+				"id":          vmId,
+				"name":        vmName,
+				"state":       vmState,
+				"type":        "kvm",
+				"uuid":        "",
+				"memory":      0,
+				"vcpus":       0,
+				"autostart":   false,
+				"description": "",
+				"status":      vmState, // Alias for compatibility
 			}
 
 			// Get detailed VM information
 			if vmDetails := v.getVMDetails(vmName); vmDetails != nil {
-				for k, v := range vmDetails {
-					vm[k] = v
+				for k, val := range vmDetails {
+					if val != nil { // Only override defaults with non-nil values
+						vm[k] = val
+					}
 				}
 			}
 

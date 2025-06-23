@@ -10,6 +10,8 @@ func (r *Router) registerSystemRoutes() {
 	r.mux.HandleFunc("/api/v1/system/temperature", r.systemHandler.HandleSystemTemperature)
 	r.mux.HandleFunc("/api/v1/system/gpu", r.systemHandler.HandleSystemGPU)
 	r.mux.HandleFunc("/api/v1/system/ups", r.systemHandler.HandleSystemUPS)
+	r.mux.HandleFunc("/api/v1/ups/status", r.systemHandler.HandleSystemUPS)   // Alternative UPS endpoint
+	r.mux.HandleFunc("/api/v1/system/load", r.systemHandler.HandleSystemLoad) // System load endpoint
 	r.mux.HandleFunc("/api/v1/system/network", r.systemHandler.HandleSystemNetwork)
 	r.mux.HandleFunc("/api/v1/system/resources", r.systemHandler.HandleSystemResources)
 	r.mux.HandleFunc("/api/v1/system/filesystems", r.systemHandler.HandleSystemFilesystems)

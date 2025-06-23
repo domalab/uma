@@ -12,7 +12,7 @@ import (
 	"github.com/domalab/uma/daemon/logger"
 )
 
-var Version = "2025.06.23" // Default version, can be overridden at build time
+var Version = "2025.06.24" // Default version, can be overridden at build time
 
 // Sentry functions temporarily disabled for testing
 
