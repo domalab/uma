@@ -18,6 +18,7 @@ func (m *MockAPIInterface) GetSystem() utils.SystemInterface   { return nil }
 func (m *MockAPIInterface) GetStorage() utils.StorageInterface { return nil }
 func (m *MockAPIInterface) GetDocker() utils.DockerInterface   { return nil }
 func (m *MockAPIInterface) GetVM() utils.VMInterface           { return nil }
+func (m *MockAPIInterface) GetAuth() utils.AuthInterface       { return nil }
 
 func (m *MockAPIInterface) GetNotifications() utils.NotificationInterface { return nil }
 func (m *MockAPIInterface) GetUPSDetector() utils.UPSDetectorInterface    { return nil }

@@ -52,6 +52,11 @@ func (a *APIAdapter) GetVM() utils.VMInterface {
 	return NewVMAdapter(a.api)
 }
 
+// GetAuth returns the authentication interface
+func (a *APIAdapter) GetAuth() utils.AuthInterface {
+	return NewAuthAdapter(a.api)
+}
+
 // GetNotifications returns the notification interface
 func (a *APIAdapter) GetNotifications() utils.NotificationInterface {
 	return &NotificationAdapter{api: a.api}
@@ -552,4 +557,39 @@ func (u *UPSDetectorAdapter) GetStatus() interface{} {
 		"last_check": "",
 		"error":      "UPS detector not available",
 	}
+}
+
+// AuthAdapter adapts authentication operations
+type AuthAdapter struct {
+	api interface{}
+}
+
+func NewAuthAdapter(api interface{}) *AuthAdapter {
+	return &AuthAdapter{api: api}
+}
+
+func (a *AuthAdapter) Login(username, password string) (interface{}, error) {
+	// Authentication is not implemented in UMA (internal-only API)
+	return nil, fmt.Errorf("authentication is not implemented in UMA - this is an internal-only API")
+}
+
+func (a *AuthAdapter) GetUsers() (interface{}, error) {
+	// Return empty user list since authentication is not implemented
+	return []interface{}{}, nil
+}
+
+func (a *AuthAdapter) GetStats() (interface{}, error) {
+	// Return basic auth stats indicating authentication is disabled
+	return map[string]interface{}{
+		"enabled":        false,
+		"total_users":    0,
+		"active_users":   0,
+		"total_sessions": 0,
+		"message":        "Authentication is not implemented in UMA",
+	}, nil
+}
+
+func (a *AuthAdapter) IsEnabled() bool {
+	// Authentication is not enabled in UMA
+	return false
 }

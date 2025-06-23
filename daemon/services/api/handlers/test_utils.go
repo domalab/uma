@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/domalab/uma/daemon/services/api/utils"
 )
 
@@ -43,6 +45,11 @@ func (m *MockAPIInterface) GetVM() utils.VMInterface {
 // GetNotifications returns a mock notification interface
 func (m *MockAPIInterface) GetNotifications() utils.NotificationInterface {
 	return &MockNotificationInterface{}
+}
+
+// GetAuth returns a mock authentication interface
+func (m *MockAPIInterface) GetAuth() utils.AuthInterface {
+	return &MockAuthInterface{}
 }
 
 // MockSystemInterface provides mock system functionality
@@ -300,4 +307,29 @@ func (m *MockUPSDetectorInterface) GetStatus() interface{} {
 		"last_check": "2024-01-01T00:00:00Z",
 		"error":      "No UPS detected (mock)",
 	}
+}
+
+// MockAuthInterface provides mock authentication functionality
+type MockAuthInterface struct{}
+
+func (m *MockAuthInterface) Login(username, password string) (interface{}, error) {
+	return nil, fmt.Errorf("authentication is not implemented in UMA")
+}
+
+func (m *MockAuthInterface) GetUsers() (interface{}, error) {
+	return []interface{}{}, nil
+}
+
+func (m *MockAuthInterface) GetStats() (interface{}, error) {
+	return map[string]interface{}{
+		"enabled":        false,
+		"total_users":    0,
+		"active_users":   0,
+		"total_sessions": 0,
+		"message":        "Authentication is not implemented in UMA",
+	}, nil
+}
+
+func (m *MockAuthInterface) IsEnabled() bool {
+	return false
 }

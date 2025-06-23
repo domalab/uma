@@ -1199,3 +1199,35 @@ func (h *StorageHandler) transformZFSDataset(dataset map[string]interface{}) map
 
 	return transformed
 }
+
+// HandleStorageSMART handles GET /api/v1/storage/smart
+func (h *StorageHandler) HandleStorageSMART(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	smartData, err := h.getSMARTData()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get SMART data: %v", err))
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, smartData)
+}
+
+// HandleArrayStatus handles GET /api/v1/storage/array/status
+func (h *StorageHandler) HandleArrayStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	arrayStatus, err := h.getDetailedArrayStatus()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get array status: %v", err))
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, arrayStatus)
+}

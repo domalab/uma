@@ -8,6 +8,7 @@ type APIInterface interface {
 	GetStorage() StorageInterface
 	GetDocker() DockerInterface
 	GetVM() VMInterface
+	GetAuth() AuthInterface
 
 	GetNotifications() NotificationInterface
 	GetUPSDetector() UPSDetectorInterface
@@ -79,4 +80,12 @@ type NotificationInterface interface {
 type UPSDetectorInterface interface {
 	IsAvailable() bool
 	GetStatus() interface{}
+}
+
+// AuthInterface defines the interface for authentication operations
+type AuthInterface interface {
+	Login(username, password string) (interface{}, error)
+	GetUsers() (interface{}, error)
+	GetStats() (interface{}, error)
+	IsEnabled() bool
 }

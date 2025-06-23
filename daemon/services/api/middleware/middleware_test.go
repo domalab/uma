@@ -35,9 +35,9 @@ func TestCORS(t *testing.T) {
 			origin:         "http://localhost:3000",
 			expectedStatus: http.StatusOK,
 			checkHeaders: map[string]string{
-				"Access-Control-Allow-Origin":  "*",
-				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-				"Access-Control-Allow-Headers": "Content-Type, Authorization, X-Request-ID",
+				"Access-Control-Allow-Origin":  "http://localhost:3000",
+				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+				"Access-Control-Allow-Headers": "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Request-ID",
 			},
 		},
 		{
@@ -46,9 +46,9 @@ func TestCORS(t *testing.T) {
 			origin:         "http://localhost:3000",
 			expectedStatus: http.StatusOK,
 			checkHeaders: map[string]string{
-				"Access-Control-Allow-Origin":  "*",
-				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-				"Access-Control-Allow-Headers": "Content-Type, Authorization, X-Request-ID",
+				"Access-Control-Allow-Origin":  "http://localhost:3000",
+				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+				"Access-Control-Allow-Headers": "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Request-ID",
 			},
 		},
 	}
