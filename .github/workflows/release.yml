@@ -1,4 +1,4 @@
-name: Modern Release Pipeline
+name: Release Pipeline
 
 on:
   release:
