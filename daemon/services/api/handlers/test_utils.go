@@ -52,6 +52,35 @@ func (m *MockAPIInterface) GetAuth() utils.AuthInterface {
 	return &MockAuthInterface{}
 }
 
+// GetConfigManager returns a mock configuration manager
+func (m *MockAPIInterface) GetConfigManager() interface{} {
+	return &MockConfigManager{}
+}
+
+// GetMCPServer returns a mock MCP server
+func (m *MockAPIInterface) GetMCPServer() interface{} {
+	return nil // Return nil to simulate disabled MCP server
+}
+
+// MockConfigManager provides mock configuration management
+type MockConfigManager struct {
+	mcpEnabled        bool
+	mcpMaxConnections int
+}
+
+func (m *MockConfigManager) SetMCPEnabled(enabled bool) error {
+	m.mcpEnabled = enabled
+	return nil
+}
+
+func (m *MockConfigManager) SetMCPMaxConnections(maxConnections int) error {
+	if maxConnections <= 0 {
+		return fmt.Errorf("invalid max connections: %d", maxConnections)
+	}
+	m.mcpMaxConnections = maxConnections
+	return nil
+}
+
 // MockSystemInterface provides mock system functionality
 type MockSystemInterface struct{}
 

@@ -23,7 +23,6 @@ import (
 	"github.com/domalab/uma/daemon/services/async"
 	"github.com/domalab/uma/daemon/services/cache"
 	"github.com/domalab/uma/daemon/services/config"
-	"github.com/domalab/uma/daemon/services/mcp"
 	upsDetector "github.com/domalab/uma/daemon/services/ups"
 )
 
@@ -35,9 +34,6 @@ type Api struct {
 
 	// HTTP server
 	httpServer *HTTPServer
-
-	// MCP server
-	mcpServer *mcp.Server
 
 	// Services
 	configManager *config.Manager
@@ -86,17 +82,6 @@ func Create(ctx *domain.Context) *Api {
 		api.httpServer = NewHTTPServer(api, loadedConfig.HTTPServer.Port)
 	}
 
-	// Initialize MCP server if enabled (requires HTTP server for API adapter)
-	if loadedConfig.MCP.Enabled && api.httpServer != nil {
-		// Create MCP configuration from domain config
-		mcpConfig := config.MCPConfig{
-			Enabled:        loadedConfig.MCP.Enabled,
-			Port:           loadedConfig.MCP.Port,
-			MaxConnections: loadedConfig.MCP.MaxConnections,
-		}
-		api.mcpServer = mcp.NewServer(mcpConfig, api.httpServer.apiAdapter)
-	}
-
 	return api
 }
 
@@ -141,13 +126,6 @@ func (a *Api) Run() error {
 	if a.httpServer != nil {
 		if err := a.httpServer.Start(); err != nil {
 			logger.Yellow("Failed to start HTTP server: %v", err)
-		}
-	}
-
-	// Start MCP server if configured
-	if a.mcpServer != nil {
-		if err := a.mcpServer.Start(); err != nil {
-			logger.Yellow("Failed to start MCP server: %v", err)
 		}
 	}
 
@@ -198,13 +176,6 @@ func (a *Api) Stop() error {
 	if a.httpServer != nil {
 		if err := a.httpServer.Stop(); err != nil {
 			logger.Yellow("Error stopping HTTP server: %v", err)
-		}
-	}
-
-	// Stop MCP server
-	if a.mcpServer != nil {
-		if err := a.mcpServer.Stop(); err != nil {
-			logger.Yellow("Error stopping MCP server: %v", err)
 		}
 	}
 
@@ -366,7 +337,7 @@ func (a *Api) RefreshUPS() {
 	a.ups = a.createUps()
 }
 
-// GetMCPServer returns the MCP server instance
-func (a *Api) GetMCPServer() *mcp.Server {
-	return a.mcpServer
+// GetConfigManager returns the configuration manager instance
+func (a *Api) GetConfigManager() interface{} {
+	return a.configManager
 }

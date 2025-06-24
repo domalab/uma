@@ -60,7 +60,7 @@ func (m *MockAPIWithMCP) GetAuth() utils.AuthInterface                  { return
 func (m *MockAPIWithMCP) GetNotifications() utils.NotificationInterface { return nil }
 func (m *MockAPIWithMCP) GetUPSDetector() utils.UPSDetectorInterface    { return nil }
 
-func (m *MockAPIWithMCP) GetMCPServer() *mcp.Server {
+func (m *MockAPIWithMCP) GetMCPServer() interface{} {
 	// Return nil to simulate disabled MCP server, or create a mock
 	return nil
 }
@@ -72,7 +72,6 @@ func (m *MockAPIWithMCP) GetConfig() *domain.Config {
 	return &domain.Config{
 		MCP: domain.MCPConfig{
 			Enabled:        false,
-			Port:           34800,
 			MaxConnections: 100,
 		},
 	}
@@ -80,34 +79,6 @@ func (m *MockAPIWithMCP) GetConfig() *domain.Config {
 
 func (m *MockAPIWithMCP) GetConfigManager() interface{} {
 	return &MockConfigManager{}
-}
-
-// MockConfigManager provides mock configuration management
-type MockConfigManager struct {
-	mcpEnabled        bool
-	mcpPort           int
-	mcpMaxConnections int
-}
-
-func (m *MockConfigManager) SetMCPEnabled(enabled bool) error {
-	m.mcpEnabled = enabled
-	return nil
-}
-
-func (m *MockConfigManager) SetMCPPort(port int) error {
-	if port < 1024 || port > 65535 {
-		return assert.AnError
-	}
-	m.mcpPort = port
-	return nil
-}
-
-func (m *MockConfigManager) SetMCPMaxConnections(maxConnections int) error {
-	if maxConnections <= 0 {
-		return assert.AnError
-	}
-	m.mcpMaxConnections = maxConnections
-	return nil
 }
 
 // TestGetMCPStatus tests MCP status endpoint
@@ -230,7 +201,6 @@ func TestUpdateMCPConfig(t *testing.T) {
 			name: "valid update - enable MCP",
 			requestBody: map[string]interface{}{
 				"enabled": true,
-				"port":    35000,
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, body map[string]interface{}) {
@@ -278,7 +248,6 @@ func TestUpdateMCPConfig(t *testing.T) {
 				config: &domain.Config{
 					MCP: domain.MCPConfig{
 						Enabled:        false,
-						Port:           34800,
 						MaxConnections: 100,
 					},
 				},
@@ -453,40 +422,7 @@ func TestUpdateMCPConfigEdgeCases(t *testing.T) {
 				assert.Contains(t, data["message"], "updated successfully")
 			},
 		},
-		{
-			name:           "port boundary - minimum valid",
-			requestBody:    `{"port": 1024}`,
-			expectedStatus: http.StatusOK,
-			checkResponse: func(t *testing.T, body map[string]interface{}) {
-				assert.True(t, body["success"].(bool))
-			},
-		},
-		{
-			name:           "port boundary - maximum valid",
-			requestBody:    `{"port": 65535}`,
-			expectedStatus: http.StatusOK,
-			checkResponse: func(t *testing.T, body map[string]interface{}) {
-				assert.True(t, body["success"].(bool))
-			},
-		},
-		{
-			name:           "port boundary - just below minimum",
-			requestBody:    `{"port": 1023}`,
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, body map[string]interface{}) {
-				assert.False(t, body["success"].(bool))
-				assert.Contains(t, body["error"], "Port must be between 1024 and 65535")
-			},
-		},
-		{
-			name:           "port boundary - just above maximum",
-			requestBody:    `{"port": 65536}`,
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, body map[string]interface{}) {
-				assert.False(t, body["success"].(bool))
-				assert.Contains(t, body["error"], "Port must be between 1024 and 65535")
-			},
-		},
+
 		{
 			name:           "max connections boundary - minimum valid",
 			requestBody:    `{"max_connections": 1}`,

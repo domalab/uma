@@ -26,7 +26,6 @@ type LogConfig struct {
 // MCPConfig holds MCP (Model Context Protocol) server configuration
 type MCPConfig struct {
 	Enabled        bool `json:"enabled"`
-	Port           int  `json:"port"`
 	MaxConnections int  `json:"max_connections"`
 }
 
@@ -46,8 +45,7 @@ func DefaultConfig() Config {
 			MaxAge:     0,  // DISABLED - no age-based retention
 		},
 		MCP: MCPConfig{
-			Enabled:        false,
-			Port:           34800,
+			Enabled:        true, // Enable MCP by default
 			MaxConnections: 100,
 		},
 	}

@@ -67,6 +67,24 @@ func (a *APIAdapter) GetUPSDetector() utils.UPSDetectorInterface {
 	return &UPSDetectorAdapter{api: a.api}
 }
 
+// GetConfigManager returns the configuration manager interface
+func (a *APIAdapter) GetConfigManager() interface{} {
+	// Try to cast the API to the correct type that has GetConfigManager method
+	if apiInstance, ok := a.api.(interface{ GetConfigManager() interface{} }); ok {
+		return apiInstance.GetConfigManager()
+	}
+	return nil
+}
+
+// GetMCPServer returns the MCP server interface
+func (a *APIAdapter) GetMCPServer() interface{} {
+	// Try to cast the API to the correct type that has GetMCPServer method
+	if apiInstance, ok := a.api.(interface{ GetMCPServer() interface{} }); ok {
+		return apiInstance.GetMCPServer()
+	}
+	return nil
+}
+
 // SystemAdapter adapts system operations
 type SystemAdapter struct {
 	api     interface{}

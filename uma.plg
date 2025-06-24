@@ -58,8 +58,6 @@ echo "Preparing installation..."
 <INLINE>
 SERVICE="enable"
 PORT="34600"
-MCP_ENABLED="disable"
-MCP_PORT="34800"
 MCP_MAX_CONNECTIONS="100"
 UPS="enable"
 </INLINE>

@@ -129,8 +129,7 @@ func (c *ViperConfigService) setDefaults() {
 	c.viper.SetDefault("cors.allowed_headers", []string{"*"})
 
 	// MCP (Model Context Protocol) defaults
-	c.viper.SetDefault("mcp.enabled", false)
-	c.viper.SetDefault("mcp.port", 34800)
+	c.viper.SetDefault("mcp.enabled", true) // Enable MCP by default
 	c.viper.SetDefault("mcp.max_connections", 100)
 }
 
@@ -416,8 +415,7 @@ cors:
 
 # MCP (Model Context Protocol) Configuration
 mcp:
-  enabled: false
-  port: 34800
+  enabled: true   # Enable MCP by default for better user experience
   max_connections: 100
 `
 

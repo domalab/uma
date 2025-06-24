@@ -1,6 +1,6 @@
 Menu="Utilities"
-Icon="uma.png"
-Title="UMA"
+Icon="signal"
+Title="Unraid Management Agent"
 Markdown="false"
 ---
 <style>
@@ -161,53 +161,9 @@ Markdown="false"
     background: linear-gradient(135deg, #495057 0%, #343a40 100%);
 }
 
-.uma-web-ui-link {
-    background: linear-gradient(135deg, #17a2b8 0%, #117a8b 100%);
-    color: white !important;
-    padding: 12px 24px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    text-decoration: none !important;
-    display: inline-block;
-    margin: 15px 0;
-    transition: all 0.2s ease-in-out;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
-}
 
-.uma-web-ui-link:hover {
-    background: linear-gradient(135deg, #117a8b 0%, #0c5460 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 5px 10px rgba(0,0,0,0.2);
-    color: white !important;
-}
 
-/* MCP Section */
-.mcp-section {
-    border-top: none;
-    padding-top: 0;
-    margin-top: 0;
-}
 
-.mcp-info {
-    background: #e7f3ff;
-    border: 1px solid #b8daff;
-    border-radius: 6px;
-    padding: 15px;
-    margin-bottom: 20px;
-    color: #004085;
-}
-
-.mcp-info a {
-    color: #0056b3;
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.mcp-info a:hover {
-    text-decoration: underline;
-}
 
 /* Status icons */
 .status-icon {
@@ -246,10 +202,7 @@ Markdown="false"
     }
 }
 
-/* Hide MCP fields when disabled */
-.mcp-field-hidden {
-    display: none !important;
-}
+
 </style>
 
 <div class="uma-container">
@@ -258,11 +211,6 @@ $sName = "uma";
 $uma_cfg = parse_plugin_cfg("uma");
 $uma_service = isset($uma_cfg['SERVICE']) ? $uma_cfg['SERVICE'] : "enable";
 $uma_port = isset($uma_cfg['PORT']) ? $uma_cfg['PORT'] : "34600";
-
-// MCP Configuration
-$mcp_enabled = isset($uma_cfg['MCP_ENABLED']) ? $uma_cfg['MCP_ENABLED'] : "disable";
-$mcp_port = isset($uma_cfg['MCP_PORT']) ? $uma_cfg['MCP_PORT'] : "34800";
-$mcp_max_connections = isset($uma_cfg['MCP_MAX_CONNECTIONS']) ? $uma_cfg['MCP_MAX_CONNECTIONS'] : "100";
 
 // Get process count and validate
 $uma_running = (int)trim(shell_exec("pidof uma 2>/dev/null | wc -w"));
@@ -299,15 +247,7 @@ if ($uma_running >= 1) {
 
     error_log("UMA Debug: Health response = " . ($health_response ? "SUCCESS" : "FAILED"));
 
-    // Check MCP status if UMA is running and responsive
-    if ($uma_api_responsive && $mcp_enabled == "enable") {
-        $mcp_config_url = "http://localhost:$uma_port/api/v1/mcp/config";
-        $mcp_status_json = @file_get_contents($mcp_config_url, false, $context);
-        if ($mcp_status_json) {
-            $mcp_status_data = json_decode($mcp_status_json, true);
-            $mcp_status = isset($mcp_status_data['data']['enabled']) && $mcp_status_data['data']['enabled'] ? "running" : "disabled";
-        }
-    }
+
 } else {
     error_log("UMA Debug: No UMA processes found");
 }
@@ -315,35 +255,17 @@ if ($uma_running >= 1) {
 
     <!-- Status Section -->
     <div class="uma-status <?php echo ($uma_running >= 1 && $uma_api_responsive) ? '' : (($uma_running >= 1) ? 'warning' : 'stopped'); ?>">
-        <h3>UMA (Unraid Management Agent)</h3>
+        <h3>Unraid Management Agent</h3>
         
         <?php if ($uma_running >= 1 && $uma_api_responsive): ?>
             <p class="uma-status-text success">
                 <span class="status-icon success">✓</span>Service is running and responsive
             </p>
             <p class="uma-status-text info">HTTP API available on port <?=$uma_port;?></p>
-            
-            <?php if ($mcp_enabled == "enable"): ?>
-                <?php if ($mcp_status == "running"): ?>
-                    <p class="uma-status-text success">
-                        <span class="status-icon success">✓</span>MCP Server is running on port <?=$mcp_port;?>
-                    </p>
-                <?php elseif ($mcp_status == "disabled"): ?>
-                    <p class="uma-status-text warning">
-                        <span class="status-icon warning">⚠</span>MCP Server is disabled in configuration
-                    </p>
-                <?php else: ?>
-                    <p class="uma-status-text info">MCP Server status: checking...</p>
-                <?php endif; ?>
-            <?php endif; ?>
-            
+
             <p class="uma-status-text info">
-                Features: REST API, WebSocket Streaming, MCP Protocol, Optimized Logging
+                Features: REST API, WebSocket Streaming, MCP Protocol Support, System Monitoring, Optimized Logging
             </p>
-            
-            <a href="http://<?=$server_ip;?>:<?=$uma_port;?>/api/v1/docs" target="_blank" class="uma-web-ui-link">
-                🚀 Open Web UI (Swagger API Documentation)
-            </a>
             
         <?php elseif ($uma_running >= 1 && !$uma_api_responsive): ?>
             <p class="uma-status-text warning">
@@ -369,7 +291,7 @@ if ($uma_running >= 1) {
             <h4>Basic Configuration</h4>
 
             <div class="uma-form-group">
-                <label for="SERVICE">Enable UMA Service:</label>
+                <label for="SERVICE">Enable Service:</label>
                 <select id="SERVICE" name="SERVICE" size="1" onChange="checkRUNNING(this.form);">
                     <?=mk_option($uma_service, "disable", "Disabled");?>
                     <?=mk_option($uma_service, "enable", "Enabled");?>
@@ -379,38 +301,11 @@ if ($uma_running >= 1) {
             <div class="uma-form-group">
                 <label for="PORT">HTTP Port:</label>
                 <input id="PORT" name="PORT" type="number" value="<?=$uma_port;?>" min="1024" max="65535" placeholder="34600" style="width:120px;" onChange="checkRUNNING(this.form);">
-                <small>Port range: 1024-65535 (default: 34600)</small>
+                <small>Port for REST API and WebSocket services (1024-65535, default: 34600)</small>
             </div>
         </div>
 
-        <!-- MCP Configuration -->
-        <div class="uma-form-section">
-            <h4>MCP (Model Context Protocol) Settings</h4>
-            <div class="mcp-info">
-                <strong>About MCP:</strong> MCP enables AI agents to interact with UMA through a standardized protocol.
-                <a href="https://modelcontextprotocol.io/" target="_blank">Learn more about MCP</a>
-            </div>
 
-            <div class="uma-form-group">
-                <label for="MCP_ENABLED">Enable MCP Server:</label>
-                <select id="MCP_ENABLED" name="MCP_ENABLED" size="1" onChange="checkMCPSettings(this.form);">
-                    <?=mk_option($mcp_enabled, "disable", "Disabled");?>
-                    <?=mk_option($mcp_enabled, "enable", "Enabled");?>
-                </select>
-            </div>
-
-            <div class="uma-form-group" id="mcp-port-group">
-                <label for="MCP_PORT">MCP Server Port:</label>
-                <input id="MCP_PORT" name="MCP_PORT" type="number" value="<?=$mcp_port;?>" min="1024" max="65535" placeholder="34800" style="width:120px;" onChange="checkRUNNING(this.form);">
-                <small>Port range: 1024-65535 (default: 34800)</small>
-            </div>
-
-            <div class="uma-form-group" id="mcp-connections-group">
-                <label for="MCP_MAX_CONNECTIONS">Max Connections:</label>
-                <input id="MCP_MAX_CONNECTIONS" name="MCP_MAX_CONNECTIONS" type="number" value="<?=$mcp_max_connections;?>" min="1" max="1000" placeholder="100" style="width:120px;" onChange="checkRUNNING(this.form);">
-                <small>Maximum concurrent MCP connections (default: 100)</small>
-            </div>
-        </div>
 
         <!-- Action Buttons -->
         <div class="uma-button-group">
@@ -425,7 +320,6 @@ if ($uma_running >= 1) {
 $(function(){
     showStatus('<?=$sName;?>');
     checkRUNNING(document.uma_settings);
-    checkMCPSettings(document.uma_settings);
 
     // Auto-refresh status every 10 seconds if service was just started
     if (window.location.search.includes('refresh=1')) {
@@ -438,10 +332,6 @@ $(function(){
 function resetDATA(form) {
     form.SERVICE.value = "enable";
     form.PORT.value = "34600";
-    form.MCP_ENABLED.value = "disable";
-    form.MCP_PORT.value = "34800";
-    form.MCP_MAX_CONNECTIONS.value = "100";
-    checkMCPSettings(form);
 }
 
 function checkRUNNING(form) {
@@ -461,22 +351,7 @@ function checkRUNNING(form) {
     }
 }
 
-function checkMCPSettings(form) {
-    var mcpEnabled = form.MCP_ENABLED.value == "enable";
 
-    // Show/hide MCP configuration fields based on enabled status
-    if (mcpEnabled) {
-        $("#mcp-port-group").removeClass('mcp-field-hidden');
-        $("#mcp-connections-group").removeClass('mcp-field-hidden');
-    } else {
-        $("#mcp-port-group").addClass('mcp-field-hidden');
-        $("#mcp-connections-group").addClass('mcp-field-hidden');
-    }
-
-    // Enable/disable MCP fields
-    form.MCP_PORT.disabled = !mcpEnabled;
-    form.MCP_MAX_CONNECTIONS.disabled = !mcpEnabled;
-}
 
 function verifyDATA(form) {
     // Validate HTTP port number
@@ -484,28 +359,6 @@ function verifyDATA(form) {
     if (isNaN(port) || port < 1024 || port > 65535) {
         alert("HTTP Port must be a number between 1024 and 65535");
         return false;
-    }
-
-    // Validate MCP port if MCP is enabled
-    if (form.MCP_ENABLED.value == "enable") {
-        var mcpPort = parseInt(form.MCP_PORT.value);
-        if (isNaN(mcpPort) || mcpPort < 1024 || mcpPort > 65535) {
-            alert("MCP Port must be a number between 1024 and 65535");
-            return false;
-        }
-
-        // Check if MCP port conflicts with HTTP port
-        if (mcpPort == port) {
-            alert("MCP Port cannot be the same as HTTP Port");
-            return false;
-        }
-
-        // Validate max connections
-        var maxConnections = parseInt(form.MCP_MAX_CONNECTIONS.value);
-        if (isNaN(maxConnections) || maxConnections < 1 || maxConnections > 1000) {
-            alert("Max Connections must be a number between 1 and 1000");
-            return false;
-        }
     }
 
     // Check for common reserved ports
@@ -516,19 +369,8 @@ function verifyDATA(form) {
         }
     }
 
-    if (form.MCP_ENABLED.value == "enable" && reservedPorts.includes(parseInt(form.MCP_PORT.value))) {
-        if (!confirm("MCP Port " + form.MCP_PORT.value + " is commonly used by other services. Are you sure you want to use this port?")) {
-            return false;
-        }
-    }
-
     form.SERVICE.value = form.SERVICE.value.replace(/ /g,"_");
     form.PORT.value = port.toString();
-    form.MCP_ENABLED.value = form.MCP_ENABLED.value.replace(/ /g,"_");
-    if (form.MCP_ENABLED.value == "enable") {
-        form.MCP_PORT.value = parseInt(form.MCP_PORT.value).toString();
-        form.MCP_MAX_CONNECTIONS.value = parseInt(form.MCP_MAX_CONNECTIONS.value).toString();
-    }
 
     // If enabling the service, trigger a refresh after submission
     if (form.SERVICE.value == "enable") {

@@ -119,6 +119,19 @@ func (m *Manager) loadLegacyINI() error {
 	service := cfg.Section("").Key("SERVICE").MustString("disable")
 	m.config.HTTPServer.Enabled = (service == "enable")
 
+	// Parse HTTP port
+	if port := cfg.Section("").Key("PORT").MustInt(34600); port > 0 && port <= 65535 {
+		m.config.HTTPServer.Port = port
+	}
+
+	// Parse MCP settings
+	mcpEnabled := cfg.Section("").Key("MCP_ENABLED").MustString("false")
+	m.config.MCP.Enabled = (mcpEnabled == "true")
+
+	logger.Blue("Loaded legacy config: HTTP=%v:%d, MCP=%v (shares HTTP port)",
+		m.config.HTTPServer.Enabled, m.config.HTTPServer.Port,
+		m.config.MCP.Enabled)
+
 	return nil
 }
 
@@ -149,9 +162,6 @@ func (m *Manager) validateAndSetDefaults() {
 	}
 
 	// Validate MCP config
-	if m.config.MCP.Port <= 0 || m.config.MCP.Port > 65535 {
-		m.config.MCP.Port = defaults.MCP.Port
-	}
 	if m.config.MCP.MaxConnections <= 0 {
 		m.config.MCP.MaxConnections = defaults.MCP.MaxConnections
 	}
@@ -188,15 +198,6 @@ func (m *Manager) SetMCPEnabled(enabled bool) error {
 	return m.Save()
 }
 
-// SetMCPPort sets the MCP server port
-func (m *Manager) SetMCPPort(port int) error {
-	if port <= 0 || port > 65535 {
-		return fmt.Errorf("invalid MCP port number: %d", port)
-	}
-	m.config.MCP.Port = port
-	return m.Save()
-}
-
 // SetMCPMaxConnections sets the maximum number of MCP connections
 func (m *Manager) SetMCPMaxConnections(maxConnections int) error {
 	if maxConnections <= 0 {
@@ -204,11 +205,6 @@ func (m *Manager) SetMCPMaxConnections(maxConnections int) error {
 	}
 	m.config.MCP.MaxConnections = maxConnections
 	return m.Save()
-}
-
-// GetMCPPort returns the configured MCP port
-func (m *Manager) GetMCPPort() int {
-	return m.config.MCP.Port
 }
 
 // IsMCPEnabled returns whether MCP server is enabled

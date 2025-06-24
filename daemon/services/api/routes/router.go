@@ -105,7 +105,8 @@ func (r *Router) GetHandler() http.Handler {
 // isWebSocketEndpoint checks if the path is a WebSocket endpoint
 func isWebSocketEndpoint(path string) bool {
 	wsEndpoints := []string{
-		"/api/v1/ws", // Unified WebSocket endpoint
+		"/api/v1/ws",  // Real-time monitoring WebSocket
+		"/api/v1/mcp", // MCP JSON-RPC 2.0 WebSocket
 	}
 
 	for _, endpoint := range wsEndpoints {
@@ -174,4 +175,6 @@ func (r *Router) registerMCPRoutes() {
 	r.mux.HandleFunc("GET /api/v1/mcp/tools", r.mcpHandler.GetMCPTools)
 	r.mux.HandleFunc("GET /api/v1/mcp/tools/categories", r.mcpHandler.GetMCPToolsByCategory)
 	r.mux.HandleFunc("POST /api/v1/mcp/tools/refresh", r.mcpHandler.RefreshMCPTools)
+
+	// Note: MCP WebSocket endpoint (/api/v1/mcp) is registered in registerWebSocketRoutes()
 }

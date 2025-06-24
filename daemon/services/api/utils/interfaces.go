@@ -12,6 +12,8 @@ type APIInterface interface {
 
 	GetNotifications() NotificationInterface
 	GetUPSDetector() UPSDetectorInterface
+	GetConfigManager() interface{}
+	GetMCPServer() interface{}
 }
 
 // SystemInterface defines the interface for system operations
