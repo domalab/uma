@@ -1731,7 +1731,7 @@ func (s *StorageMonitor) getDiskHealth(device string) string {
 	return "unknown"
 }
 
-// GetRealDisks retrieves actual disk information with SMART data
+// GetRealDisks retrieves actual disk information with SMART data and usage statistics
 func (s *StorageMonitor) GetRealDisks() (interface{}, error) {
 	disks := make([]interface{}, 0)
 
@@ -1741,6 +1741,9 @@ func (s *StorageMonitor) GetRealDisks() (interface{}, error) {
 	if err != nil {
 		return disks, err
 	}
+
+	// Get mount information for usage data
+	mountInfo := s.getMountInfo()
 
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
@@ -1756,21 +1759,215 @@ func (s *StorageMonitor) GetRealDisks() (interface{}, error) {
 				continue
 			}
 
+			// Parse size to bytes
+			sizeBytes := s.parseSizeToBytes(fields[1])
+
 			disk := map[string]interface{}{
 				"name":        deviceName,
 				"device":      devicePath,
-				"size":        fields[1],
+				"size":        sizeBytes,
 				"type":        "disk",
 				"health":      s.getDiskHealth(devicePath),
 				"temperature": s.getDiskTemperature(devicePath),
 				"smart_data":  s.getSMARTData(devicePath),
+				"status":      "active", // Default status
 			}
+
+			// Add usage data if disk is mounted
+			s.addDiskUsageData(disk, devicePath, mountInfo)
 
 			disks = append(disks, disk)
 		}
 	}
 
 	return disks, nil
+}
+
+// getMountInfo gets mount information for all mounted filesystems
+func (s *StorageMonitor) getMountInfo() map[string]map[string]interface{} {
+	mountInfo := make(map[string]map[string]interface{})
+
+	// Read /proc/mounts to get mount information
+	content, err := s.fs.ReadFile("/proc/mounts")
+	if err != nil {
+		return mountInfo
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			device := fields[0]
+			mountPoint := fields[1]
+
+			// Only process Unraid disk mounts
+			if strings.HasPrefix(mountPoint, "/mnt/disk") ||
+				strings.HasPrefix(mountPoint, "/mnt/cache") ||
+				strings.HasPrefix(mountPoint, "/boot") {
+				mountInfo[device] = map[string]interface{}{
+					"mount_point": mountPoint,
+				}
+			}
+		}
+	}
+
+	return mountInfo
+}
+
+// parseSizeToBytes converts human-readable size to bytes
+func (s *StorageMonitor) parseSizeToBytes(sizeStr string) int64 {
+	if sizeStr == "" {
+		return 0
+	}
+
+	// Remove any whitespace
+	sizeStr = strings.TrimSpace(sizeStr)
+
+	// Extract numeric part and unit
+	var numStr string
+	var unit string
+
+	for i, char := range sizeStr {
+		if char >= '0' && char <= '9' || char == '.' {
+			numStr += string(char)
+		} else {
+			unit = sizeStr[i:]
+			break
+		}
+	}
+
+	// Parse the numeric value
+	value, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0
+	}
+
+	// Convert based on unit
+	unit = strings.ToUpper(strings.TrimSpace(unit))
+	switch unit {
+	case "B", "":
+		return int64(value)
+	case "K", "KB":
+		return int64(value * 1024)
+	case "M", "MB":
+		return int64(value * 1024 * 1024)
+	case "G", "GB":
+		return int64(value * 1024 * 1024 * 1024)
+	case "T", "TB":
+		return int64(value * 1024 * 1024 * 1024 * 1024)
+	case "P", "PB":
+		return int64(value * 1024 * 1024 * 1024 * 1024 * 1024)
+	default:
+		return int64(value)
+	}
+}
+
+// addDiskUsageData adds filesystem usage data to disk information
+func (s *StorageMonitor) addDiskUsageData(disk map[string]interface{}, devicePath string, mountInfo map[string]map[string]interface{}) {
+	// Initialize usage fields with null values
+	disk["used"] = nil
+	disk["free"] = nil
+	disk["available"] = nil
+	disk["usage_percent"] = nil
+	disk["mount_point"] = nil
+
+	// Get device name from path (e.g., "/dev/sdd" -> "sdd")
+	deviceName := strings.TrimPrefix(devicePath, "/dev/")
+
+	// Check if this device or its partitions are mounted
+	var mountPoint string
+
+	// Check direct device mount
+	if info, exists := mountInfo[devicePath]; exists {
+		mountPoint = info["mount_point"].(string)
+	} else {
+		// Check for partition mounts (e.g., /dev/sda1, /dev/md1p1)
+		for device, info := range mountInfo {
+			if strings.HasPrefix(device, devicePath) {
+				mountPoint = info["mount_point"].(string)
+				break
+			}
+		}
+	}
+
+	// If not found, check for Unraid MD device mapping
+	if mountPoint == "" {
+		mountPoint = s.findUnraidMountPoint(deviceName)
+	}
+
+	if mountPoint != "" {
+		disk["mount_point"] = mountPoint
+
+		// Get filesystem usage using df command
+		cmd := s.cmd.Command("df", "-B1", mountPoint)
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) >= 2 {
+				fields := strings.Fields(lines[1])
+				if len(fields) >= 4 {
+					// Parse df output: filesystem, total, used, available
+					if total, err := strconv.ParseInt(fields[1], 10, 64); err == nil {
+						disk["size"] = total // Update size with actual filesystem size
+
+						if used, err := strconv.ParseInt(fields[2], 10, 64); err == nil {
+							disk["used"] = used
+
+							if available, err := strconv.ParseInt(fields[3], 10, 64); err == nil {
+								disk["available"] = available
+								disk["free"] = available
+
+								// Calculate usage percentage
+								if total > 0 {
+									usagePercent := float64(used) / float64(total) * 100
+									disk["usage_percent"] = usagePercent
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// findUnraidMountPoint finds the mount point for an Unraid disk by checking MD device mapping
+func (s *StorageMonitor) findUnraidMountPoint(deviceName string) string {
+	// Read Unraid's mdstat file to find MD device mapping
+	content, err := s.fs.ReadFile("/proc/mdstat")
+	if err != nil {
+		return ""
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		// Look for rdevName entries that match our device
+		if strings.HasPrefix(line, "rdevName.") && strings.Contains(line, "="+deviceName) {
+			// Extract the disk number from the line (e.g., "rdevName.1=sdd" -> "1")
+			parts := strings.Split(line, ".")
+			if len(parts) >= 2 {
+				diskNumPart := strings.Split(parts[1], "=")[0]
+				if diskNum, err := strconv.Atoi(diskNumPart); err == nil {
+					// Look for the corresponding diskName entry
+					diskNameKey := fmt.Sprintf("diskName.%d=", diskNum)
+					for _, diskLine := range lines {
+						if strings.HasPrefix(diskLine, diskNameKey) {
+							diskName := strings.TrimPrefix(diskLine, diskNameKey)
+							if diskName != "" {
+								// Map MD device to mount point
+								if strings.HasPrefix(diskName, "md") && strings.HasSuffix(diskName, "p1") {
+									mdNum := strings.TrimPrefix(strings.TrimSuffix(diskName, "p1"), "md")
+									return fmt.Sprintf("/mnt/disk%s", mdNum)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return ""
 }
 
 // getDiskTemperature gets disk temperature from SMART data
