@@ -90,6 +90,22 @@ func (h *VMHandler) handleGetVM(w http.ResponseWriter, r *http.Request, vmName, 
 		}
 		utils.WriteJSON(w, http.StatusOK, stats)
 
+	case "performance":
+		performance, err := h.getVMPerformance(vmName)
+		if err != nil {
+			utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get VM performance: %v", err))
+			return
+		}
+		utils.WriteJSON(w, http.StatusOK, performance)
+
+	case "resources":
+		resources, err := h.getVMResources(vmName)
+		if err != nil {
+			utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get VM resources: %v", err))
+			return
+		}
+		utils.WriteJSON(w, http.StatusOK, resources)
+
 	case "snapshots":
 		// Handle VM snapshots - delegate to the snapshot handler
 		h.HandleVMSnapshot(w, r, vmName)
@@ -466,4 +482,138 @@ func (h *VMHandler) parseMemoryToMB(memoryStr string) int {
 		// Assume bytes if no unit
 		return int(memory / 1024 / 1024)
 	}
+}
+
+// getVMPerformance gets comprehensive VM performance metrics
+func (h *VMHandler) getVMPerformance(vmName string) (map[string]interface{}, error) {
+	// Get enhanced VM stats
+	stats, err := h.api.GetVM().GetVMStats(vmName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Transform stats into performance-focused structure
+	performance := map[string]interface{}{
+		"vm_name":   vmName,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"status":    "unknown",
+		"cpu":       map[string]interface{}{},
+		"memory":    map[string]interface{}{},
+		"disk":      map[string]interface{}{},
+		"network":   map[string]interface{}{},
+	}
+
+	if statsMap, ok := stats.(map[string]interface{}); ok {
+		// Extract CPU performance
+		if cpuStats, ok := statsMap["cpu"].(map[string]interface{}); ok {
+			performance["cpu"] = map[string]interface{}{
+				"total_time_seconds": cpuStats["total_time_seconds"],
+				"user_time_ns":       cpuStats["user_time_ns"],
+				"system_time_ns":     cpuStats["system_time_ns"],
+			}
+		}
+
+		// Extract memory performance
+		if memStats, ok := statsMap["memory"].(map[string]interface{}); ok {
+			performance["memory"] = map[string]interface{}{
+				"usage_percent":   memStats["usage_percent"],
+				"current_bytes":   memStats["current_bytes"],
+				"maximum_bytes":   memStats["maximum_bytes"],
+				"rss_bytes":       memStats["rss_bytes"],
+				"available_bytes": memStats["available_bytes"],
+			}
+		}
+
+		// Extract disk performance
+		if diskStats, ok := statsMap["disk"].(map[string]interface{}); ok {
+			performance["disk"] = map[string]interface{}{
+				"read_bytes":     diskStats["read_bytes"],
+				"write_bytes":    diskStats["write_bytes"],
+				"total_bytes":    diskStats["total_bytes"],
+				"read_requests":  diskStats["read_requests"],
+				"write_requests": diskStats["write_requests"],
+				"total_requests": diskStats["total_requests"],
+				"usage_percent":  diskStats["usage_percent"],
+			}
+		}
+
+		// Extract network performance
+		if netStats, ok := statsMap["network"].(map[string]interface{}); ok {
+			performance["network"] = map[string]interface{}{
+				"rx_bytes":      netStats["rx_bytes"],
+				"tx_bytes":      netStats["tx_bytes"],
+				"total_bytes":   netStats["total_bytes"],
+				"rx_packets":    netStats["rx_packets"],
+				"tx_packets":    netStats["tx_packets"],
+				"total_packets": netStats["total_packets"],
+				"rx_errors":     netStats["rx_errors"],
+				"tx_errors":     netStats["tx_errors"],
+			}
+		}
+
+		// Extract VM status
+		if stateStats, ok := statsMap["state"].(map[string]interface{}); ok {
+			if status, ok := stateStats["status"].(string); ok {
+				performance["status"] = status
+			}
+		}
+	}
+
+	return performance, nil
+}
+
+// getVMResources gets VM resource allocation and configuration
+func (h *VMHandler) getVMResources(vmName string) (map[string]interface{}, error) {
+	// Get VM details
+	vm, err := h.api.GetVM().GetVM(vmName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get VM stats for current usage
+	stats, err := h.api.GetVM().GetVMStats(vmName)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := map[string]interface{}{
+		"vm_name":   vmName,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"allocated": map[string]interface{}{},
+		"current":   map[string]interface{}{},
+		"limits":    map[string]interface{}{},
+	}
+
+	// Extract allocated resources from VM config
+	if vmMap, ok := vm.(map[string]interface{}); ok {
+		allocated := map[string]interface{}{}
+
+		if vcpus, ok := vmMap["vcpus"]; ok {
+			allocated["cpu_cores"] = vcpus
+		}
+		if maxMem, ok := vmMap["max_memory"]; ok {
+			allocated["memory"] = maxMem
+		}
+
+		resources["allocated"] = allocated
+	}
+
+	// Extract current usage from stats
+	if statsMap, ok := stats.(map[string]interface{}); ok {
+		current := map[string]interface{}{}
+
+		if memStats, ok := statsMap["memory"].(map[string]interface{}); ok {
+			current["memory_usage_percent"] = memStats["usage_percent"]
+			current["memory_current_bytes"] = memStats["current_bytes"]
+		}
+
+		if diskStats, ok := statsMap["disk"].(map[string]interface{}); ok {
+			current["disk_usage_percent"] = diskStats["usage_percent"]
+			current["disk_allocation_bytes"] = diskStats["allocation_bytes"]
+		}
+
+		resources["current"] = current
+	}
+
+	return resources, nil
 }

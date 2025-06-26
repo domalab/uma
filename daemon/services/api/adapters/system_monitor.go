@@ -1285,8 +1285,41 @@ func (v *VMMonitor) getVMDetails(vmName string) map[string]interface{} {
 	return details
 }
 
-// getVMStats gets runtime statistics for a VM
+// getVMStats gets comprehensive runtime statistics for a VM using domstats
 func (v *VMMonitor) getVMStats(vmName string) map[string]interface{} {
+	stats := make(map[string]interface{})
+
+	// Use virsh domstats for comprehensive statistics
+	cmd := v.cmd.Command("virsh", "domstats", vmName)
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to basic stats if domstats fails
+		return v.getBasicVMStats(vmName)
+	}
+
+	// Parse domstats output
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "=") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				// Parse and categorize the statistics
+				v.parseDomstatLine(key, value, stats)
+			}
+		}
+	}
+
+	// Calculate derived metrics
+	v.calculateDerivedMetrics(stats)
+
+	return stats
+}
+
+// getBasicVMStats provides fallback basic statistics
+func (v *VMMonitor) getBasicVMStats(vmName string) map[string]interface{} {
 	stats := make(map[string]interface{})
 
 	// Get CPU stats
@@ -1324,6 +1357,266 @@ func (v *VMMonitor) getVMStats(vmName string) map[string]interface{} {
 	}
 
 	return stats
+}
+
+// parseDomstatLine parses a single line from virsh domstats output
+func (v *VMMonitor) parseDomstatLine(key, value string, stats map[string]interface{}) {
+	// Convert string value to appropriate type
+	var parsedValue interface{}
+	if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
+		parsedValue = intVal
+	} else if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+		parsedValue = floatVal
+	} else {
+		parsedValue = value
+	}
+
+	// Categorize and store the statistic
+	switch {
+	case strings.HasPrefix(key, "cpu."):
+		v.parseCPUStats(key, parsedValue, stats)
+	case strings.HasPrefix(key, "balloon.") || strings.HasPrefix(key, "vcpu."):
+		v.parseMemoryStats(key, parsedValue, stats)
+	case strings.HasPrefix(key, "net."):
+		v.parseNetworkStats(key, parsedValue, stats)
+	case strings.HasPrefix(key, "block."):
+		v.parseDiskStats(key, parsedValue, stats)
+	case strings.HasPrefix(key, "state."):
+		v.parseStateStats(key, parsedValue, stats)
+	default:
+		// Store other stats as-is
+		stats[key] = parsedValue
+	}
+}
+
+// parseCPUStats parses CPU-related statistics
+func (v *VMMonitor) parseCPUStats(key string, value interface{}, stats map[string]interface{}) {
+	if stats["cpu"] == nil {
+		stats["cpu"] = make(map[string]interface{})
+	}
+	cpuStats := stats["cpu"].(map[string]interface{})
+
+	switch key {
+	case "cpu.time":
+		cpuStats["total_time_ns"] = value
+	case "cpu.user":
+		cpuStats["user_time_ns"] = value
+	case "cpu.system":
+		cpuStats["system_time_ns"] = value
+	default:
+		cpuStats[strings.TrimPrefix(key, "cpu.")] = value
+	}
+}
+
+// parseMemoryStats parses memory-related statistics
+func (v *VMMonitor) parseMemoryStats(key string, value interface{}, stats map[string]interface{}) {
+	if stats["memory"] == nil {
+		stats["memory"] = make(map[string]interface{})
+	}
+	memStats := stats["memory"].(map[string]interface{})
+
+	switch key {
+	case "balloon.current":
+		memStats["current_kb"] = value
+	case "balloon.maximum":
+		memStats["maximum_kb"] = value
+	case "balloon.available":
+		memStats["available_kb"] = value
+	case "balloon.rss":
+		memStats["rss_kb"] = value
+	case "balloon.unused":
+		memStats["unused_kb"] = value
+	case "balloon.usable":
+		memStats["usable_kb"] = value
+	default:
+		if strings.HasPrefix(key, "balloon.") {
+			memStats[strings.TrimPrefix(key, "balloon.")] = value
+		} else if strings.HasPrefix(key, "vcpu.") {
+			// Store vCPU stats separately
+			if stats["vcpu"] == nil {
+				stats["vcpu"] = make(map[string]interface{})
+			}
+			vcpuStats := stats["vcpu"].(map[string]interface{})
+			vcpuStats[strings.TrimPrefix(key, "vcpu.")] = value
+		}
+	}
+}
+
+// parseNetworkStats parses network-related statistics
+func (v *VMMonitor) parseNetworkStats(key string, value interface{}, stats map[string]interface{}) {
+	if stats["network"] == nil {
+		stats["network"] = make(map[string]interface{})
+	}
+	netStats := stats["network"].(map[string]interface{})
+
+	switch key {
+	case "net.count":
+		netStats["interface_count"] = value
+	default:
+		if strings.Contains(key, ".rx.bytes") {
+			netStats["rx_bytes"] = value
+		} else if strings.Contains(key, ".tx.bytes") {
+			netStats["tx_bytes"] = value
+		} else if strings.Contains(key, ".rx.pkts") {
+			netStats["rx_packets"] = value
+		} else if strings.Contains(key, ".tx.pkts") {
+			netStats["tx_packets"] = value
+		} else if strings.Contains(key, ".rx.errs") {
+			netStats["rx_errors"] = value
+		} else if strings.Contains(key, ".tx.errs") {
+			netStats["tx_errors"] = value
+		} else if strings.Contains(key, ".rx.drop") {
+			netStats["rx_dropped"] = value
+		} else if strings.Contains(key, ".tx.drop") {
+			netStats["tx_dropped"] = value
+		} else {
+			netStats[key] = value
+		}
+	}
+}
+
+// parseDiskStats parses disk-related statistics
+func (v *VMMonitor) parseDiskStats(key string, value interface{}, stats map[string]interface{}) {
+	if stats["disk"] == nil {
+		stats["disk"] = make(map[string]interface{})
+	}
+	diskStats := stats["disk"].(map[string]interface{})
+
+	switch key {
+	case "block.count":
+		diskStats["device_count"] = value
+	default:
+		if strings.Contains(key, ".rd.bytes") {
+			diskStats["read_bytes"] = value
+		} else if strings.Contains(key, ".wr.bytes") {
+			diskStats["write_bytes"] = value
+		} else if strings.Contains(key, ".rd.reqs") {
+			diskStats["read_requests"] = value
+		} else if strings.Contains(key, ".wr.reqs") {
+			diskStats["write_requests"] = value
+		} else if strings.Contains(key, ".rd.times") {
+			diskStats["read_time_ns"] = value
+		} else if strings.Contains(key, ".wr.times") {
+			diskStats["write_time_ns"] = value
+		} else if strings.Contains(key, ".allocation") {
+			diskStats["allocation_bytes"] = value
+		} else if strings.Contains(key, ".capacity") {
+			diskStats["capacity_bytes"] = value
+		} else if strings.Contains(key, ".physical") {
+			diskStats["physical_bytes"] = value
+		} else {
+			diskStats[key] = value
+		}
+	}
+}
+
+// parseStateStats parses VM state statistics
+func (v *VMMonitor) parseStateStats(key string, value interface{}, stats map[string]interface{}) {
+	if stats["state"] == nil {
+		stats["state"] = make(map[string]interface{})
+	}
+	stateStats := stats["state"].(map[string]interface{})
+
+	switch key {
+	case "state.state":
+		// Convert state number to readable string
+		if stateNum, ok := value.(int64); ok {
+			switch stateNum {
+			case 1:
+				stateStats["status"] = "running"
+			case 2:
+				stateStats["status"] = "blocked"
+			case 3:
+				stateStats["status"] = "paused"
+			case 4:
+				stateStats["status"] = "shutdown"
+			case 5:
+				stateStats["status"] = "shutoff"
+			case 6:
+				stateStats["status"] = "crashed"
+			case 7:
+				stateStats["status"] = "suspended"
+			default:
+				stateStats["status"] = "unknown"
+			}
+		}
+		stateStats["state_code"] = value
+	case "state.reason":
+		stateStats["reason_code"] = value
+	default:
+		stateStats[strings.TrimPrefix(key, "state.")] = value
+	}
+}
+
+// calculateDerivedMetrics calculates percentage and derived metrics
+func (v *VMMonitor) calculateDerivedMetrics(stats map[string]interface{}) {
+	// Calculate CPU percentage (requires previous sample for accurate calculation)
+	if cpuStats, ok := stats["cpu"].(map[string]interface{}); ok {
+		if totalTime, ok := cpuStats["total_time_ns"].(int64); ok {
+			// Store for percentage calculation (would need previous sample)
+			cpuStats["total_time_seconds"] = float64(totalTime) / 1e9
+		}
+	}
+
+	// Calculate memory percentages
+	if memStats, ok := stats["memory"].(map[string]interface{}); ok {
+		if current, ok := memStats["current_kb"].(int64); ok {
+			if maximum, ok := memStats["maximum_kb"].(int64); ok {
+				if maximum > 0 {
+					memStats["usage_percent"] = float64(current) / float64(maximum) * 100
+				}
+			}
+			// Convert to bytes for consistency
+			memStats["current_bytes"] = current * 1024
+		}
+		if maximum, ok := memStats["maximum_kb"].(int64); ok {
+			memStats["maximum_bytes"] = maximum * 1024
+		}
+		if rss, ok := memStats["rss_kb"].(int64); ok {
+			memStats["rss_bytes"] = rss * 1024
+		}
+		if available, ok := memStats["available_kb"].(int64); ok {
+			memStats["available_bytes"] = available * 1024
+		}
+	}
+
+	// Calculate network totals
+	if netStats, ok := stats["network"].(map[string]interface{}); ok {
+		if rxBytes, ok := netStats["rx_bytes"].(int64); ok {
+			if txBytes, ok := netStats["tx_bytes"].(int64); ok {
+				netStats["total_bytes"] = rxBytes + txBytes
+			}
+		}
+		if rxPackets, ok := netStats["rx_packets"].(int64); ok {
+			if txPackets, ok := netStats["tx_packets"].(int64); ok {
+				netStats["total_packets"] = rxPackets + txPackets
+			}
+		}
+	}
+
+	// Calculate disk totals and percentages
+	if diskStats, ok := stats["disk"].(map[string]interface{}); ok {
+		if readBytes, ok := diskStats["read_bytes"].(int64); ok {
+			if writeBytes, ok := diskStats["write_bytes"].(int64); ok {
+				diskStats["total_bytes"] = readBytes + writeBytes
+			}
+		}
+		if readReqs, ok := diskStats["read_requests"].(int64); ok {
+			if writeReqs, ok := diskStats["write_requests"].(int64); ok {
+				diskStats["total_requests"] = readReqs + writeReqs
+			}
+		}
+		if allocation, ok := diskStats["allocation_bytes"].(int64); ok {
+			if capacity, ok := diskStats["capacity_bytes"].(int64); ok {
+				if capacity > 0 {
+					diskStats["usage_percent"] = float64(allocation) / float64(capacity) * 100
+				}
+			}
+		}
+	}
+
+	// Add timestamp
+	stats["last_updated"] = time.Now().UTC().Format(time.RFC3339)
 }
 
 // ControlVM controls VM operations (start/stop/restart)
