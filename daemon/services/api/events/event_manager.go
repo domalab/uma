@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -29,6 +30,17 @@ type EventManager struct {
 
 	// Adaptive monitoring configuration
 	adaptiveConfig *monitoring.AdaptiveConfig
+
+	// State tracking for change detection
+	lastSystemState  map[string]interface{}
+	lastDockerState  map[string]interface{}
+	lastStorageState map[string]interface{}
+	lastVMState      map[string]interface{}
+	stateMutex       sync.RWMutex
+
+	// Performance metrics streaming
+	performanceStreaming bool
+	streamingInterval    time.Duration
 }
 
 // NewEventManager creates a new event manager
@@ -47,7 +59,13 @@ func NewEventManager(api utils.APIInterface, hub *pubsub.PubSub, wsHandler *hand
 			"disk_warning":  45.0,
 			"disk_critical": 55.0,
 		},
-		lastTempAlerts: make(map[string]time.Time),
+		lastTempAlerts:       make(map[string]time.Time),
+		lastSystemState:      make(map[string]interface{}),
+		lastDockerState:      make(map[string]interface{}),
+		lastStorageState:     make(map[string]interface{}),
+		lastVMState:          make(map[string]interface{}),
+		performanceStreaming: true,
+		streamingInterval:    2 * time.Second,
 	}
 
 	// Initialize temperature monitor
@@ -69,7 +87,7 @@ func (em *EventManager) Start() {
 	}
 
 	// Start periodic data collectors with adaptive monitoring
-	em.wg.Add(7)
+	em.wg.Add(9)
 	go em.collectSystemStats()
 	go em.collectDockerEvents()
 	go em.collectStorageStatus()
@@ -77,6 +95,8 @@ func (em *EventManager) Start() {
 	go em.collectInfrastructureStatus()
 	go em.collectResourceAlerts()
 	go em.adaptiveMonitoringManager()
+	go em.streamPerformanceMetrics()
+	go em.monitorStateChanges()
 }
 
 // Stop stops the event manager
@@ -552,3 +572,340 @@ func (em *EventManager) checkResourceAlerts() {
 // Removed unused function: checkSensorTemperature
 
 // Removed unused functions: sendTemperatureAlert, containsCPU, containsDisk
+
+// streamPerformanceMetrics streams real-time performance metrics
+func (em *EventManager) streamPerformanceMetrics() {
+	defer em.wg.Done()
+
+	if !em.performanceStreaming {
+		return
+	}
+
+	ticker := time.NewTicker(em.streamingInterval)
+	defer ticker.Stop()
+
+	logger.Green("Starting performance metrics streaming every %v", em.streamingInterval)
+
+	for {
+		select {
+		case <-em.ctx.Done():
+			return
+		case <-ticker.C:
+			// Stream enhanced VM performance metrics
+			if vms, err := em.api.GetVM().GetVMs(); err == nil {
+				if vmList, ok := vms.([]interface{}); ok {
+					for _, vm := range vmList {
+						if vmMap, ok := vm.(map[string]interface{}); ok {
+							if vmName, ok := vmMap["name"].(string); ok {
+								if vmState, ok := vmMap["state"].(string); ok && vmState == "running" {
+									// Get enhanced VM performance data
+									if vmStats, err := em.api.GetVM().GetVMStats(vmName); err == nil {
+										performanceEvent := map[string]interface{}{
+											"vm_name":   vmName,
+											"stats":     vmStats,
+											"timestamp": time.Now().UTC().Format(time.RFC3339),
+										}
+										em.wsHandler.BroadcastEvent(handlers.EventVMStats, performanceEvent)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Stream container performance metrics
+			if containers, err := em.api.GetDocker().GetContainers(); err == nil {
+				if containerList, ok := containers.([]interface{}); ok {
+					for _, container := range containerList {
+						if containerMap, ok := container.(map[string]interface{}); ok {
+							if containerID, ok := containerMap["id"].(string); ok {
+								if containerState, ok := containerMap["state"].(string); ok && containerState == "running" {
+									// Get container stats
+									if stats, err := em.api.GetDocker().GetContainerStats(containerID); err == nil {
+										statsEvent := map[string]interface{}{
+											"container_id":   containerID,
+											"container_name": containerMap["name"],
+											"stats":          stats,
+											"timestamp":      time.Now().UTC().Format(time.RFC3339),
+										}
+										em.wsHandler.BroadcastEvent(handlers.EventContainerStats, statsEvent)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Stream network performance metrics
+			if networkInfo, err := em.api.GetSystem().GetNetworkInfo(); err == nil {
+				networkEvent := map[string]interface{}{
+					"stats":     networkInfo,
+					"timestamp": time.Now().UTC().Format(time.RFC3339),
+				}
+				em.wsHandler.BroadcastEvent(handlers.EventNetworkStats, networkEvent)
+			}
+		}
+	}
+}
+
+// monitorStateChanges monitors for state changes and broadcasts immediate events
+func (em *EventManager) monitorStateChanges() {
+	defer em.wg.Done()
+
+	ticker := time.NewTicker(1 * time.Second) // Check for changes every second
+	defer ticker.Stop()
+
+	logger.Green("Starting state change monitoring")
+
+	for {
+		select {
+		case <-em.ctx.Done():
+			return
+		case <-ticker.C:
+			em.checkSystemStateChanges()
+			em.checkDockerStateChanges()
+			em.checkVMStateChanges()
+			em.checkStorageStateChanges()
+		}
+	}
+}
+
+// checkSystemStateChanges detects and broadcasts system state changes
+func (em *EventManager) checkSystemStateChanges() {
+	currentStats := em.getSystemStats()
+	if currentStats == nil {
+		return
+	}
+
+	em.stateMutex.Lock()
+	defer em.stateMutex.Unlock()
+
+	// Check for significant CPU usage changes (>10% difference)
+	if cpuData, ok := currentStats["cpu"].(map[string]interface{}); ok {
+		if currentUsage, ok := cpuData["usage_percent"].(float64); ok {
+			if lastCPU, exists := em.lastSystemState["cpu_usage"]; exists {
+				if lastUsage, ok := lastCPU.(float64); ok {
+					if math.Abs(currentUsage-lastUsage) > 10.0 {
+						changeEvent := map[string]interface{}{
+							"type":      "cpu_usage_change",
+							"previous":  lastUsage,
+							"current":   currentUsage,
+							"change":    currentUsage - lastUsage,
+							"timestamp": time.Now().UTC().Format(time.RFC3339),
+						}
+						em.wsHandler.BroadcastEvent(handlers.EventSystemAlert, changeEvent)
+					}
+				}
+			}
+			em.lastSystemState["cpu_usage"] = currentUsage
+		}
+	}
+
+	// Check for memory usage changes (>15% difference)
+	if memData, ok := currentStats["memory"].(map[string]interface{}); ok {
+		if currentUsage, ok := memData["usage_percent"].(float64); ok {
+			if lastMem, exists := em.lastSystemState["memory_usage"]; exists {
+				if lastUsage, ok := lastMem.(float64); ok {
+					if math.Abs(currentUsage-lastUsage) > 15.0 {
+						changeEvent := map[string]interface{}{
+							"type":      "memory_usage_change",
+							"previous":  lastUsage,
+							"current":   currentUsage,
+							"change":    currentUsage - lastUsage,
+							"timestamp": time.Now().UTC().Format(time.RFC3339),
+						}
+						em.wsHandler.BroadcastEvent(handlers.EventSystemAlert, changeEvent)
+					}
+				}
+			}
+			em.lastSystemState["memory_usage"] = currentUsage
+		}
+	}
+}
+
+// checkDockerStateChanges detects and broadcasts Docker state changes
+func (em *EventManager) checkDockerStateChanges() {
+	currentEvents := em.getDockerEvents()
+	if currentEvents == nil {
+		return
+	}
+
+	em.stateMutex.Lock()
+	defer em.stateMutex.Unlock()
+
+	// Check for container count changes
+	if containers, ok := currentEvents["containers"].([]interface{}); ok {
+		currentCount := len(containers)
+		if lastCount, exists := em.lastDockerState["container_count"]; exists {
+			if lastCountInt, ok := lastCount.(int); ok {
+				if currentCount != lastCountInt {
+					changeEvent := map[string]interface{}{
+						"type":      "container_count_change",
+						"previous":  lastCountInt,
+						"current":   currentCount,
+						"change":    currentCount - lastCountInt,
+						"timestamp": time.Now().UTC().Format(time.RFC3339),
+					}
+					em.wsHandler.BroadcastEvent(handlers.EventDockerEvents, changeEvent)
+				}
+			}
+		}
+		em.lastDockerState["container_count"] = currentCount
+
+		// Check for individual container state changes
+		currentContainerStates := make(map[string]string)
+		for _, container := range containers {
+			if containerMap, ok := container.(map[string]interface{}); ok {
+				if id, ok := containerMap["id"].(string); ok {
+					if state, ok := containerMap["state"].(string); ok {
+						currentContainerStates[id] = state
+					}
+				}
+			}
+		}
+
+		if lastStates, exists := em.lastDockerState["container_states"]; exists {
+			if lastStatesMap, ok := lastStates.(map[string]string); ok {
+				for id, currentState := range currentContainerStates {
+					if lastState, exists := lastStatesMap[id]; exists {
+						if currentState != lastState {
+							changeEvent := map[string]interface{}{
+								"type":           "container_state_change",
+								"container_id":   id,
+								"previous_state": lastState,
+								"current_state":  currentState,
+								"timestamp":      time.Now().UTC().Format(time.RFC3339),
+							}
+							em.wsHandler.BroadcastEvent(handlers.EventDockerEvents, changeEvent)
+						}
+					}
+				}
+			}
+		}
+		em.lastDockerState["container_states"] = currentContainerStates
+	}
+}
+
+// checkVMStateChanges detects and broadcasts VM state changes
+func (em *EventManager) checkVMStateChanges() {
+	currentVMs := em.getVMEvents()
+	if currentVMs == nil {
+		return
+	}
+
+	em.stateMutex.Lock()
+	defer em.stateMutex.Unlock()
+
+	// Check for VM count changes
+	if vms, ok := currentVMs["vms"].([]interface{}); ok {
+		currentCount := len(vms)
+		if lastCount, exists := em.lastVMState["vm_count"]; exists {
+			if lastCountInt, ok := lastCount.(int); ok {
+				if currentCount != lastCountInt {
+					changeEvent := map[string]interface{}{
+						"type":      "vm_count_change",
+						"previous":  lastCountInt,
+						"current":   currentCount,
+						"change":    currentCount - lastCountInt,
+						"timestamp": time.Now().UTC().Format(time.RFC3339),
+					}
+					em.wsHandler.BroadcastEvent(handlers.EventVMEvents, changeEvent)
+				}
+			}
+		}
+		em.lastVMState["vm_count"] = currentCount
+
+		// Check for individual VM state changes
+		currentVMStates := make(map[string]string)
+		for _, vm := range vms {
+			if vmMap, ok := vm.(map[string]interface{}); ok {
+				if name, ok := vmMap["name"].(string); ok {
+					if state, ok := vmMap["state"].(string); ok {
+						currentVMStates[name] = state
+					}
+				}
+			}
+		}
+
+		if lastStates, exists := em.lastVMState["vm_states"]; exists {
+			if lastStatesMap, ok := lastStates.(map[string]string); ok {
+				for name, currentState := range currentVMStates {
+					if lastState, exists := lastStatesMap[name]; exists {
+						if currentState != lastState {
+							changeEvent := map[string]interface{}{
+								"type":           "vm_state_change",
+								"vm_name":        name,
+								"previous_state": lastState,
+								"current_state":  currentState,
+								"timestamp":      time.Now().UTC().Format(time.RFC3339),
+							}
+							em.wsHandler.BroadcastEvent(handlers.EventVMEvents, changeEvent)
+						}
+					}
+				}
+			}
+		}
+		em.lastVMState["vm_states"] = currentVMStates
+	}
+}
+
+// checkStorageStateChanges detects and broadcasts storage state changes
+func (em *EventManager) checkStorageStateChanges() {
+	currentStorage := em.getStorageStatus()
+	if currentStorage == nil {
+		return
+	}
+
+	em.stateMutex.Lock()
+	defer em.stateMutex.Unlock()
+
+	// Check for disk usage threshold changes
+	if disks, ok := currentStorage["disks"].([]interface{}); ok {
+		for _, disk := range disks {
+			if diskMap, ok := disk.(map[string]interface{}); ok {
+				if name, ok := diskMap["name"].(string); ok {
+					if usagePercent, ok := diskMap["usage_percent"].(float64); ok {
+						lastUsageKey := "disk_usage_" + name
+						if lastUsage, exists := em.lastStorageState[lastUsageKey]; exists {
+							if lastUsageFloat, ok := lastUsage.(float64); ok {
+								// Alert on significant usage changes (>5% difference)
+								if math.Abs(usagePercent-lastUsageFloat) > 5.0 {
+									changeEvent := map[string]interface{}{
+										"type":      "disk_usage_change",
+										"disk_name": name,
+										"previous":  lastUsageFloat,
+										"current":   usagePercent,
+										"change":    usagePercent - lastUsageFloat,
+										"timestamp": time.Now().UTC().Format(time.RFC3339),
+									}
+									em.wsHandler.BroadcastEvent(handlers.EventStorageStatus, changeEvent)
+								}
+							}
+						}
+						em.lastStorageState[lastUsageKey] = usagePercent
+					}
+				}
+			}
+		}
+	}
+
+	// Check for array status changes
+	if arrayStatus, ok := currentStorage["array_status"].(string); ok {
+		if lastStatus, exists := em.lastStorageState["array_status"]; exists {
+			if lastStatusStr, ok := lastStatus.(string); ok {
+				if arrayStatus != lastStatusStr {
+					changeEvent := map[string]interface{}{
+						"type":            "array_status_change",
+						"previous_status": lastStatusStr,
+						"current_status":  arrayStatus,
+						"timestamp":       time.Now().UTC().Format(time.RFC3339),
+					}
+					em.wsHandler.BroadcastEvent(handlers.EventArrayStatus, changeEvent)
+				}
+			}
+		}
+		em.lastStorageState["array_status"] = arrayStatus
+	}
+}
