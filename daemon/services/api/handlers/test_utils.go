@@ -164,6 +164,21 @@ func (m *MockSystemInterface) GetRealArrayInfo() (interface{}, error) {
 	}, nil
 }
 
+func (m *MockSystemInterface) GetRealDisks() (interface{}, error) {
+	return []interface{}{
+		map[string]interface{}{
+			"name":          "sda",
+			"size":          "1TB",
+			"used":          500000000000,
+			"available":     500000000000,
+			"usage_percent": 50.0,
+			"mount_point":   "/mnt/disk1",
+			"health":        "healthy",
+			"temperature":   35,
+		},
+	}, nil
+}
+
 // MockStorageInterface provides mock storage functionality
 type MockStorageInterface struct{}
 

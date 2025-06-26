@@ -27,6 +27,7 @@ type SystemInterface interface {
 	GetGPUInfo() (interface{}, error)
 	GetSystemLogs() (interface{}, error)
 	GetRealArrayInfo() (interface{}, error)
+	GetRealDisks() (interface{}, error)
 }
 
 // StorageInterface defines the interface for storage operations

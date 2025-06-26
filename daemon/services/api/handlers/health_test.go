@@ -419,6 +419,10 @@ func (m *MockSystemWithFailures) GetRealArrayInfo() (interface{}, error) {
 	return nil, fmt.Errorf("failed to read array info")
 }
 
+func (m *MockSystemWithFailures) GetRealDisks() (interface{}, error) {
+	return nil, fmt.Errorf("failed to read disk info")
+}
+
 // MockDockerWithFailures simulates Docker interface failures
 type MockDockerWithFailures struct{}
 

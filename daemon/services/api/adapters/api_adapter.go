@@ -167,6 +167,12 @@ func (s *SystemAdapter) GetRealArrayInfo() (interface{}, error) {
 	return storageMonitor.GetRealArrayInfo()
 }
 
+func (s *SystemAdapter) GetRealDisks() (interface{}, error) {
+	// Use real disk monitoring from storage monitor
+	storageMonitor := NewStorageMonitor()
+	return storageMonitor.GetRealDisks()
+}
+
 // StorageAdapter adapts storage operations
 type StorageAdapter struct {
 	api     interface{}

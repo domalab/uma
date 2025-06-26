@@ -57,7 +57,8 @@ func (h *StorageHandler) HandleStorageDisks(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	disks, err := h.api.GetStorage().GetDisks()
+	// Use the system interface to get real disk info with usage data
+	disks, err := h.api.GetSystem().GetRealDisks()
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get disk information: %v", err))
 		return
