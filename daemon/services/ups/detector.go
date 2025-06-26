@@ -38,7 +38,7 @@ func NewDetector() *Detector {
 			LastCheck: time.Now(),
 		},
 		stopCh:        make(chan struct{}),
-		checkInterval: 30 * time.Second, // Check every 30 seconds
+		checkInterval: 5 * time.Minute, // Check every 5 minutes - reduced from 30 seconds
 		callbacks:     make([]StatusChangeCallback, 0),
 	}
 }
@@ -65,6 +65,11 @@ func (d *Detector) GetStatus() DetectionStatus {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.status
+}
+
+// ForceCheck performs an immediate UPS detection check (useful for API calls)
+func (d *Detector) ForceCheck() {
+	d.detectUPS()
 }
 
 // IsAvailable returns true if a UPS is currently detected and available
@@ -139,12 +144,12 @@ func (d *Detector) detectUPS() {
 	if d.validateUPSCommunication(upsType) {
 		d.status.Available = true
 		d.status.Type = upsType
-		logger.Green("UPS detected and validated: %s", d.getUPSTypeName(upsType))
+		// Only log UPS detection on status change, not every check
 	} else {
 		d.status.Available = false
 		d.status.Type = ups.DNE
 		d.status.Error = "UPS detected but communication failed"
-		logger.Yellow("UPS detected but communication validation failed")
+		// Only log validation failures on status change
 	}
 
 	d.mu.Unlock()
@@ -156,13 +161,21 @@ func (d *Detector) notifyStatusChange(prevAvailable bool, prevType ups.Kind) {
 	d.mu.RLock()
 	currentAvailable := d.status.Available
 	currentType := d.status.Type
+	currentError := d.status.Error
 	callbacks := make([]StatusChangeCallback, len(d.callbacks))
 	copy(callbacks, d.callbacks)
 	d.mu.RUnlock()
 
-	// Only notify if status actually changed
+	// Only notify and log if status actually changed
 	if prevAvailable != currentAvailable || prevType != currentType {
-		logger.Blue("UPS status changed: available=%t, type=%s", currentAvailable, d.getUPSTypeName(currentType))
+		if currentAvailable {
+			logger.Green("UPS detected and validated: %s", d.getUPSTypeName(currentType))
+		} else if currentError != "" {
+			logger.Yellow("UPS status changed: %s", currentError)
+		} else {
+			logger.Blue("UPS status changed: available=%t, type=%s", currentAvailable, d.getUPSTypeName(currentType))
+		}
+
 		for _, callback := range callbacks {
 			go callback(currentAvailable, currentType)
 		}
