@@ -289,13 +289,18 @@ func (s *SystemService) GetAPCUPSData() map[string]interface{} {
 	}
 
 	upsData := map[string]interface{}{
-		"status":         "unknown",
-		"battery_charge": 0,
-		"runtime":        0,
-		"load":           0,
-		"voltage":        0,
-		"last_updated":   time.Now().UTC().Format(time.RFC3339),
+		"status":            "unknown",
+		"battery_charge":    0,
+		"runtime":           0,
+		"load":              0,
+		"voltage":           0,
+		"power_consumption": 0,
+		"nominal_power":     0,
+		"last_updated":      time.Now().UTC().Format(time.RFC3339),
 	}
+
+	var nominalPower float64
+	var loadPercent float64
 
 	// Parse apcaccess output
 	lines := strings.Split(string(output), "\n")
@@ -322,12 +327,24 @@ func (s *SystemService) GetAPCUPSData() map[string]interface{} {
 		case "LOADPCT":
 			if load, err := strconv.ParseFloat(strings.TrimSuffix(value, " Percent"), 64); err == nil {
 				upsData["load"] = load
+				loadPercent = load
 			}
 		case "LINEV":
 			if voltage, err := strconv.ParseFloat(strings.TrimSuffix(value, " Volts"), 64); err == nil {
 				upsData["voltage"] = voltage
 			}
+		case "NOMPOWER":
+			if power, err := strconv.ParseFloat(strings.TrimSuffix(value, " Watts"), 64); err == nil {
+				upsData["nominal_power"] = power
+				nominalPower = power
+			}
 		}
+	}
+
+	// Calculate real power consumption: nominal_power * load_percent / 100
+	if nominalPower > 0 && loadPercent >= 0 {
+		powerConsumption := nominalPower * loadPercent / 100
+		upsData["power_consumption"] = powerConsumption
 	}
 
 	return upsData
@@ -343,13 +360,18 @@ func (s *SystemService) GetNUTUPSData() map[string]interface{} {
 	}
 
 	upsData := map[string]interface{}{
-		"status":         "unknown",
-		"battery_charge": 0,
-		"runtime":        0,
-		"load":           0,
-		"voltage":        0,
-		"last_updated":   time.Now().UTC().Format(time.RFC3339),
+		"status":            "unknown",
+		"battery_charge":    0,
+		"runtime":           0,
+		"load":              0,
+		"voltage":           0,
+		"power_consumption": 0,
+		"nominal_power":     0,
+		"last_updated":      time.Now().UTC().Format(time.RFC3339),
 	}
+
+	var nominalPower float64
+	var loadPercent float64
 
 	// Parse upsc output
 	lines := strings.Split(string(output), "\n")
@@ -376,12 +398,24 @@ func (s *SystemService) GetNUTUPSData() map[string]interface{} {
 		case "ups.load":
 			if load, err := strconv.ParseFloat(value, 64); err == nil {
 				upsData["load"] = load
+				loadPercent = load
 			}
 		case "input.voltage":
 			if voltage, err := strconv.ParseFloat(value, 64); err == nil {
 				upsData["voltage"] = voltage
 			}
+		case "ups.realpower.nominal", "ups.power.nominal":
+			if power, err := strconv.ParseFloat(value, 64); err == nil {
+				upsData["nominal_power"] = power
+				nominalPower = power
+			}
 		}
+	}
+
+	// Calculate real power consumption: nominal_power * load_percent / 100
+	if nominalPower > 0 && loadPercent >= 0 {
+		powerConsumption := nominalPower * loadPercent / 100
+		upsData["power_consumption"] = powerConsumption
 	}
 
 	return upsData
