@@ -40,6 +40,7 @@ type HTTPServer struct {
 	dockerHandler  *handlers.DockerHandler
 	vmHandler      *handlers.VMHandler
 	healthHandler  *handlers.HealthHandler
+	networkHandler *handlers.NetworkHandler
 
 	webSocketHandler    *handlers.WebSocketHandler
 	notificationHandler *handlers.NotificationHandler
@@ -92,6 +93,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 	httpServer.dockerHandler = handlers.NewDockerHandler(httpServer.apiAdapter)
 	httpServer.vmHandler = handlers.NewVMHandler(httpServer.apiAdapter)
 	httpServer.healthHandler = handlers.NewHealthHandler(httpServer.apiAdapter, api.ctx.Config.Version)
+	httpServer.networkHandler = handlers.NewNetworkHandler(httpServer.apiAdapter)
 	// OpenAPI documentation is now handled directly by HTTPServer (no separate docs handler needed)
 	httpServer.webSocketHandler = handlers.NewWebSocketHandler(httpServer.apiAdapter, api.ctx.Hub)
 	httpServer.notificationHandler = handlers.NewNotificationHandler(httpServer.apiAdapter)
@@ -106,6 +108,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 		httpServer.dockerHandler,
 		httpServer.vmHandler,
 		httpServer.healthHandler,
+		httpServer.networkHandler,
 		httpServer.webSocketHandler,
 		httpServer.notificationHandler,
 		httpServer.asyncHandler,

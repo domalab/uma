@@ -17,6 +17,7 @@ type Router struct {
 	dockerHandler  *handlers.DockerHandler
 	vmHandler      *handlers.VMHandler
 	healthHandler  *handlers.HealthHandler
+	networkHandler *handlers.NetworkHandler
 
 	webSocketHandler    *handlers.WebSocketHandler
 	notificationHandler *handlers.NotificationHandler
@@ -36,6 +37,7 @@ func NewRouter(
 	dockerHandler *handlers.DockerHandler,
 	vmHandler *handlers.VMHandler,
 	healthHandler *handlers.HealthHandler,
+	networkHandler *handlers.NetworkHandler,
 	webSocketHandler *handlers.WebSocketHandler,
 	notificationHandler *handlers.NotificationHandler,
 	asyncHandler *handlers.AsyncHandler,
@@ -51,6 +53,7 @@ func NewRouter(
 		dockerHandler:       dockerHandler,
 		vmHandler:           vmHandler,
 		healthHandler:       healthHandler,
+		networkHandler:      networkHandler,
 		webSocketHandler:    webSocketHandler,
 		notificationHandler: notificationHandler,
 		asyncHandler:        asyncHandler,
@@ -72,6 +75,7 @@ func (r *Router) RegisterRoutes() {
 	r.registerStorageRoutes()
 	r.registerDockerRoutes()
 	r.registerVMRoutes()
+	r.registerNetworkRoutes()
 	r.registerWebSocketRoutes()
 	r.registerNotificationRoutes()
 	r.registerShareRoutes()
