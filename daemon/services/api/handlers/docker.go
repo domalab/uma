@@ -312,31 +312,62 @@ func (h *DockerHandler) validateContainerOperation(containerID, operation string
 		return fmt.Errorf("container not found: %v", err)
 	}
 
-	if containerMap, ok := container.(map[string]interface{}); ok {
-		state, exists := containerMap["state"]
-		if !exists {
-			return fmt.Errorf("unable to determine container state")
+	var state string
+	var stateFound bool
+
+	// Handle different return types from GetContainer()
+	switch v := container.(type) {
+	case map[string]interface{}:
+		// Handle map format
+		if stateVal, exists := v["state"]; exists {
+			if stateStr, ok := stateVal.(string); ok {
+				state = stateStr
+				stateFound = true
+			}
+		}
+	default:
+		// Handle struct format - convert to map using JSON marshaling for consistent access
+		containerBytes, err := json.Marshal(container)
+		if err != nil {
+			return fmt.Errorf("failed to marshal container data: %v", err)
 		}
 
-		// Validate operation against current state
-		// Note: In test environments, we allow operations regardless of state
-		// for better test coverage and flexibility
-		switch operation {
-		case "start":
-			if state == "running" {
-				// In production, this would be an error, but for tests we allow it
-				logger.Yellow("Warning: Attempting to start container that is already running")
+		var containerMap map[string]interface{}
+		if err := json.Unmarshal(containerBytes, &containerMap); err != nil {
+			return fmt.Errorf("failed to unmarshal container data: %v", err)
+		}
+
+		if stateVal, exists := containerMap["state"]; exists {
+			if stateStr, ok := stateVal.(string); ok {
+				state = stateStr
+				stateFound = true
 			}
-		case "stop":
-			if state == "exited" || state == "stopped" {
-				// In production, this would be an error, but for tests we allow it
-				logger.Yellow("Warning: Attempting to stop container that is already stopped")
-			}
-		case "restart":
-			// Restart can be performed on any container
 		}
 	}
 
+	if !stateFound || state == "" {
+		return fmt.Errorf("unable to determine container state")
+	}
+
+	// Validate operation against current state
+	// Note: In test environments, we allow operations regardless of state
+	// for better test coverage and flexibility
+	switch operation {
+	case "start":
+		if state == "running" {
+			// In production, this would be an error, but for tests we allow it
+			logger.Yellow("Warning: Attempting to start container that is already running")
+		}
+	case "stop":
+		if state == "exited" || state == "stopped" {
+			// In production, this would be an error, but for tests we allow it
+			logger.Yellow("Warning: Attempting to stop container that is already stopped")
+		}
+	case "restart":
+		// Restart can be performed on any container
+	}
+
+	logger.Blue("Container %s validation passed - current state: %s, operation: %s", containerID, state, operation)
 	return nil
 }
 
@@ -368,8 +399,7 @@ func (h *DockerHandler) executeContainerStop(containerID string, r *http.Request
 
 	logger.Blue("Stopping container %s with timeout %d seconds", containerID, timeout)
 
-	// In a real implementation, this would use the timeout parameter
-	return h.api.GetDocker().StopContainer(containerID)
+	return h.api.GetDocker().StopContainer(containerID, timeout)
 }
 
 // transformContainersData transforms container data to ensure schema compliance
@@ -586,7 +616,8 @@ func (h *DockerHandler) executeContainerRestart(containerID string) error {
 	// 3. Start the container
 	// 4. Verify startup
 
-	return h.api.GetDocker().RestartContainer(containerID)
+	// Use default timeout of 10 seconds for restart
+	return h.api.GetDocker().RestartContainer(containerID, 10)
 }
 
 // performBulkAction performs bulk actions on multiple containers
@@ -600,9 +631,9 @@ func (h *DockerHandler) performBulkAction(containerIDs []string, action string, 
 		case "start":
 			err = h.api.GetDocker().StartContainer(containerID)
 		case "stop":
-			err = h.api.GetDocker().StopContainer(containerID)
+			err = h.api.GetDocker().StopContainer(containerID, 10) // Default 10 second timeout
 		case "restart":
-			err = h.api.GetDocker().RestartContainer(containerID)
+			err = h.api.GetDocker().RestartContainer(containerID, 10) // Default 10 second timeout
 		default:
 			err = fmt.Errorf("invalid action: %s", action)
 		}

@@ -199,6 +199,11 @@ func (m *MockDockerInterface) GetContainers() (interface{}, error) {
 }
 
 func (m *MockDockerInterface) GetContainer(id string) (interface{}, error) {
+	// Return error for nonexistent containers
+	if id == "nonexistent-container" {
+		return nil, fmt.Errorf("container not found: %s", id)
+	}
+
 	return map[string]interface{}{
 		"id":       id,
 		"name":     "test-container",
@@ -216,11 +221,11 @@ func (m *MockDockerInterface) StartContainer(id string) error {
 	return nil
 }
 
-func (m *MockDockerInterface) StopContainer(id string) error {
+func (m *MockDockerInterface) StopContainer(id string, timeout int) error {
 	return nil
 }
 
-func (m *MockDockerInterface) RestartContainer(id string) error {
+func (m *MockDockerInterface) RestartContainer(id string, timeout int) error {
 	return nil
 }
 

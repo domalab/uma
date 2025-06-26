@@ -45,8 +45,8 @@ type DockerInterface interface {
 	GetContainer(id string) (interface{}, error)
 	GetContainerStats(id string) (interface{}, error)
 	StartContainer(id string) error
-	StopContainer(id string) error
-	RestartContainer(id string) error
+	StopContainer(id string, timeout int) error
+	RestartContainer(id string, timeout int) error
 	GetImages() (interface{}, error)
 	GetNetworks() (interface{}, error)
 	GetSystemInfo() (interface{}, error)

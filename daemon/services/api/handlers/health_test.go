@@ -434,11 +434,11 @@ func (m *MockDockerWithFailures) StartContainer(id string) error {
 	return fmt.Errorf("failed to start container")
 }
 
-func (m *MockDockerWithFailures) StopContainer(id string) error {
+func (m *MockDockerWithFailures) StopContainer(id string, timeout int) error {
 	return fmt.Errorf("failed to stop container")
 }
 
-func (m *MockDockerWithFailures) RestartContainer(id string) error {
+func (m *MockDockerWithFailures) RestartContainer(id string, timeout int) error {
 	return fmt.Errorf("failed to restart container")
 }
 

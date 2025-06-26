@@ -268,3 +268,54 @@ func TestDockerHandler_MethodNotAllowed(t *testing.T) {
 		})
 	}
 }
+
+// TestDockerHandler_ContainerValidation tests the container validation fix
+func TestDockerHandler_ContainerValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		containerID string
+		operation   string
+		expectError bool
+	}{
+		{
+			name:        "Valid container start operation",
+			containerID: "test-container",
+			operation:   "start",
+			expectError: false,
+		},
+		{
+			name:        "Valid container stop operation",
+			containerID: "test-container",
+			operation:   "stop",
+			expectError: false,
+		},
+		{
+			name:        "Valid container restart operation",
+			containerID: "test-container",
+			operation:   "restart",
+			expectError: false,
+		},
+		{
+			name:        "Container not found",
+			containerID: "nonexistent-container",
+			operation:   "start",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewDockerHandler(&MockAPIInterface{})
+
+			err := handler.validateContainerOperation(tt.containerID, tt.operation)
+
+			if tt.expectError && err == nil {
+				t.Errorf("Expected error for %s operation on %s, but got none", tt.operation, tt.containerID)
+			}
+
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error for %s operation on %s, but got: %v", tt.operation, tt.containerID, err)
+			}
+		})
+	}
+}

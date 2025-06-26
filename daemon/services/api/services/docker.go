@@ -197,7 +197,7 @@ func (d *DockerService) StartContainer(containerID string) error {
 
 // StopContainer stops a Docker container
 func (d *DockerService) StopContainer(containerID string, timeout int) error {
-	if err := d.api.GetDocker().StopContainer(containerID); err != nil {
+	if err := d.api.GetDocker().StopContainer(containerID, timeout); err != nil {
 		return fmt.Errorf("failed to stop container: %v", err)
 	}
 
@@ -207,7 +207,7 @@ func (d *DockerService) StopContainer(containerID string, timeout int) error {
 
 // RestartContainer restarts a Docker container
 func (d *DockerService) RestartContainer(containerID string, timeout int) error {
-	if err := d.api.GetDocker().RestartContainer(containerID); err != nil {
+	if err := d.api.GetDocker().RestartContainer(containerID, timeout); err != nil {
 		return fmt.Errorf("failed to restart container: %v", err)
 	}
 

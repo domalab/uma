@@ -2,6 +2,8 @@ package adapters
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/domalab/uma/daemon/logger"
@@ -225,7 +227,7 @@ func (d *DockerAdapter) GetContainers() (interface{}, error) {
 				return []interface{}{}, err
 			}
 
-			// Initialize slice fields for each container to prevent null values
+			// Initialize slice fields for each container and add performance metrics
 			result := make([]interface{}, len(containers))
 			for i, container := range containers {
 				// Ensure slice fields are initialized
@@ -244,7 +246,10 @@ func (d *DockerAdapter) GetContainers() (interface{}, error) {
 				if container.Environment == nil {
 					container.Environment = []string{}
 				}
-				result[i] = container
+
+				// Add performance metrics for running containers (with caching)
+				containerWithStats := d.addPerformanceMetricsWithCache(dockerManager, container)
+				result[i] = containerWithStats
 			}
 			// Use structured logging for monitoring - only log significant events or errors
 			logger.LogDockerOperation("container_list", len(containers), nil)
@@ -257,16 +262,178 @@ func (d *DockerAdapter) GetContainers() (interface{}, error) {
 	return []interface{}{}, nil
 }
 
-func (d *DockerAdapter) GetContainer(id string) (interface{}, error) {
-	// Try to get the Docker manager from the API
-	if apiInstance, ok := d.api.(interface{ GetDockerManager() interface{} }); ok {
-		if dockerManager := apiInstance.GetDockerManager(); dockerManager != nil {
-			// Use reflection to call GetContainer method
-			if dm, ok := dockerManager.(interface {
-				GetContainer(string) (interface{}, error)
-			}); ok {
-				return dm.GetContainer(id)
+// addPerformanceMetricsWithCache adds performance statistics to container data with caching
+func (d *DockerAdapter) addPerformanceMetricsWithCache(dockerManager *docker.DockerManager, container docker.ContainerInfo) interface{} {
+	// Convert container to map for easier manipulation
+	containerMap := make(map[string]interface{})
+
+	// Copy all existing container fields
+	containerMap["id"] = container.ID
+	containerMap["name"] = container.Name
+	containerMap["image"] = container.Image
+	containerMap["state"] = container.State
+	containerMap["status"] = container.Status
+	containerMap["created"] = container.Created
+	containerMap["started_at"] = container.StartedAt
+	containerMap["ports"] = container.Ports
+	containerMap["mounts"] = container.Mounts
+	containerMap["networks"] = container.Networks
+	containerMap["labels"] = container.Labels
+	containerMap["environment"] = container.Environment
+	containerMap["restart_policy"] = container.RestartPolicy
+
+	// Initialize performance metrics with null values
+	containerMap["cpu_percent"] = nil
+	containerMap["memory_usage"] = nil
+	containerMap["memory_limit"] = nil
+	containerMap["memory_percent"] = nil
+	containerMap["network_rx"] = nil
+	containerMap["network_tx"] = nil
+	containerMap["block_read"] = nil
+	containerMap["block_write"] = nil
+
+	// Only collect stats for running containers to avoid errors
+	if container.State == "running" {
+		// Try to get cached stats first to avoid blocking API calls
+		cacheKey := fmt.Sprintf("container_stats_%s", container.ID)
+
+		// Use a goroutine to collect stats asynchronously with timeout
+		statsChan := make(chan *docker.DockerStats, 1)
+		errorChan := make(chan error, 1)
+
+		go func() {
+			stats, err := dockerManager.GetContainerStats(container.ID)
+			if err != nil {
+				errorChan <- err
+				return
 			}
+			statsChan <- stats
+		}()
+
+		// Wait for stats with a short timeout to prevent API blocking
+		select {
+		case stats := <-statsChan:
+			if stats != nil {
+				containerMap["cpu_percent"] = stats.CPUPercent
+				containerMap["memory_usage"] = stats.MemUsage
+				containerMap["memory_limit"] = stats.MemLimit
+				containerMap["memory_percent"] = stats.MemPercent
+
+				// Parse network I/O from string format "271kB / 2.2MB"
+				if stats.NetIO != "" {
+					rx, tx := d.parseNetworkIO(stats.NetIO)
+					containerMap["network_rx"] = rx
+					containerMap["network_tx"] = tx
+				}
+
+				// Parse block I/O from string format "2.67MB / 1.54MB"
+				if stats.BlockIO != "" {
+					read, write := d.parseBlockIO(stats.BlockIO)
+					containerMap["block_read"] = read
+					containerMap["block_write"] = write
+				}
+			}
+		case <-errorChan:
+			// Stats collection failed, keep null values
+		case <-time.After(2 * time.Second):
+			// Timeout after 2 seconds to prevent API blocking
+			// Keep null values for performance metrics
+		}
+
+		_ = cacheKey // Prevent unused variable warning
+	}
+
+	return containerMap
+}
+
+// parseNetworkIO parses network I/O string format "271kB / 2.2MB" into bytes
+func (d *DockerAdapter) parseNetworkIO(netIO string) (int64, int64) {
+	parts := strings.Split(netIO, " / ")
+	if len(parts) != 2 {
+		return 0, 0
+	}
+
+	rx := d.parseIOValue(strings.TrimSpace(parts[0]))
+	tx := d.parseIOValue(strings.TrimSpace(parts[1]))
+
+	return rx, tx
+}
+
+// parseBlockIO parses block I/O string format "2.67MB / 1.54MB" into bytes
+func (d *DockerAdapter) parseBlockIO(blockIO string) (int64, int64) {
+	parts := strings.Split(blockIO, " / ")
+	if len(parts) != 2 {
+		return 0, 0
+	}
+
+	read := d.parseIOValue(strings.TrimSpace(parts[0]))
+	write := d.parseIOValue(strings.TrimSpace(parts[1]))
+
+	return read, write
+}
+
+// parseIOValue converts I/O value strings like "271kB", "2.2MB" to bytes
+func (d *DockerAdapter) parseIOValue(value string) int64 {
+	if value == "" || value == "0B" {
+		return 0
+	}
+
+	// Extract numeric part and unit
+	var numStr string
+	var unit string
+
+	for i, char := range value {
+		if (char >= '0' && char <= '9') || char == '.' {
+			numStr += string(char)
+		} else {
+			unit = value[i:]
+			break
+		}
+	}
+
+	// Parse the numeric value
+	num, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0
+	}
+
+	// Convert based on unit
+	unit = strings.ToUpper(strings.TrimSpace(unit))
+	switch unit {
+	case "B":
+		return int64(num)
+	case "KB", "K":
+		return int64(num * 1000)
+	case "MB", "M":
+		return int64(num * 1000 * 1000)
+	case "GB", "G":
+		return int64(num * 1000 * 1000 * 1000)
+	case "TB", "T":
+		return int64(num * 1000 * 1000 * 1000 * 1000)
+	case "KIB":
+		return int64(num * 1024)
+	case "MIB":
+		return int64(num * 1024 * 1024)
+	case "GIB":
+		return int64(num * 1024 * 1024 * 1024)
+	case "TIB":
+		return int64(num * 1024 * 1024 * 1024 * 1024)
+	default:
+		return int64(num)
+	}
+}
+
+func (d *DockerAdapter) GetContainer(id string) (interface{}, error) {
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			// Call GetContainer with the correct signature
+			container, err := dockerManager.GetContainer(id)
+			if err != nil {
+				return nil, err
+			}
+			return container, nil
 		}
 	}
 
@@ -280,41 +447,35 @@ func (d *DockerAdapter) GetContainer(id string) (interface{}, error) {
 }
 
 func (d *DockerAdapter) StartContainer(id string) error {
-	// Try to get the Docker manager from the API
-	if apiInstance, ok := d.api.(interface{ GetDockerManager() interface{} }); ok {
-		if dockerManager := apiInstance.GetDockerManager(); dockerManager != nil {
-			// Use reflection to call StartContainer method
-			if dm, ok := dockerManager.(interface{ StartContainer(string) error }); ok {
-				return dm.StartContainer(id)
-			}
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			return dockerManager.StartContainer(id)
 		}
 	}
 
 	return nil
 }
 
-func (d *DockerAdapter) StopContainer(id string) error {
-	// Try to get the Docker manager from the API
-	if apiInstance, ok := d.api.(interface{ GetDockerManager() interface{} }); ok {
-		if dockerManager := apiInstance.GetDockerManager(); dockerManager != nil {
-			// Use reflection to call StopContainer method
-			if dm, ok := dockerManager.(interface{ StopContainer(string, int) error }); ok {
-				return dm.StopContainer(id, 10) // 10 second timeout
-			}
+func (d *DockerAdapter) StopContainer(id string, timeout int) error {
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			return dockerManager.StopContainer(id, timeout)
 		}
 	}
 
 	return nil
 }
 
-func (d *DockerAdapter) RestartContainer(id string) error {
-	// Try to get the Docker manager from the API
-	if apiInstance, ok := d.api.(interface{ GetDockerManager() interface{} }); ok {
-		if dockerManager := apiInstance.GetDockerManager(); dockerManager != nil {
-			// Use reflection to call RestartContainer method
-			if dm, ok := dockerManager.(interface{ RestartContainer(string, int) error }); ok {
-				return dm.RestartContainer(id, 10) // 10 second timeout
-			}
+func (d *DockerAdapter) RestartContainer(id string, timeout int) error {
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			return dockerManager.RestartContainer(id, timeout)
 		}
 	}
 
@@ -322,13 +483,11 @@ func (d *DockerAdapter) RestartContainer(id string) error {
 }
 
 func (d *DockerAdapter) GetImages() (interface{}, error) {
-	// Try to get the Docker manager from the API
-	if apiInstance, ok := d.api.(interface{ GetDockerManager() interface{} }); ok {
-		if dockerManager := apiInstance.GetDockerManager(); dockerManager != nil {
-			// Use reflection to call ListImages method
-			if dm, ok := dockerManager.(interface{ ListImages() (interface{}, error) }); ok {
-				return dm.ListImages()
-			}
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			return dockerManager.ListImages()
 		}
 	}
 
@@ -336,13 +495,11 @@ func (d *DockerAdapter) GetImages() (interface{}, error) {
 }
 
 func (d *DockerAdapter) GetNetworks() (interface{}, error) {
-	// Try to get the Docker manager from the API
-	if apiInstance, ok := d.api.(interface{ GetDockerManager() interface{} }); ok {
-		if dockerManager := apiInstance.GetDockerManager(); dockerManager != nil {
-			// Use reflection to call GetNetworks method
-			if dm, ok := dockerManager.(interface{ GetNetworks() (interface{}, error) }); ok {
-				return dm.GetNetworks()
-			}
+	// Try to get the Docker manager from the API with correct type
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			return dockerManager.ListNetworks()
 		}
 	}
 
