@@ -47,17 +47,45 @@ http://your-unraid-ip:34600/api/v1
 
 ## API Documentation
 
-UMA provides a comprehensive REST API with OpenAPI 3.0.3 specification for integration with Home Assistant, Prometheus, and other automation platforms.
+UMA provides a comprehensive REST API with OpenAPI 3.0.3 specification for integration with Home Assistant, Prometheus, and other automation platforms. **All endpoints return real system data** collected from actual hardware and services.
 
-### Key Endpoints
+### 🚀 Enhanced Monitoring Capabilities
 
-- **System Monitoring**: `/api/v1/health`, `/api/v1/system/*` - Health checks and system metrics
-- **Storage Management**: `/api/v1/storage/*` - Array, cache, and disk information
-- **Docker Control**: `/api/v1/docker/*` - Container management and bulk operations
-- **VM Management**: `/api/v1/vm/*` - Virtual machine control and monitoring
-- **MCP Server**: `/api/v1/mcp/*` - Model Context Protocol configuration and tools
-- **WebSocket Streams**: `/api/v1/ws/*` - Real-time monitoring endpoints
-- **Prometheus Metrics**: `/metrics` - Metrics export for monitoring systems
+#### 🗄️ **Storage Monitoring with Real Usage Calculations**
+- **Array Capacity Planning**: Real total capacity (38.2 TB), used space (8.3 TB), usage percentage (21.67%)
+- **Individual Disk Metrics**: Per-disk usage, temperature, SMART data, health status
+- **Cache & Boot Monitoring**: Complete filesystem usage tracking with real percentages
+- **ZFS Pool Support**: Comprehensive ZFS storage monitoring and health checks
+
+#### ⚡ **UPS Power Monitoring with Real Consumption Data**
+- **Power Consumption Tracking**: Real watts calculated from UPS load × nominal power
+- **Battery Management**: Live charge level (100%), runtime estimates (220 min), voltage monitoring
+- **UPS Health Monitoring**: Line voltage, load percentage, operational status
+- **Multi-UPS Support**: APC (apcupsd) and NUT (Network UPS Tools) integration
+
+#### 🖥️ **Performance Monitoring Across All Components**
+- **Container Performance**: CPU, memory, network I/O metrics for all Docker containers
+- **VM Performance**: CPU usage, disk I/O, network stats via libvirt integration
+- **GPU Monitoring**: Intel/NVIDIA/AMD GPU utilization, memory, temperatures, power draw
+- **Network Interfaces**: Speeds, duplex settings, traffic statistics, connectivity testing
+
+#### 📡 **Real-time Event Streaming & Integration**
+- **WebSocket Events**: Live system changes, container events, performance updates
+- **MCP Integration**: Model Context Protocol for AI assistant integration
+- **Prometheus Export**: Complete metrics for monitoring and alerting systems
+- **Home Assistant Ready**: Optimized for home automation platform integration
+
+### Key API Endpoints
+
+- **Enhanced Storage**: `/api/v1/storage/*` - Real capacity calculations and disk metrics
+- **UPS Power Monitoring**: `/api/v1/system/ups` - Real power consumption and battery data
+- **Container Performance**: `/api/v1/docker/*` - CPU, memory, network metrics
+- **VM Monitoring**: `/api/v1/vm/*` - Complete virtual machine performance tracking
+- **GPU Metrics**: `/api/v1/system/gpu` - Multi-vendor GPU monitoring
+- **Network Monitoring**: `/api/v1/network/*` - Interface speeds, traffic, connectivity
+- **Real-time Streams**: `/api/v1/ws/*` - WebSocket event broadcasting
+- **System Health**: `/api/v1/health` - Comprehensive dependency monitoring
+- **Prometheus Metrics**: `/metrics` - Complete metrics export
 
 ### Documentation Resources
 

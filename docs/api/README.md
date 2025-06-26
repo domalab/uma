@@ -1,15 +1,43 @@
 # UMA API Documentation
 
-The UMA API provides comprehensive access to Unraid system monitoring, management, and control capabilities through a RESTful interface with OpenAPI 3.1.1 specification.
+The UMA API provides comprehensive access to Unraid system monitoring, management, and control capabilities through a RESTful interface with OpenAPI 3.1.1 specification. All endpoints return **real system data** collected from actual hardware and services.
 
 ## API Overview
 
 - **Base URL**: `http://your-unraid-ip:34600/api/v1`
-- **Format**: JSON
+- **Format**: JSON with real-time system data
 - **Authentication**: None (runs on trusted network)
 - **Versioning**: Accept header-based (`application/vnd.uma.v1+json`)
 - **Compression**: Gzip supported
 - **Documentation**: Interactive Swagger UI available
+- **Data Quality**: 100% real measurements, no placeholder or hardcoded values
+
+## Enhanced Monitoring Capabilities
+
+UMA provides comprehensive real-time monitoring across all major Unraid system components:
+
+### 🗄️ **Storage Monitoring**
+- **Real Capacity Calculations**: Actual disk usage, not estimates
+- **Array Totals**: Total capacity, used space, free space with real percentages
+- **Individual Disk Metrics**: Per-disk usage, temperature, SMART data
+- **Cache & Boot Monitoring**: Complete filesystem usage tracking
+
+### ⚡ **Power & UPS Monitoring**
+- **Real Power Consumption**: Calculated from UPS load × nominal power
+- **Battery Status**: Real-time charge level, runtime estimates
+- **UPS Health**: Line voltage, load percentage, operational status
+- **Power Efficiency**: Actual watts consumed vs. capacity
+
+### 🖥️ **Performance Monitoring**
+- **Container Metrics**: CPU, memory, network I/O for all Docker containers
+- **VM Performance**: CPU usage, disk I/O, network stats via libvirt
+- **GPU Monitoring**: Intel/NVIDIA/AMD GPU utilization, memory, temperatures
+- **Network Interfaces**: Speeds, duplex, traffic statistics, connectivity
+
+### 📡 **Real-time Streaming**
+- **WebSocket Events**: Live system changes, container events, performance updates
+- **MCP Integration**: Model Context Protocol for AI assistant integration
+- **Prometheus Metrics**: Complete metrics export for monitoring systems
 
 ## Quick Start
 

@@ -1,6 +1,6 @@
 # OpenAPI/Swagger Documentation Guide
 
-UMA provides comprehensive API documentation through OpenAPI 3.1.1 specification with an interactive Swagger UI interface.
+UMA provides comprehensive API documentation through OpenAPI 3.1.1 specification with an interactive Swagger UI interface. **All schemas have been enhanced** to reflect real system data and new monitoring capabilities.
 
 ## Accessing the Documentation
 
@@ -17,6 +17,99 @@ http://your-unraid-ip:34600/api/v1/docs
 - Request/response examples
 - Schema documentation
 - No authentication required - all endpoints are publicly accessible
+- **Enhanced schemas** with real data field documentation
+
+## Enhanced API Schemas
+
+All OpenAPI schemas have been updated to reflect the comprehensive monitoring enhancements:
+
+### Storage Array Schema Enhancements
+The storage array response now includes real capacity calculations:
+
+```yaml
+StorageArrayResponse:
+  type: object
+  properties:
+    total_capacity:
+      type: integer
+      format: int64
+      description: "Total array capacity in bytes (real calculation)"
+      example: 41996310249472
+    total_capacity_formatted:
+      type: string
+      description: "Human-readable total capacity"
+      example: "38.2 TB"
+    total_used:
+      type: integer
+      format: int64
+      description: "Total used space in bytes (real calculation)"
+      example: 9099742822400
+    total_used_formatted:
+      type: string
+      description: "Human-readable used space"
+      example: "8.3 TB"
+    total_free:
+      type: integer
+      format: int64
+      description: "Total free space in bytes (calculated)"
+      example: 32896567427072
+    total_free_formatted:
+      type: string
+      description: "Human-readable free space"
+      example: "29.9 TB"
+    usage_percent:
+      type: number
+      format: float
+      description: "Usage percentage (real calculation)"
+      example: 21.67
+    disk_count:
+      type: integer
+      description: "Number of disks in array"
+      example: 8
+```
+
+### UPS Monitoring Schema Enhancements
+The UPS response now includes real power consumption data:
+
+```yaml
+UPSResponse:
+  type: object
+  properties:
+    power_consumption:
+      type: number
+      format: float
+      description: "Real power consumption in watts (calculated)"
+      example: 0
+    nominal_power:
+      type: number
+      format: float
+      description: "UPS nominal power rating in watts"
+      example: 480
+    battery_charge:
+      type: number
+      format: float
+      description: "Battery charge percentage (real data)"
+      example: 100
+    runtime:
+      type: number
+      format: float
+      description: "Estimated runtime in minutes (real data)"
+      example: 220
+    voltage:
+      type: number
+      format: float
+      description: "Line voltage (real measurement)"
+      example: 236
+    load:
+      type: number
+      format: float
+      description: "Load percentage (real data)"
+      example: 0
+    status:
+      type: string
+      description: "UPS operational status"
+      example: "online"
+```
 
 ### OpenAPI Specification (JSON)
 The machine-readable OpenAPI specification is available at:

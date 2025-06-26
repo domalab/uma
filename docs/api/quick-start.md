@@ -84,31 +84,97 @@ curl -H "X-Request-ID: system-stats" \
 }
 ```
 
-### 3. Storage Information
+### 3. Enhanced Storage Information
 
-Monitor array and disk status:
+Monitor array status with **real capacity calculations**:
 
 ```bash
 curl -H "X-Request-ID: storage-info" \
      http://your-unraid-ip:34600/api/v1/storage/array
 ```
 
-**Response:**
+**Real Response Example** (from production Unraid server):
 ```json
 {
-  "status": "started",
-  "total_size_bytes": 12000000000000,
-  "used_bytes": 8000000000000,
-  "free_bytes": 4000000000000,
-  "parity_disks": 2,
-  "data_disks": 8,
-  "cache_disks": 2,
-  "last_parity_check": "2025-06-15T02:00:00Z",
-  "parity_errors": 0
+  "state": "started",
+  "protection": "parity",
+  "disk_count": 8,
+  "total_capacity": 41996310249472,
+  "total_capacity_formatted": "38.2 TB",
+  "total_used": 9099742822400,
+  "total_used_formatted": "8.3 TB",
+  "total_free": 32896567427072,
+  "total_free_formatted": "29.9 TB",
+  "usage_percent": 21.67,
+  "disks": [
+    {
+      "device": "/dev/sdd",
+      "health": "healthy",
+      "name": "disk1",
+      "size": "7451.0GB",
+      "status": "active",
+      "temperature": 35,
+      "type": "data"
+    }
+  ],
+  "parity": [
+    {
+      "device": "/dev/sdc",
+      "health": "healthy",
+      "name": "parity",
+      "size": "7451.0GB",
+      "status": "active",
+      "temperature": 36,
+      "type": "parity"
+    }
+  ],
+  "last_updated": "2025-06-26T09:39:53Z"
 }
 ```
 
-### 4. Docker Containers
+**Key Features:**
+- ✅ **Real Usage Calculations**: 21.67% usage from actual disk data
+- ✅ **Accurate Capacity**: 38.2 TB total from hardware detection
+- ✅ **Live Temperature Data**: Real SMART sensor readings
+- ✅ **Human-Readable Formatting**: TB/GB values for easy reading
+```
+
+### 4. UPS Power Monitoring
+
+Monitor UPS status with **real power consumption data**:
+
+```bash
+curl -H "X-Request-ID: ups-power-status" \
+     http://your-unraid-ip:34600/api/v1/system/ups
+```
+
+**Real Response Example** (from APC Back-UPS XS 950U):
+```json
+{
+  "available": true,
+  "status": "online",
+  "battery_charge": 100,
+  "load": 0,
+  "runtime": 220,
+  "voltage": 236,
+  "power_consumption": 0,
+  "nominal_power": 480,
+  "detection": {
+    "available": true,
+    "type": 1,
+    "last_check": "2025-06-26T19:38:39.635267658+10:00"
+  },
+  "last_updated": "2025-06-26T09:39:53Z"
+}
+```
+
+**Key Features:**
+- ✅ **Real Power Consumption**: 0W calculated (480W × 0% load)
+- ✅ **Live Battery Data**: 100% charge, 220 minutes runtime
+- ✅ **Voltage Monitoring**: 236V line voltage from UPS sensors
+- ✅ **Hardware Detection**: Automatic APC/NUT UPS identification
+
+### 5. Docker Containers
 
 List all Docker containers:
 
