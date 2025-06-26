@@ -47,7 +47,9 @@ func (h *StorageHandler) HandleStorageArray(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, arrayInfo)
+	// Transform array data to include real usage calculations
+	transformedArrayInfo := h.transformArrayData(arrayInfo)
+	utils.WriteJSON(w, http.StatusOK, transformedArrayInfo)
 }
 
 // HandleStorageDisks handles GET /api/v1/storage/disks
@@ -615,6 +617,87 @@ func (h *StorageHandler) parseSizeToBytes(sizeStr string) int64 {
 	}
 }
 
+// transformArrayData transforms array data to include real usage calculations
+func (h *StorageHandler) transformArrayData(arrayInfo interface{}) interface{} {
+	// Handle different possible return types
+	switch v := arrayInfo.(type) {
+	case map[string]interface{}:
+		return h.transformSingleArrayData(v)
+	default:
+		// Return as-is if unknown type
+		return arrayInfo
+	}
+}
+
+// transformSingleArrayData transforms a single array object to include real usage calculations
+func (h *StorageHandler) transformSingleArrayData(arrayData map[string]interface{}) map[string]interface{} {
+	transformed := make(map[string]interface{})
+
+	// Copy all existing fields first
+	for key, value := range arrayData {
+		transformed[key] = value
+	}
+
+	// Calculate real usage totals from actual disk data
+	totalCapacity := int64(0)
+	totalUsed := int64(0)
+	diskCount := 0
+
+	// Try to get disk information to calculate totals
+	if disks, err := h.api.GetSystem().GetRealDisks(); err == nil {
+		if disksArray, ok := disks.([]interface{}); ok {
+			diskCount = len(disksArray)
+			for _, disk := range disksArray {
+				if diskMap, ok := disk.(map[string]interface{}); ok {
+					// Only include data disks (not parity, boot, or cache)
+					diskType, _ := diskMap["type"].(string)
+					if diskType == "disk" {
+						// Check if this is a mounted data disk (has mount_point and not /boot or /mnt/cache)
+						mountPoint, _ := diskMap["mount_point"].(string)
+						if mountPoint != "" && mountPoint != "/boot" && mountPoint != "/mnt/cache" {
+							// Get size in bytes
+							if sizeBytes, ok := diskMap["size"].(int64); ok && sizeBytes > 0 {
+								totalCapacity += sizeBytes
+							}
+
+							// Get used bytes
+							if usedBytes, ok := diskMap["used"].(int64); ok && usedBytes > 0 {
+								totalUsed += usedBytes
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Calculate usage percentage
+	usagePercent := 0.0
+	if totalCapacity > 0 {
+		usagePercent = float64(totalUsed) / float64(totalCapacity) * 100
+	}
+
+	// Add required fields with real calculated values
+	totalFree := totalCapacity - totalUsed
+	transformed["total_capacity"] = totalCapacity
+	transformed["total_used"] = totalUsed
+	transformed["total_free"] = totalFree
+	transformed["usage_percent"] = usagePercent
+	transformed["disk_count"] = diskCount
+
+	// Add human-readable formatted values
+	transformed["total_capacity_formatted"] = utils.BytesToHumanReadable(totalCapacity)
+	transformed["total_used_formatted"] = utils.BytesToHumanReadable(totalUsed)
+	transformed["total_free_formatted"] = utils.BytesToHumanReadable(totalFree)
+
+	// Ensure last_updated is present
+	if _, exists := transformed["last_updated"]; !exists {
+		transformed["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	return transformed
+}
+
 // transformBootInfo transforms boot info to match OpenAPI schema
 func (h *StorageHandler) transformBootInfo(bootInfo map[string]interface{}) map[string]interface{} {
 	transformed := make(map[string]interface{})
@@ -791,14 +874,26 @@ func (h *StorageHandler) transformGeneralInfo(generalInfo map[string]interface{}
 	diskCount := 0
 
 	// Try to get disk information to calculate totals
-	if disks, err := h.api.GetStorage().GetDisks(); err == nil {
+	if disks, err := h.api.GetSystem().GetRealDisks(); err == nil {
 		if disksArray, ok := disks.([]interface{}); ok {
 			diskCount = len(disksArray)
 			for _, disk := range disksArray {
 				if diskMap, ok := disk.(map[string]interface{}); ok {
-					if sizeStr, ok := diskMap["size"].(string); ok {
-						if sizeBytes := h.parseSizeToBytes(sizeStr); sizeBytes > 0 {
-							totalCapacity += sizeBytes
+					// Only include data disks (not parity, boot, or cache)
+					diskType, _ := diskMap["type"].(string)
+					if diskType == "disk" {
+						// Check if this is a mounted data disk (has mount_point and not /boot or /mnt/cache)
+						mountPoint, _ := diskMap["mount_point"].(string)
+						if mountPoint != "" && mountPoint != "/boot" && mountPoint != "/mnt/cache" {
+							// Get size in bytes
+							if sizeBytes, ok := diskMap["size"].(int64); ok && sizeBytes > 0 {
+								totalCapacity += sizeBytes
+							}
+
+							// Get used bytes
+							if usedBytes, ok := diskMap["used"].(int64); ok && usedBytes > 0 {
+								totalUsed += usedBytes
+							}
 						}
 					}
 				}
@@ -812,12 +907,18 @@ func (h *StorageHandler) transformGeneralInfo(generalInfo map[string]interface{}
 		usagePercent = float64(totalUsed) / float64(totalCapacity) * 100
 	}
 
-	// Add required fields
+	// Add required fields with real calculated values
+	totalFree := totalCapacity - totalUsed
 	transformed["total_capacity"] = totalCapacity
 	transformed["total_used"] = totalUsed
-	transformed["total_free"] = totalCapacity - totalUsed
+	transformed["total_free"] = totalFree
 	transformed["usage_percent"] = usagePercent
 	transformed["disk_count"] = diskCount
+
+	// Add human-readable formatted values
+	transformed["total_capacity_formatted"] = utils.BytesToHumanReadable(totalCapacity)
+	transformed["total_used_formatted"] = utils.BytesToHumanReadable(totalUsed)
+	transformed["total_free_formatted"] = utils.BytesToHumanReadable(totalFree)
 	transformed["array_status"] = h.getArrayStatus()
 
 	// Ensure last_updated is present
