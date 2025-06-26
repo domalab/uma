@@ -18,48 +18,48 @@ type AdaptiveConfig struct {
 	currentIntervals map[string]time.Duration
 
 	// System load thresholds
-	lowLoadThreshold    float64 // Below this, use slower intervals
-	highLoadThreshold   float64 // Above this, use faster intervals
-	criticalThreshold   float64 // Above this, use critical intervals
+	lowLoadThreshold  float64 // Below this, use slower intervals
+	highLoadThreshold float64 // Above this, use faster intervals
+	criticalThreshold float64 // Above this, use critical intervals
 
 	// Activity tracking
-	lastActivity     map[string]time.Time
-	activityTimeout  time.Duration
-	errorCounts      map[string]int
-	errorThreshold   int
+	lastActivity    map[string]time.Time
+	activityTimeout time.Duration
+	errorCounts     map[string]int
+	errorThreshold  int
 
 	// Adaptive factors
-	slowFactor       float64 // Multiply interval by this when load is low
-	fastFactor       float64 // Multiply interval by this when load is high
-	criticalFactor   float64 // Multiply interval by this when critical
+	slowFactor     float64 // Multiply interval by this when load is low
+	fastFactor     float64 // Multiply interval by this when load is high
+	criticalFactor float64 // Multiply interval by this when critical
 }
 
 // MonitoringType represents different types of monitoring
 type MonitoringType string
 
 const (
-	SystemStats      MonitoringType = "system_stats"
-	DockerEvents     MonitoringType = "docker_events"
-	StorageStatus    MonitoringType = "storage_status"
-	VMEvents         MonitoringType = "vm_events"
-	Infrastructure   MonitoringType = "infrastructure"
-	ResourceAlerts   MonitoringType = "resource_alerts"
-	Temperature      MonitoringType = "temperature"
-	UPSDetection     MonitoringType = "ups_detection"
+	SystemStats    MonitoringType = "system_stats"
+	DockerEvents   MonitoringType = "docker_events"
+	StorageStatus  MonitoringType = "storage_status"
+	VMEvents       MonitoringType = "vm_events"
+	Infrastructure MonitoringType = "infrastructure"
+	ResourceAlerts MonitoringType = "resource_alerts"
+	Temperature    MonitoringType = "temperature"
+	UPSDetection   MonitoringType = "ups_detection"
 )
 
 // NewAdaptiveConfig creates a new adaptive monitoring configuration
 func NewAdaptiveConfig() *AdaptiveConfig {
 	config := &AdaptiveConfig{
 		baseIntervals: map[string]time.Duration{
-			string(SystemStats):      3 * time.Second,
-			string(DockerEvents):     5 * time.Second,
-			string(StorageStatus):    10 * time.Second,
-			string(VMEvents):         8 * time.Second,
-			string(Infrastructure):   15 * time.Second,
-			string(ResourceAlerts):   5 * time.Second,
-			string(Temperature):      2 * time.Second,
-			string(UPSDetection):     30 * time.Second,
+			string(SystemStats):    3 * time.Second,
+			string(DockerEvents):   30 * time.Second, // Reduced from 5s to 30s to minimize log noise
+			string(StorageStatus):  10 * time.Second,
+			string(VMEvents):       8 * time.Second,
+			string(Infrastructure): 15 * time.Second,
+			string(ResourceAlerts): 5 * time.Second,
+			string(Temperature):    2 * time.Second,
+			string(UPSDetection):   30 * time.Second,
 		},
 		currentIntervals: make(map[string]time.Duration),
 		lastActivity:     make(map[string]time.Time),
@@ -128,17 +128,17 @@ func (ac *AdaptiveConfig) UpdateSystemLoad(loadAverage float64, memoryUsage floa
 	// Apply factor to all intervals
 	for monitorType, baseInterval := range ac.baseIntervals {
 		newInterval := time.Duration(float64(baseInterval) * factor)
-		
+
 		// Enforce minimum and maximum bounds
 		minInterval := 1 * time.Second
 		maxInterval := 2 * time.Minute
-		
+
 		if newInterval < minInterval {
 			newInterval = minInterval
 		} else if newInterval > maxInterval {
 			newInterval = maxInterval
 		}
-		
+
 		ac.currentIntervals[monitorType] = newInterval
 	}
 }
@@ -147,9 +147,9 @@ func (ac *AdaptiveConfig) UpdateSystemLoad(loadAverage float64, memoryUsage floa
 func (ac *AdaptiveConfig) RecordActivity(monitorType MonitoringType) {
 	ac.mutex.Lock()
 	defer ac.mutex.Unlock()
-	
+
 	ac.lastActivity[string(monitorType)] = time.Now()
-	
+
 	// Reset error count on successful activity
 	ac.errorCounts[string(monitorType)] = 0
 }
@@ -158,22 +158,22 @@ func (ac *AdaptiveConfig) RecordActivity(monitorType MonitoringType) {
 func (ac *AdaptiveConfig) RecordError(monitorType MonitoringType, err error) {
 	ac.mutex.Lock()
 	defer ac.mutex.Unlock()
-	
+
 	ac.errorCounts[string(monitorType)]++
-	
+
 	// If error threshold is exceeded, slow down monitoring for this type
 	if ac.errorCounts[string(monitorType)] >= ac.errorThreshold {
 		currentInterval := ac.currentIntervals[string(monitorType)]
 		newInterval := time.Duration(float64(currentInterval) * 2.0) // Double the interval
-		
+
 		// Enforce maximum bound
 		maxInterval := 5 * time.Minute
 		if newInterval > maxInterval {
 			newInterval = maxInterval
 		}
-		
+
 		ac.currentIntervals[string(monitorType)] = newInterval
-		logger.Yellow("Monitoring type %s has %d errors, slowing interval to %v", 
+		logger.Yellow("Monitoring type %s has %d errors, slowing interval to %v",
 			monitorType, ac.errorCounts[string(monitorType)], newInterval)
 	}
 }
@@ -182,23 +182,23 @@ func (ac *AdaptiveConfig) RecordError(monitorType MonitoringType, err error) {
 func (ac *AdaptiveConfig) CheckInactiveMonitors() {
 	ac.mutex.Lock()
 	defer ac.mutex.Unlock()
-	
+
 	now := time.Now()
-	
+
 	for monitorType, lastActivity := range ac.lastActivity {
 		if now.Sub(lastActivity) > ac.activityTimeout {
 			// Monitor has been inactive, slow it down
 			currentInterval := ac.currentIntervals[monitorType]
 			newInterval := time.Duration(float64(currentInterval) * 1.2) // 20% slower
-			
+
 			// Enforce maximum bound
 			maxInterval := 2 * time.Minute
 			if newInterval > maxInterval {
 				newInterval = maxInterval
 			}
-			
+
 			ac.currentIntervals[monitorType] = newInterval
-			logger.Blue("Monitor %s inactive for %v, adjusting interval to %v", 
+			logger.Blue("Monitor %s inactive for %v, adjusting interval to %v",
 				monitorType, now.Sub(lastActivity), newInterval)
 		}
 	}
@@ -208,7 +208,7 @@ func (ac *AdaptiveConfig) CheckInactiveMonitors() {
 func (ac *AdaptiveConfig) GetConfiguration() map[string]interface{} {
 	ac.mutex.RLock()
 	defer ac.mutex.RUnlock()
-	
+
 	config := make(map[string]interface{})
 	config["base_intervals"] = ac.baseIntervals
 	config["current_intervals"] = ac.currentIntervals
@@ -224,7 +224,7 @@ func (ac *AdaptiveConfig) GetConfiguration() map[string]interface{} {
 	}
 	config["error_counts"] = ac.errorCounts
 	config["last_activity"] = ac.lastActivity
-	
+
 	return config
 }
 
@@ -232,16 +232,16 @@ func (ac *AdaptiveConfig) GetConfiguration() map[string]interface{} {
 func (ac *AdaptiveConfig) ResetToDefaults() {
 	ac.mutex.Lock()
 	defer ac.mutex.Unlock()
-	
+
 	for k, v := range ac.baseIntervals {
 		ac.currentIntervals[k] = v
 	}
-	
+
 	// Clear error counts and activity tracking
 	for k := range ac.errorCounts {
 		ac.errorCounts[k] = 0
 	}
-	
+
 	logger.Blue("Adaptive monitoring configuration reset to defaults")
 }
 
@@ -249,7 +249,7 @@ func (ac *AdaptiveConfig) ResetToDefaults() {
 func (ac *AdaptiveConfig) SetCustomInterval(monitorType MonitoringType, interval time.Duration) {
 	ac.mutex.Lock()
 	defer ac.mutex.Unlock()
-	
+
 	ac.currentIntervals[string(monitorType)] = interval
 	logger.Blue("Custom interval set for %s: %v", monitorType, interval)
 }

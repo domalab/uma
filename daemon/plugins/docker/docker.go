@@ -161,19 +161,17 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 	}
 
 	output := d.cmdExecutor.GetCmdOutput("docker", args...)
-	if len(output) > 0 {
-		logger.Blue("Docker ps output: %d lines", len(output))
+	// Only log Docker ps output in debug scenarios or when there are issues
+	if len(output) == 0 {
+		logger.Yellow("Docker ps returned no output - Docker may not be running")
 	}
 
-	for i, line := range output {
+	for _, line := range output {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 
-		// Reduced logging verbosity - only log first container for debugging
-		if i == 0 {
-			logger.Blue("Processing line %d: %s", i, line[:min(100, len(line))])
-		}
+		// Remove verbose per-line processing logs - only log errors
 
 		// Parse the docker ps JSON format first
 		var dockerPsData map[string]interface{}
@@ -194,10 +192,8 @@ func (d *DockerManager) ListContainers(all bool) ([]ContainerInfo, error) {
 		containers = append(containers, container)
 	}
 
-	// Single summary log instead of verbose per-container logging
-	if len(containers) > 0 {
-		logger.Blue("Successfully retrieved and processed %d Docker containers", len(containers))
-	}
+	// Use structured logging for container summary - only log when count changes significantly or errors occur
+	// This reduces log noise from routine monitoring while preserving important information
 	return containers, nil
 }
 

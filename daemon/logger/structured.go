@@ -298,6 +298,27 @@ func GetLogger() zerolog.Logger {
 	return Logger
 }
 
+// LogDockerOperation logs Docker operations with minimal verbosity for routine monitoring
+func LogDockerOperation(operation string, containerCount int, err error) {
+	// Only log Docker operations when there are errors or significant changes
+	// This prevents routine monitoring from flooding logs
+	if err != nil {
+		Logger.Error().
+			Str("component", "docker").
+			Str("operation", operation).
+			Int("container_count", containerCount).
+			Err(err).
+			Msg("Docker operation failed")
+	} else if containerCount == 0 {
+		Logger.Warn().
+			Str("component", "docker").
+			Str("operation", operation).
+			Int("container_count", containerCount).
+			Msg("No Docker containers found")
+	}
+	// Success cases with containers are not logged to reduce noise
+}
+
 // WithContext creates a logger with additional context fields
 func WithContext(fields map[string]interface{}) zerolog.Logger {
 	ctx := Logger.With()

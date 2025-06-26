@@ -246,7 +246,8 @@ func (d *DockerAdapter) GetContainers() (interface{}, error) {
 				}
 				result[i] = container
 			}
-			logger.Blue("Successfully retrieved and processed %d Docker containers", len(containers))
+			// Use structured logging for monitoring - only log significant events or errors
+			logger.LogDockerOperation("container_list", len(containers), nil)
 			return result, nil
 		}
 	}
