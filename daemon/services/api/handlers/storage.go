@@ -74,8 +74,8 @@ func (h *StorageHandler) HandleStorageDisks(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Transform the comprehensive disk data to include hardware information
-	transformedDisks := h.transformComprehensiveDisksData(disks)
+	// Transform the enhanced disk data (now returns simple array format)
+	transformedDisks := h.transformDisksData(disks)
 	utils.WriteJSON(w, http.StatusOK, transformedDisks)
 }
 

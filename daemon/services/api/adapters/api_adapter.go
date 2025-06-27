@@ -8,7 +8,6 @@ import (
 
 	"github.com/domalab/uma/daemon/logger"
 	"github.com/domalab/uma/daemon/plugins/docker"
-	"github.com/domalab/uma/daemon/plugins/storage"
 	"github.com/domalab/uma/daemon/services/api/utils"
 	upsDetector "github.com/domalab/uma/daemon/services/ups"
 )
@@ -198,9 +197,177 @@ func (s *StorageAdapter) GetDisks() (interface{}, error) {
 }
 
 func (s *StorageAdapter) GetConsolidatedDisksInfo() (interface{}, error) {
-	// Create a new storage monitor instance from the storage plugin
-	storageMonitor := &storage.StorageMonitor{}
-	return storageMonitor.GetConsolidatedDisksInfo()
+	// Get basic disk information and enhance it with hardware details
+	basicDisks, err := s.monitor.GetRealDisks()
+	if err != nil {
+		return nil, err
+	}
+
+	// Enhance each disk with hardware information
+	if diskArray, ok := basicDisks.([]interface{}); ok {
+		enhancedDisks := make([]interface{}, len(diskArray))
+		for i, disk := range diskArray {
+			if diskMap, ok := disk.(map[string]interface{}); ok {
+				enhancedDisks[i] = s.enhanceDiskWithHardwareInfo(diskMap)
+			} else {
+				enhancedDisks[i] = disk
+			}
+		}
+		return enhancedDisks, nil
+	}
+
+	return basicDisks, nil
+}
+
+// enhanceDiskWithHardwareInfo enhances a disk map with hardware information
+func (s *StorageAdapter) enhanceDiskWithHardwareInfo(disk map[string]interface{}) map[string]interface{} {
+	enhanced := make(map[string]interface{})
+
+	// Copy existing fields
+	for k, v := range disk {
+		enhanced[k] = v
+	}
+
+	// Get device path for hardware detection
+	devicePath := ""
+	if device, ok := disk["device"].(string); ok {
+		devicePath = device
+	} else if name, ok := disk["name"].(string); ok {
+		devicePath = "/dev/" + name
+	}
+
+	if devicePath != "" {
+		// Get disk model and serial using smartctl
+		model, serial := s.getDiskModelAndSerial(devicePath)
+		enhanced["model"] = model
+		enhanced["serial_number"] = serial
+
+		// Get filesystem information
+		enhanced["filesystem"] = s.getDiskFilesystem(devicePath)
+
+		// Get spin down delay (placeholder - would need Unraid-specific implementation)
+		enhanced["spin_down_delay"] = s.getDiskSpinDownDelay(devicePath)
+
+		// Get disk type (HDD/SSD) from smartctl
+		enhanced["disk_type"] = s.getDiskType(devicePath)
+
+		// Get interface type (SATA/USB/NVMe)
+		enhanced["interface"] = s.getDiskInterface(devicePath)
+	} else {
+		// Set default values if device path is not available
+		enhanced["model"] = ""
+		enhanced["serial_number"] = ""
+		enhanced["filesystem"] = ""
+		enhanced["spin_down_delay"] = "Unknown"
+		enhanced["disk_type"] = "Unknown"
+		enhanced["interface"] = "Unknown"
+	}
+
+	return enhanced
+}
+
+// getDiskModelAndSerial gets disk model and serial number using smartctl
+func (s *StorageAdapter) getDiskModelAndSerial(devicePath string) (string, string) {
+	cmd := s.monitor.cmd.Command("smartctl", "-i", devicePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", ""
+	}
+
+	model := ""
+	serial := ""
+	lines := strings.Split(string(output), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Device Model:") || strings.HasPrefix(line, "Model Number:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				model = strings.TrimSpace(parts[1])
+			}
+		} else if strings.HasPrefix(line, "Serial Number:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				serial = strings.TrimSpace(parts[1])
+			}
+		}
+	}
+
+	return model, serial
+}
+
+// getDiskFilesystem gets filesystem type using lsblk
+func (s *StorageAdapter) getDiskFilesystem(devicePath string) string {
+	cmd := s.monitor.cmd.Command("lsblk", "-f", "-o", "FSTYPE", devicePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && line != "FSTYPE" {
+			return line
+		}
+	}
+
+	return ""
+}
+
+// getDiskSpinDownDelay gets spin down delay (placeholder implementation)
+func (s *StorageAdapter) getDiskSpinDownDelay(devicePath string) string {
+	// This would require reading Unraid-specific configuration
+	// For now, return a placeholder
+	return "Unknown"
+}
+
+// getDiskType determines if disk is HDD or SSD using smartctl
+func (s *StorageAdapter) getDiskType(devicePath string) string {
+	cmd := s.monitor.cmd.Command("smartctl", "-i", devicePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return "Unknown"
+	}
+
+	outputStr := strings.ToLower(string(output))
+	if strings.Contains(outputStr, "solid state") || strings.Contains(outputStr, "ssd") {
+		return "SSD"
+	} else if strings.Contains(outputStr, "rotation rate") {
+		// Check rotation rate to distinguish HDD from SSD
+		if strings.Contains(outputStr, "solid state device") {
+			return "SSD"
+		}
+		return "HDD"
+	}
+
+	// Default assumption for traditional drives
+	return "HDD"
+}
+
+// getDiskInterface determines disk interface type
+func (s *StorageAdapter) getDiskInterface(devicePath string) string {
+	// Check if it's NVMe
+	if strings.Contains(devicePath, "nvme") {
+		return "NVMe"
+	}
+
+	// Use lsblk to get more information
+	cmd := s.monitor.cmd.Command("lsblk", "-d", "-o", "TRAN", devicePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return "Unknown"
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && line != "TRAN" {
+			return strings.ToUpper(line)
+		}
+	}
+
+	return "Unknown"
 }
 
 func (s *StorageAdapter) GetZFSPools() (interface{}, error) {
