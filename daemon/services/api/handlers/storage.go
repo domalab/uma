@@ -335,6 +335,136 @@ func (h *StorageHandler) getLogFilesystemUsage() map[string]interface{} {
 	return h.getPathUsage("/var/log")
 }
 
+// HandleDockerStorage handles GET /api/v1/storage/docker
+func (h *StorageHandler) HandleDockerStorage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	dockerUsage := h.getDockerVDiskUsage()
+
+	// Enhance with additional Docker-specific information
+	enhancedDockerUsage := map[string]interface{}{
+		"total_bytes":      dockerUsage["total"],
+		"used_bytes":       dockerUsage["used"],
+		"free_bytes":       dockerUsage["free"],
+		"usage_percentage": dockerUsage["usage_percentage"],
+		"path":             dockerUsage["path"],
+		"filesystem":       dockerUsage["filesystem"],
+		"mount_point":      dockerUsage["mount_point"],
+		"docker_info": map[string]interface{}{
+			"vdisk_enabled":   h.isDockerVDiskEnabled(),
+			"vdisk_size":      dockerUsage["total"],
+			"containers_path": "/var/lib/docker/containers",
+			"images_path":     "/var/lib/docker/image",
+		},
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	utils.WriteJSON(w, http.StatusOK, enhancedDockerUsage)
+}
+
+// HandleLogStorage handles GET /api/v1/storage/logs
+func (h *StorageHandler) HandleLogStorage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	logUsage := h.getLogFilesystemUsage()
+
+	// Enhance with additional log-specific information
+	enhancedLogUsage := map[string]interface{}{
+		"total_bytes":      logUsage["total"],
+		"used_bytes":       logUsage["used"],
+		"free_bytes":       logUsage["free"],
+		"usage_percentage": logUsage["usage_percentage"],
+		"path":             "/var/log",
+		"filesystem":       logUsage["filesystem"],
+		"mount_point":      logUsage["mount_point"],
+		"log_info": map[string]interface{}{
+			"uma_log_size":     h.getUMALogSize(),
+			"syslog_size":      h.getSyslogSize(),
+			"max_log_size":     "5MB",
+			"rotation_enabled": true,
+		},
+		"growth_rate": map[string]interface{}{
+			"daily_estimate": h.estimateDailyLogGrowth(),
+			"monitoring":     "enabled",
+		},
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	utils.WriteJSON(w, http.StatusOK, enhancedLogUsage)
+}
+
+// isDockerVDiskEnabled checks if Docker vDisk is enabled
+func (h *StorageHandler) isDockerVDiskEnabled() bool {
+	// Check if Docker vDisk file exists
+	dockerVDiskPaths := []string{
+		"/mnt/user/system/docker/docker.img",
+		"/var/lib/docker.img",
+	}
+
+	for _, path := range dockerVDiskPaths {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// getUMALogSize returns the size of the UMA log file
+func (h *StorageHandler) getUMALogSize() int64 {
+	logPaths := []string{
+		"/var/log/uma.log",
+		"/tmp/uma.log",
+		"/boot/logs/uma.log",
+	}
+
+	for _, path := range logPaths {
+		if info, err := os.Stat(path); err == nil {
+			return info.Size()
+		}
+	}
+	return 0
+}
+
+// getSyslogSize returns the size of the main syslog file
+func (h *StorageHandler) getSyslogSize() int64 {
+	syslogPaths := []string{
+		"/var/log/syslog",
+		"/var/log/messages",
+	}
+
+	for _, path := range syslogPaths {
+		if info, err := os.Stat(path); err == nil {
+			return info.Size()
+		}
+	}
+	return 0
+}
+
+// estimateDailyLogGrowth estimates daily log growth rate
+func (h *StorageHandler) estimateDailyLogGrowth() string {
+	// Simple estimation based on current UMA log size and typical growth patterns
+	umaLogSize := h.getUMALogSize()
+
+	if umaLogSize == 0 {
+		return "< 1MB/day"
+	}
+
+	// Estimate based on log size (very rough approximation)
+	if umaLogSize < 1024*1024 { // < 1MB
+		return "< 1MB/day"
+	} else if umaLogSize < 5*1024*1024 { // < 5MB
+		return "1-2MB/day"
+	} else {
+		return "2-5MB/day"
+	}
+}
+
 // getParityCheckStatus returns the current parity check status
 func (h *StorageHandler) getParityCheckStatus() responses.ParityCheckStatus {
 	// Get parity check data from storage service

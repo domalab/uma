@@ -90,7 +90,7 @@ func (c *ViperConfigService) setDefaults() {
 	c.viper.SetDefault("logging.level", "info")
 	c.viper.SetDefault("logging.format", "console")
 	c.viper.SetDefault("logging.file", "")
-	c.viper.SetDefault("logging.max_size", 10)   // 10MB limit as requested
+	c.viper.SetDefault("logging.max_size", 5)    // 5MB limit for minimal disk usage
 	c.viper.SetDefault("logging.max_backups", 0) // DISABLED - no backup files
 	c.viper.SetDefault("logging.max_age", 0)     // DISABLED - no age-based retention
 
@@ -364,7 +364,7 @@ logging:
   level: "info"
   format: "console"
   file: ""
-  max_size: 10      # 10MB limit to prevent disk space issues
+  max_size: 5       # 5MB limit for minimal disk usage
   max_backups: 0    # DISABLED - no backup files
   max_age: 0        # DISABLED - no age-based retention
 

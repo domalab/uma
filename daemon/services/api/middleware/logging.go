@@ -56,12 +56,12 @@ func LoggingWithConfig(config LoggingConfig) func(http.Handler) http.Handler {
 				}
 			}
 
-			// Backward compatibility: also log with colored output
+			// Backward compatibility: also log with colored output (production optimized)
 			if config.ColoredOutput {
 				if requestID != "" {
-					logger.LightGreen("HTTP %s %s %d %v [%s]", r.Method, r.URL.Path, wrapper.statusCode, duration, requestID)
+					logger.ProductionInfo("HTTP %s %s %d %v [%s]", r.Method, r.URL.Path, wrapper.statusCode, duration, requestID)
 				} else {
-					logger.LightGreen("HTTP %s %s %d %v", r.Method, r.URL.Path, wrapper.statusCode, duration)
+					logger.ProductionInfo("HTTP %s %s %d %v", r.Method, r.URL.Path, wrapper.statusCode, duration)
 				}
 			}
 

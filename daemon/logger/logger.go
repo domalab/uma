@@ -3,6 +3,7 @@ package logger
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -59,4 +60,60 @@ func printer2(fn *color.Style256, format string, args ...interface{}) {
 	line := fmt.Sprintf(format, args...)
 	fn.Printf("%s %s\n", time.Now().Format("15:04"), line)
 	log.Println(line)
+}
+
+// Production logging optimization variables
+var (
+	isProductionMode = false
+	verbosePatterns  = []string{
+		"HTTP GET /health",
+		"HTTP GET /metrics",
+		"HTTP GET /api/v1/system/stats",
+		"Monitoring cycle completed",
+		"Cache hit for",
+		"WebSocket ping",
+		"Heartbeat",
+	}
+)
+
+// SetProductionMode enables production logging optimizations
+func SetProductionMode(enabled bool) {
+	isProductionMode = enabled
+	if enabled {
+		Green("Production logging mode enabled - verbose messages will be filtered")
+	}
+}
+
+// IsProductionMode returns whether production mode is enabled
+func IsProductionMode() bool {
+	return isProductionMode
+}
+
+// shouldSkipVerboseLog determines if a log message should be skipped in production
+func shouldSkipVerboseLog(message string) bool {
+	if !IsProductionMode() {
+		return false
+	}
+
+	for _, pattern := range verbosePatterns {
+		if strings.Contains(message, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// ProductionInfo logs info messages only if not verbose in production mode
+func ProductionInfo(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	if !shouldSkipVerboseLog(message) {
+		Blue(format, args...)
+	}
+}
+
+// ProductionDebug logs debug messages only in non-production mode
+func ProductionDebug(format string, args ...interface{}) {
+	if !IsProductionMode() {
+		LightGreen(format, args...)
+	}
 }

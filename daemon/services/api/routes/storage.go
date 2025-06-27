@@ -19,5 +19,9 @@ func (r *Router) registerStorageRoutes() {
 	r.mux.HandleFunc("/api/v1/storage/array/start", r.storageHandler.HandleArrayStart)
 	r.mux.HandleFunc("/api/v1/storage/array/stop", r.storageHandler.HandleArrayStop)
 
+	// Storage usage monitoring endpoints
+	r.mux.HandleFunc("/api/v1/storage/docker", r.storageHandler.HandleDockerStorage)
+	r.mux.HandleFunc("/api/v1/storage/logs", r.storageHandler.HandleLogStorage)
+
 	// Parity endpoints moved to system routes to avoid conflicts
 }

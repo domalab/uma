@@ -23,7 +23,7 @@ type FileLoggerConfig struct {
 func DefaultFileLoggerConfig(logsDir string) FileLoggerConfig {
 	return FileLoggerConfig{
 		Filename:   filepath.Join(logsDir, "uma.log"),
-		MaxSize:    10,    // 10MB limit as requested
+		MaxSize:    5,     // 5MB limit for minimal disk usage
 		MaxBackups: 0,     // DISABLED - no backup files to prevent disk space issues
 		MaxAge:     0,     // DISABLED - no age-based retention
 		Compress:   false, // DISABLED - no compression to avoid backup files
@@ -35,7 +35,7 @@ func DefaultFileLoggerConfig(logsDir string) FileLoggerConfig {
 func UnraidOptimizedConfig(logsDir string) FileLoggerConfig {
 	return FileLoggerConfig{
 		Filename:   filepath.Join(logsDir, "uma.log"),
-		MaxSize:    10,    // 10MB maximum file size
+		MaxSize:    5,     // 5MB maximum file size for minimal disk usage
 		MaxBackups: 0,     // No backup files - when limit reached, truncate
 		MaxAge:     0,     // No age-based rotation
 		Compress:   false, // No compression to avoid creating additional files
@@ -74,7 +74,7 @@ func SetupFileLogger(config FileLoggerConfig) error {
 func CleanupOldLogFiles(logsDir string) error {
 	// Pattern to match UMA log backup files (uma.log.1, uma.log.2, etc.)
 	pattern := filepath.Join(logsDir, "uma.log.*")
-	
+
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to find log backup files: %w", err)
@@ -106,7 +106,7 @@ func GetLogFileSize(filename string) (int64, error) {
 // LogDiskUsageInfo logs information about current log file usage
 func LogDiskUsageInfo(logsDir string) {
 	logFile := filepath.Join(logsDir, "uma.log")
-	
+
 	size, err := GetLogFileSize(logFile)
 	if err != nil {
 		log.Printf("Warning: could not get log file size: %v", err)

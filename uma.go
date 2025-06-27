@@ -40,7 +40,7 @@ func main() {
 
 	log.SetOutput(&lumberjack.Logger{
 		Filename:   logConfig.Filename,
-		MaxSize:    logConfig.MaxSize,    // 10MB limit as requested
+		MaxSize:    logConfig.MaxSize,    // 5MB limit for minimal disk usage
 		MaxBackups: logConfig.MaxBackups, // 0 - DISABLED to prevent disk space issues
 		MaxAge:     logConfig.MaxAge,     // 0 - DISABLED for minimal disk usage
 		Compress:   logConfig.Compress,   // false - DISABLED to avoid backup files
@@ -48,6 +48,9 @@ func main() {
 
 	// Log disk usage information for monitoring
 	logger.LogDiskUsageInfo(cli.LogsDir)
+
+	// Enable production logging mode to reduce verbose messages
+	logger.SetProductionMode(true)
 
 	// Create base configuration
 	config := domain.DefaultConfig()
