@@ -1543,6 +1543,8 @@ func (v *VMMonitor) GetRealVMs() (interface{}, error) {
 	}
 
 	lines := strings.Split(string(output), "\n")
+	vmCounter := 1 // Sequential ID counter for VMs
+
 	for i, line := range lines {
 		// Skip header lines
 		if i < 2 {
@@ -1556,12 +1558,18 @@ func (v *VMMonitor) GetRealVMs() (interface{}, error) {
 
 		fields := strings.Fields(line)
 		if len(fields) >= 3 {
-			vmId := fields[0]
+			libvirtId := fields[0] // Original libvirt ID (might be "-")
 			vmName := fields[1]
 			vmState := strings.Join(fields[2:], " ")
 
+			// Assign sequential ID instead of using libvirt ID
+			// This fixes the issue where inactive VMs have ID "-"
+			vmId := strconv.Itoa(vmCounter)
+			vmCounter++
+
 			vm := map[string]interface{}{
-				"id":          vmId,
+				"id":          vmId,      // Sequential ID (1, 2, 3, ...)
+				"libvirt_id":  libvirtId, // Original libvirt ID for reference
 				"name":        vmName,
 				"state":       vmState,
 				"type":        "kvm",

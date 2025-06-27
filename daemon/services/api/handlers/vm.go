@@ -49,18 +49,25 @@ func (h *VMHandler) HandleVMList(w http.ResponseWriter, r *http.Request) {
 
 // HandleVM handles VM operations
 func (h *VMHandler) HandleVM(w http.ResponseWriter, r *http.Request) {
-	// Extract VM name from URL path
+	// Extract VM identifier from URL path (could be ID or name)
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/vms/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 || parts[0] == "" {
-		utils.WriteError(w, http.StatusBadRequest, "VM name required")
+		utils.WriteError(w, http.StatusBadRequest, "VM identifier required")
 		return
 	}
 
-	vmName := parts[0]
+	vmIdentifier := parts[0]
 	action := ""
 	if len(parts) > 1 {
 		action = parts[1]
+	}
+
+	// Resolve VM identifier to VM name (handles both ID and name)
+	vmName, err := h.resolveVMName(vmIdentifier)
+	if err != nil {
+		utils.WriteError(w, http.StatusNotFound, fmt.Sprintf("VM not found: %v", err))
+		return
 	}
 
 	switch r.Method {
@@ -616,4 +623,39 @@ func (h *VMHandler) getVMResources(vmName string) (map[string]interface{}, error
 	}
 
 	return resources, nil
+}
+
+// resolveVMName resolves a VM identifier (ID or name) to the actual VM name
+func (h *VMHandler) resolveVMName(identifier string) (string, error) {
+	// If identifier looks like a numeric ID, resolve it to name
+	if vmId, err := strconv.Atoi(identifier); err == nil {
+		// Get all VMs to find the one with matching ID
+		vms, err := h.api.GetVM().GetVMs()
+		if err != nil {
+			return "", fmt.Errorf("failed to get VMs: %v", err)
+		}
+
+		// Handle different possible return types from GetVMs()
+		switch v := vms.(type) {
+		case []interface{}:
+			for _, vm := range v {
+				if vmMap, ok := vm.(map[string]interface{}); ok {
+					if vmIdStr, exists := vmMap["id"]; exists {
+						if vmIdStr == strconv.Itoa(vmId) || vmIdStr == identifier {
+							if vmName, exists := vmMap["name"]; exists {
+								if name, ok := vmName.(string); ok {
+									return name, nil
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return "", fmt.Errorf("VM with ID %s not found", identifier)
+	}
+
+	// If not numeric, assume it's already a VM name
+	return identifier, nil
 }
