@@ -465,6 +465,11 @@ func (h *SystemHandler) getSystemInfo() map[string]interface{} {
 		"last_updated": time.Now().UTC().Format(time.RFC3339),
 	}
 
+	// Add comprehensive hardware specifications
+	if hardware := h.getHardwareSpecifications(); hardware != nil {
+		info["hardware"] = hardware
+	}
+
 	return info
 }
 
@@ -484,6 +489,356 @@ func (h *SystemHandler) getKernelVersion() string {
 		return strings.TrimSpace(string(output))
 	}
 	return "unknown"
+}
+
+// getHardwareSpecifications returns comprehensive hardware information using dmidecode
+func (h *SystemHandler) getHardwareSpecifications() map[string]interface{} {
+	hardware := map[string]interface{}{}
+
+	// Get motherboard information
+	if motherboard := h.getMotherboardInfo(); motherboard != nil {
+		hardware["motherboard"] = motherboard
+	}
+
+	// Get BIOS information
+	if bios := h.getBIOSInfo(); bios != nil {
+		hardware["bios"] = bios
+	}
+
+	// Get chassis information
+	if chassis := h.getChassisInfo(); chassis != nil {
+		hardware["chassis"] = chassis
+	}
+
+	// Get memory module information
+	if memory := h.getMemoryModuleInfo(); memory != nil {
+		hardware["memory"] = memory
+	}
+
+	// Get PCIe device information
+	if pcie := h.getPCIeDeviceInfo(); pcie != nil {
+		hardware["pcie_devices"] = pcie
+	}
+
+	// Only return hardware info if we got at least some data
+	if len(hardware) > 0 {
+		return hardware
+	}
+
+	return nil
+}
+
+// getMotherboardInfo gets motherboard information using dmidecode
+func (h *SystemHandler) getMotherboardInfo() map[string]interface{} {
+	output, err := exec.Command("dmidecode", "-t", "baseboard").Output()
+	if err != nil {
+		return nil
+	}
+
+	motherboard := map[string]interface{}{}
+	lines := strings.Split(string(output), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				switch key {
+				case "Manufacturer":
+					motherboard["manufacturer"] = value
+				case "Product Name":
+					motherboard["model"] = value
+				case "Version":
+					motherboard["version"] = value
+				case "Serial Number":
+					if value != "Not Specified" && value != "Default string" {
+						motherboard["serial"] = value
+					}
+				}
+			}
+		}
+	}
+
+	if len(motherboard) > 0 {
+		return motherboard
+	}
+	return nil
+}
+
+// getBIOSInfo gets BIOS information using dmidecode
+func (h *SystemHandler) getBIOSInfo() map[string]interface{} {
+	output, err := exec.Command("dmidecode", "-t", "bios").Output()
+	if err != nil {
+		return nil
+	}
+
+	bios := map[string]interface{}{}
+	lines := strings.Split(string(output), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				switch key {
+				case "Vendor":
+					bios["vendor"] = value
+				case "Version":
+					bios["version"] = value
+				case "Release Date":
+					bios["date"] = value
+				}
+			}
+		}
+	}
+
+	if len(bios) > 0 {
+		return bios
+	}
+	return nil
+}
+
+// getChassisInfo gets chassis information using dmidecode
+func (h *SystemHandler) getChassisInfo() map[string]interface{} {
+	output, err := exec.Command("dmidecode", "-t", "chassis").Output()
+	if err != nil {
+		return nil
+	}
+
+	chassis := map[string]interface{}{}
+	lines := strings.Split(string(output), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				switch key {
+				case "Manufacturer":
+					if value != "Default string" {
+						chassis["manufacturer"] = value
+					}
+				case "Type":
+					chassis["type"] = value
+				case "Version":
+					if value != "Default string" {
+						chassis["version"] = value
+					}
+				case "Serial Number":
+					if value != "Default string" && value != "Not Specified" {
+						chassis["serial"] = value
+					}
+				}
+			}
+		}
+	}
+
+	if len(chassis) > 0 {
+		return chassis
+	}
+	return nil
+}
+
+// getMemoryModuleInfo gets memory module information using dmidecode
+func (h *SystemHandler) getMemoryModuleInfo() map[string]interface{} {
+	output, err := exec.Command("dmidecode", "-t", "memory").Output()
+	if err != nil {
+		return nil
+	}
+
+	memory := map[string]interface{}{
+		"total_slots":     0,
+		"populated_slots": 0,
+		"max_capacity_gb": 0,
+		"modules":         []map[string]interface{}{},
+	}
+
+	lines := strings.Split(string(output), "\n")
+	var currentModule map[string]interface{}
+	modules := []map[string]interface{}{}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Detect start of new memory device
+		if strings.Contains(line, "Memory Device") {
+			if currentModule != nil && len(currentModule) > 1 {
+				modules = append(modules, currentModule)
+			}
+			currentModule = map[string]interface{}{}
+			continue
+		}
+
+		if currentModule != nil && strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				switch key {
+				case "Size":
+					if value != "No Module Installed" && value != "Not Installed" {
+						currentModule["size"] = value
+						memory["populated_slots"] = memory["populated_slots"].(int) + 1
+					}
+				case "Locator":
+					currentModule["slot"] = value
+					memory["total_slots"] = memory["total_slots"].(int) + 1
+				case "Type":
+					if value != "Unknown" {
+						currentModule["type"] = value
+					}
+				case "Speed":
+					if value != "Unknown" {
+						currentModule["speed"] = value
+					}
+				case "Manufacturer":
+					if value != "Not Specified" && value != "Unknown" {
+						currentModule["manufacturer"] = value
+					}
+				case "Part Number":
+					if value != "Not Specified" && value != "Unknown" {
+						currentModule["part_number"] = value
+					}
+				}
+			}
+		}
+	}
+
+	// Add the last module
+	if currentModule != nil && len(currentModule) > 1 {
+		modules = append(modules, currentModule)
+	}
+
+	memory["modules"] = modules
+
+	if memory["total_slots"].(int) > 0 {
+		return memory
+	}
+	return nil
+}
+
+// getPCIeDeviceInfo gets PCIe device information using lspci
+func (h *SystemHandler) getPCIeDeviceInfo() []map[string]interface{} {
+	output, err := exec.Command("lspci").Output()
+	if err != nil {
+		return nil
+	}
+
+	devices := []map[string]interface{}{}
+	lines := strings.Split(string(output), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Parse line format: "00:1f.2 SATA controller: Intel Corporation Cannon Lake PCH SATA AHCI Controller (rev 10)"
+		if regexp.MustCompile(`^[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]`).MatchString(line) {
+			// Split into slot and description
+			parts := strings.SplitN(line, " ", 2)
+			if len(parts) < 2 {
+				continue
+			}
+
+			slot := parts[0]
+			description := parts[1]
+
+			// Extract device type (everything before the first colon)
+			deviceType := ""
+			vendor := ""
+			model := ""
+
+			if colonIndex := strings.Index(description, ":"); colonIndex != -1 {
+				deviceType = strings.TrimSpace(description[:colonIndex])
+				remainder := strings.TrimSpace(description[colonIndex+1:])
+
+				// Extract vendor and model from remainder
+				// Format: "Intel Corporation Cannon Lake PCH SATA AHCI Controller (rev 10)"
+				if remainder != "" {
+					// Remove revision info if present
+					if revIndex := strings.Index(remainder, "(rev "); revIndex != -1 {
+						remainder = strings.TrimSpace(remainder[:revIndex])
+					}
+
+					// Split vendor and model - vendor is usually first 1-2 words
+					words := strings.Fields(remainder)
+					if len(words) >= 2 {
+						if words[1] == "Corporation" || words[1] == "Inc." || words[1] == "Ltd." {
+							vendor = strings.Join(words[:2], " ")
+							if len(words) > 2 {
+								model = strings.Join(words[2:], " ")
+							}
+						} else {
+							vendor = words[0]
+							if len(words) > 1 {
+								model = strings.Join(words[1:], " ")
+							}
+						}
+					} else if len(words) == 1 {
+						vendor = words[0]
+					}
+				}
+			}
+
+			// Only include interesting device types
+			if h.isInterestingPCIeDevice(deviceType) {
+				device := map[string]interface{}{
+					"slot":   slot,
+					"device": deviceType,
+					"vendor": vendor,
+					"model":  model,
+				}
+				devices = append(devices, device)
+			}
+		}
+	}
+
+	if len(devices) > 0 {
+		return devices
+	}
+	return nil
+}
+
+// isInterestingPCIeDevice determines if a PCIe device type is interesting for hardware inventory
+func (h *SystemHandler) isInterestingPCIeDevice(deviceType string) bool {
+	deviceTypeLower := strings.ToLower(deviceType)
+
+	// Include controllers and important devices
+	interestingTypes := []string{
+		"controller",
+		"adapter",
+		"ethernet",
+		"network",
+		"wireless",
+		"audio",
+		"multimedia",
+		"storage",
+		"nvme",
+		"sata",
+		"usb",
+		"graphics",
+		"vga",
+		"display",
+	}
+
+	for _, interestingType := range interestingTypes {
+		if strings.Contains(deviceTypeLower, interestingType) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // getUptime returns the system uptime in seconds
