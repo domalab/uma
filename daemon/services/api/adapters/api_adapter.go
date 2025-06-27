@@ -233,7 +233,7 @@ func (d *DockerAdapter) GetContainers() (interface{}, error) {
 				return []interface{}{}, err
 			}
 
-			// Initialize slice fields for each container and add performance metrics
+			// Initialize slice fields for each container - fast response without blocking stats
 			result := make([]interface{}, len(containers))
 			for i, container := range containers {
 				// Ensure slice fields are initialized
@@ -253,9 +253,9 @@ func (d *DockerAdapter) GetContainers() (interface{}, error) {
 					container.Environment = []string{}
 				}
 
-				// Add performance metrics for running containers (with caching)
-				containerWithStats := d.addPerformanceMetricsWithCache(dockerManager, container)
-				result[i] = containerWithStats
+				// Convert to interface{} without performance metrics for fast response
+				// Performance metrics can be retrieved via separate /containers/{id}/stats endpoint
+				result[i] = d.containerToMap(container)
 			}
 			// Use structured logging for monitoring - only log significant events or errors
 			logger.LogDockerOperation("container_list", len(containers), nil)
@@ -268,7 +268,36 @@ func (d *DockerAdapter) GetContainers() (interface{}, error) {
 	return []interface{}{}, nil
 }
 
+// containerToMap converts a ContainerInfo to a map without performance metrics for fast response
+func (d *DockerAdapter) containerToMap(container docker.ContainerInfo) map[string]interface{} {
+	return map[string]interface{}{
+		"id":             container.ID,
+		"name":           container.Name,
+		"image":          container.Image,
+		"state":          container.State,
+		"status":         container.Status,
+		"created":        container.Created,
+		"started_at":     container.StartedAt,
+		"ports":          container.Ports,
+		"mounts":         container.Mounts,
+		"networks":       container.Networks,
+		"labels":         container.Labels,
+		"environment":    container.Environment,
+		"restart_policy": container.RestartPolicy,
+		// Performance metrics are null - use /containers/{id}/stats for real-time stats
+		"cpu_percent":    nil,
+		"memory_usage":   nil,
+		"memory_limit":   nil,
+		"memory_percent": nil,
+		"network_rx":     nil,
+		"network_tx":     nil,
+		"block_read":     nil,
+		"block_write":    nil,
+	}
+}
+
 // addPerformanceMetricsWithCache adds performance statistics to container data with caching
+// DEPRECATED: This function causes API timeouts and should be removed. Use /containers/{id}/stats instead.
 func (d *DockerAdapter) addPerformanceMetricsWithCache(dockerManager *docker.DockerManager, container docker.ContainerInfo) interface{} {
 	// Convert container to map for easier manipulation
 	containerMap := make(map[string]interface{})
