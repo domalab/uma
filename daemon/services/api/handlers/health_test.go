@@ -430,6 +430,10 @@ func (m *MockDockerWithFailures) GetContainers() (interface{}, error) {
 	return nil, fmt.Errorf("docker daemon not available")
 }
 
+func (m *MockDockerWithFailures) GetContainersWithStats() (interface{}, error) {
+	return nil, fmt.Errorf("docker daemon not available")
+}
+
 func (m *MockDockerWithFailures) GetContainer(id string) (interface{}, error) {
 	return nil, fmt.Errorf("container not found")
 }

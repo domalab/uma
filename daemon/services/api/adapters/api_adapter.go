@@ -296,6 +296,106 @@ func (d *DockerAdapter) containerToMap(container docker.ContainerInfo) map[strin
 	}
 }
 
+// containerToMapWithStats converts a ContainerInfo to a map with performance metrics included
+func (d *DockerAdapter) containerToMapWithStats(dockerManager *docker.DockerManager, container docker.ContainerInfo) map[string]interface{} {
+	// Start with basic container data
+	containerMap := d.containerToMap(container)
+
+	// Only collect stats for running containers to avoid errors
+	if container.State == "running" {
+		// Get container stats with a timeout to prevent blocking
+		statsChan := make(chan *docker.DockerStats, 1)
+		errorChan := make(chan error, 1)
+
+		go func() {
+			stats, err := dockerManager.GetContainerStats(container.ID)
+			if err != nil {
+				errorChan <- err
+				return
+			}
+			statsChan <- stats
+		}()
+
+		// Wait for stats with a 2-second timeout
+		select {
+		case stats := <-statsChan:
+			if stats != nil {
+				containerMap["cpu_percent"] = stats.CPUPercent
+				containerMap["memory_usage"] = stats.MemUsage
+				containerMap["memory_limit"] = stats.MemLimit
+				containerMap["memory_percent"] = stats.MemPercent
+
+				// Parse network I/O from string format "271kB / 2.2MB"
+				if stats.NetIO != "" {
+					rx, tx := d.parseNetworkIO(stats.NetIO)
+					containerMap["network_rx"] = rx
+					containerMap["network_tx"] = tx
+				}
+
+				// Parse block I/O from string format "2.67MB / 1.54MB"
+				if stats.BlockIO != "" {
+					read, write := d.parseBlockIO(stats.BlockIO)
+					containerMap["block_read"] = read
+					containerMap["block_write"] = write
+				}
+			}
+		case <-errorChan:
+			// Stats collection failed, keep null values
+		case <-time.After(2 * time.Second):
+			// Timeout reached, keep null values to prevent API blocking
+		}
+	}
+
+	return containerMap
+}
+
+// GetContainersWithStats retrieves containers with performance metrics included
+func (d *DockerAdapter) GetContainersWithStats() (interface{}, error) {
+	// Try to cast the API to the correct type that has GetDockerManager method
+	if apiInstance, ok := d.api.(interface{ GetDockerManager() *docker.DockerManager }); ok {
+		dockerManager := apiInstance.GetDockerManager()
+		if dockerManager != nil {
+			// Call ListContainers with all=true to get all containers
+			containers, err := dockerManager.ListContainers(true)
+			if err != nil {
+				logger.Yellow("Failed to get Docker containers: %v", err)
+				return []interface{}{}, err
+			}
+
+			// Initialize slice fields for each container and add performance metrics
+			result := make([]interface{}, len(containers))
+			for i, container := range containers {
+				// Ensure slice fields are initialized
+				if container.Ports == nil {
+					container.Ports = []docker.PortMapping{}
+				}
+				if container.Mounts == nil {
+					container.Mounts = []docker.MountInfo{}
+				}
+				if container.Networks == nil {
+					container.Networks = []docker.NetworkInfo{}
+				}
+				if container.Labels == nil {
+					container.Labels = make(map[string]string)
+				}
+				if container.Environment == nil {
+					container.Environment = []string{}
+				}
+
+				// Convert to interface{} with performance metrics included
+				result[i] = d.containerToMapWithStats(dockerManager, container)
+			}
+			// Use structured logging for monitoring - only log significant events or errors
+			logger.LogDockerOperation("container_list_with_stats", len(containers), nil)
+			return result, nil
+		}
+	}
+
+	// Fallback to empty array if Docker manager not available
+	logger.Yellow("Docker manager not available, returning empty container list")
+	return []interface{}{}, nil
+}
+
 // addPerformanceMetricsWithCache adds performance statistics to container data with caching
 // DEPRECATED: This function causes API timeouts and should be removed. Use /containers/{id}/stats instead.
 func (d *DockerAdapter) addPerformanceMetricsWithCache(dockerManager *docker.DockerManager, container docker.ContainerInfo) interface{} {

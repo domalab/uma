@@ -36,16 +36,29 @@ func (h *DockerHandler) HandleDockerContainers(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	containers, err := h.api.GetDocker().GetContainers()
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get containers: %v", err))
-		return
+	// Check for stats query parameter
+	includeStats := r.URL.Query().Get("stats") == "true"
+
+	if includeStats {
+		// Get containers with performance metrics (slower but comprehensive)
+		containers, err := h.api.GetDocker().GetContainersWithStats()
+		if err != nil {
+			utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get containers with stats: %v", err))
+			return
+		}
+		utils.WriteJSON(w, http.StatusOK, containers)
+	} else {
+		// Get containers without performance metrics (fast response)
+		containers, err := h.api.GetDocker().GetContainers()
+		if err != nil {
+			utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get containers: %v", err))
+			return
+		}
+
+		// Transform containers to ensure schema compliance
+		transformedContainers := h.transformContainersData(containers)
+		utils.WriteJSON(w, http.StatusOK, transformedContainers)
 	}
-
-	// Transform containers to ensure schema compliance
-	transformedContainers := h.transformContainersData(containers)
-
-	utils.WriteJSON(w, http.StatusOK, transformedContainers)
 }
 
 // HandleDockerContainer handles individual Docker container operations

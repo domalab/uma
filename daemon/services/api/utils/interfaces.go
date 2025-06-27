@@ -43,6 +43,7 @@ type StorageInterface interface {
 // DockerInterface defines the interface for Docker operations
 type DockerInterface interface {
 	GetContainers() (interface{}, error)
+	GetContainersWithStats() (interface{}, error)
 	GetContainer(id string) (interface{}, error)
 	GetContainerStats(id string) (interface{}, error)
 	StartContainer(id string) error

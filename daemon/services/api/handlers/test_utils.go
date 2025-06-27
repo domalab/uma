@@ -213,6 +213,10 @@ func (m *MockDockerInterface) GetContainers() (interface{}, error) {
 	return []interface{}{}, nil
 }
 
+func (m *MockDockerInterface) GetContainersWithStats() (interface{}, error) {
+	return []interface{}{}, nil
+}
+
 func (m *MockDockerInterface) GetContainer(id string) (interface{}, error) {
 	// Return error for nonexistent containers
 	if id == "nonexistent-container" {
