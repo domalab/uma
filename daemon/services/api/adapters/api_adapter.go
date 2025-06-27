@@ -707,8 +707,26 @@ func NewVMAdapter(api interface{}) *VMAdapter {
 }
 
 func (v *VMAdapter) GetVMs() (interface{}, error) {
-	// Use real VM monitoring
-	return v.monitor.GetRealVMs()
+	// Get VMs from the monitor and enhance them with configuration details
+	vms, err := v.monitor.GetRealVMs()
+	if err != nil {
+		return vms, err
+	}
+
+	// Transform and enhance VM data with configuration details
+	if vmList, ok := vms.([]interface{}); ok {
+		enhanced := make([]interface{}, len(vmList))
+		for i, vm := range vmList {
+			if vmMap, ok := vm.(map[string]interface{}); ok {
+				enhanced[i] = v.enhanceVMWithConfiguration(vmMap)
+			} else {
+				enhanced[i] = vm
+			}
+		}
+		return enhanced, nil
+	}
+
+	return vms, nil
 }
 
 func (v *VMAdapter) GetVM(name string) (interface{}, error) {
@@ -722,7 +740,8 @@ func (v *VMAdapter) GetVM(name string) (interface{}, error) {
 		for _, vm := range vmList {
 			if vmMap, ok := vm.(map[string]interface{}); ok {
 				if vmMap["name"] == name {
-					return vmMap, nil
+					// Enhance the VM with configuration details
+					return v.enhanceVMWithConfiguration(vmMap), nil
 				}
 			}
 		}
@@ -789,6 +808,400 @@ func (v *VMAdapter) GetVMConsole(name string) (interface{}, error) {
 
 func (v *VMAdapter) SetVMAutostart(name string, autostart bool) error {
 	return nil
+}
+
+// getVMManager tries to get the VM manager from the API
+func (v *VMAdapter) getVMManager() interface {
+	ListVMs(bool) ([]interface{}, error)
+	GetVM(string) (interface{}, error)
+} {
+	// Try to get the VM manager from the API with correct type
+	if apiInstance, ok := v.api.(interface{ GetVMManager() interface{} }); ok {
+		vmManager := apiInstance.GetVMManager()
+		if vm, ok := vmManager.(interface {
+			ListVMs(bool) ([]interface{}, error)
+			GetVM(string) (interface{}, error)
+		}); ok {
+			return vm
+		}
+	}
+	return nil
+}
+
+// transformVMPluginData transforms VM plugin data to API format
+func (v *VMAdapter) transformVMPluginData(vms []interface{}) []interface{} {
+	result := make([]interface{}, len(vms))
+	for i, vm := range vms {
+		result[i] = v.transformSingleVMPluginData(vm)
+	}
+	return result
+}
+
+// transformSingleVMPluginData transforms a single VM from plugin format to API format
+func (v *VMAdapter) transformSingleVMPluginData(vmData interface{}) map[string]interface{} {
+	// Handle VMInfo struct from the VM plugin
+	if vmInfo, ok := vmData.(interface {
+		GetID() int
+		GetName() string
+		GetUUID() string
+		GetState() string
+		GetCPUs() int
+		GetMemory() uint64
+		GetAutostart() bool
+		GetPersistent() bool
+		GetOSType() string
+		GetArchitecture() string
+		GetDisks() []interface{}
+		GetNetworks() []interface{}
+		GetGraphics() []interface{}
+		GetUSBDevices() []interface{}
+		GetPCIDevices() []interface{}
+	}); ok {
+		return v.buildVMFromStruct(vmInfo)
+	}
+
+	// Handle map format (fallback)
+	if vmMap, ok := vmData.(map[string]interface{}); ok {
+		return v.enhanceVMMap(vmMap)
+	}
+
+	// Handle direct struct access via reflection-like interface
+	if vm, ok := vmData.(interface{}); ok {
+		return v.buildVMFromInterface(vm)
+	}
+
+	// Fallback to empty VM
+	return map[string]interface{}{
+		"id":     0,
+		"name":   "unknown",
+		"uuid":   "",
+		"state":  "unknown",
+		"status": "unknown",
+	}
+}
+
+// buildVMFromStruct builds VM data from a structured VM interface
+func (v *VMAdapter) buildVMFromStruct(vmInfo interface {
+	GetID() int
+	GetName() string
+	GetUUID() string
+	GetState() string
+	GetCPUs() int
+	GetMemory() uint64
+	GetAutostart() bool
+	GetPersistent() bool
+	GetOSType() string
+	GetArchitecture() string
+	GetDisks() []interface{}
+	GetNetworks() []interface{}
+	GetGraphics() []interface{}
+	GetUSBDevices() []interface{}
+	GetPCIDevices() []interface{}
+}) map[string]interface{} {
+	// Extract VNC/console information from graphics
+	graphics := vmInfo.GetGraphics()
+	vncPort := 0
+	vncEnabled := false
+	for _, gfx := range graphics {
+		if gfxMap, ok := gfx.(map[string]interface{}); ok {
+			if gfxMap["type"] == "vnc" {
+				vncEnabled = true
+				if port, ok := gfxMap["port"].(int); ok {
+					vncPort = port
+				}
+			}
+		}
+	}
+
+	// Build comprehensive VM data
+	return map[string]interface{}{
+		"id":           vmInfo.GetID(),
+		"name":         vmInfo.GetName(),
+		"uuid":         vmInfo.GetUUID(),
+		"state":        vmInfo.GetState(),
+		"status":       vmInfo.GetState(), // Alias for compatibility
+		"autostart":    vmInfo.GetAutostart(),
+		"persistent":   vmInfo.GetPersistent(),
+		"os_type":      vmInfo.GetOSType(),
+		"architecture": vmInfo.GetArchitecture(),
+		"resources": map[string]interface{}{
+			"cpu":    vmInfo.GetCPUs(),
+			"memory": vmInfo.GetMemory(),
+		},
+		"configuration": map[string]interface{}{
+			"console": map[string]interface{}{
+				"vnc_enabled": vncEnabled,
+				"vnc_port":    vncPort,
+			},
+			"disks":    v.transformDisks(vmInfo.GetDisks()),
+			"networks": v.transformNetworks(vmInfo.GetNetworks()),
+		},
+		"devices": map[string]interface{}{
+			"usb_devices": vmInfo.GetUSBDevices(),
+			"pci_devices": vmInfo.GetPCIDevices(),
+		},
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+// enhanceVMMap enhances a basic VM map with additional configuration details
+func (v *VMAdapter) enhanceVMMap(vmMap map[string]interface{}) map[string]interface{} {
+	// Add missing fields with defaults
+	enhanced := make(map[string]interface{})
+	for k, val := range vmMap {
+		enhanced[k] = val
+	}
+
+	// Ensure required fields exist
+	if _, exists := enhanced["uuid"]; !exists {
+		enhanced["uuid"] = ""
+	}
+	if _, exists := enhanced["configuration"]; !exists {
+		enhanced["configuration"] = map[string]interface{}{
+			"console": map[string]interface{}{
+				"vnc_enabled": false,
+				"vnc_port":    0,
+			},
+			"disks":    []interface{}{},
+			"networks": []interface{}{},
+		}
+	}
+	if _, exists := enhanced["devices"]; !exists {
+		enhanced["devices"] = map[string]interface{}{
+			"usb_devices": []interface{}{},
+			"pci_devices": []interface{}{},
+		}
+	}
+	if _, exists := enhanced["last_updated"]; !exists {
+		enhanced["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	return enhanced
+}
+
+// buildVMFromInterface builds VM data from a generic interface using reflection-like access
+func (v *VMAdapter) buildVMFromInterface(vm interface{}) map[string]interface{} {
+	// This is a simplified version that tries to extract common fields
+	result := map[string]interface{}{
+		"id":     0,
+		"name":   "unknown",
+		"uuid":   "",
+		"state":  "unknown",
+		"status": "unknown",
+		"configuration": map[string]interface{}{
+			"console": map[string]interface{}{
+				"vnc_enabled": false,
+				"vnc_port":    0,
+			},
+			"disks":    []interface{}{},
+			"networks": []interface{}{},
+		},
+		"devices": map[string]interface{}{
+			"usb_devices": []interface{}{},
+			"pci_devices": []interface{}{},
+		},
+		"last_updated": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Try to extract fields using type assertion patterns
+	// This would need to be expanded based on the actual VM plugin structure
+	return result
+}
+
+// transformDisks transforms VM disk information to API format
+func (v *VMAdapter) transformDisks(disks []interface{}) []interface{} {
+	result := make([]interface{}, len(disks))
+	for i, disk := range disks {
+		if diskMap, ok := disk.(map[string]interface{}); ok {
+			result[i] = map[string]interface{}{
+				"device": v.getStringValue(diskMap, "device"),
+				"target": v.getStringValue(diskMap, "target"),
+				"source": v.getStringValue(diskMap, "source"),
+				"bus":    v.getStringValue(diskMap, "bus"),
+				"type":   v.getStringValue(diskMap, "type"),
+			}
+		} else {
+			result[i] = disk
+		}
+	}
+	return result
+}
+
+// transformNetworks transforms VM network information to API format
+func (v *VMAdapter) transformNetworks(networks []interface{}) []interface{} {
+	result := make([]interface{}, len(networks))
+	for i, network := range networks {
+		if netMap, ok := network.(map[string]interface{}); ok {
+			result[i] = map[string]interface{}{
+				"type":   v.getStringValue(netMap, "type"),
+				"source": v.getStringValue(netMap, "source"),
+				"mac":    v.getStringValue(netMap, "mac"),
+				"model":  v.getStringValue(netMap, "model"),
+			}
+		} else {
+			result[i] = network
+		}
+	}
+	return result
+}
+
+// getStringValue safely extracts a string value from a map
+func (v *VMAdapter) getStringValue(data map[string]interface{}, key string) string {
+	if value, ok := data[key]; ok {
+		if str, ok := value.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+// enhanceVMWithConfiguration enhances a VM map with comprehensive configuration details
+func (v *VMAdapter) enhanceVMWithConfiguration(vmMap map[string]interface{}) map[string]interface{} {
+	// Start with the existing VM data
+	enhanced := make(map[string]interface{})
+	for k, val := range vmMap {
+		enhanced[k] = val
+	}
+
+	vmName := v.getStringValue(vmMap, "name")
+	if vmName == "" {
+		return enhanced
+	}
+
+	// Get comprehensive VM configuration using virsh dumpxml
+	if vmConfig := v.getVMConfiguration(vmName); vmConfig != nil {
+		// Merge configuration data
+		for k, val := range vmConfig {
+			enhanced[k] = val
+		}
+	}
+
+	// Ensure required fields exist with defaults
+	if _, exists := enhanced["uuid"]; !exists {
+		enhanced["uuid"] = ""
+	}
+	if _, exists := enhanced["configuration"]; !exists {
+		enhanced["configuration"] = map[string]interface{}{
+			"console": map[string]interface{}{
+				"vnc_enabled": false,
+				"vnc_port":    0,
+			},
+			"boot": map[string]interface{}{
+				"mode":  "BIOS",
+				"order": []string{"hd"},
+			},
+			"disks":    []interface{}{},
+			"networks": []interface{}{},
+		}
+	}
+	if _, exists := enhanced["devices"]; !exists {
+		enhanced["devices"] = map[string]interface{}{
+			"usb_devices": []interface{}{},
+			"pci_devices": []interface{}{},
+		}
+	}
+	if _, exists := enhanced["last_updated"]; !exists {
+		enhanced["last_updated"] = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	return enhanced
+}
+
+// getVMConfiguration gets comprehensive VM configuration using virsh commands
+func (v *VMAdapter) getVMConfiguration(vmName string) map[string]interface{} {
+	config := make(map[string]interface{})
+
+	// Get VM UUID and basic info using virsh dominfo
+	if domInfo := v.getVMDomInfo(vmName); domInfo != nil {
+		for k, val := range domInfo {
+			config[k] = val
+		}
+	}
+
+	// Get VNC/console information using virsh vncdisplay
+	if consoleInfo := v.getVMConsoleInfo(vmName); consoleInfo != nil {
+		config["configuration"] = map[string]interface{}{
+			"console": consoleInfo,
+			"boot": map[string]interface{}{
+				"mode":  "BIOS",
+				"order": []string{"hd"},
+			},
+			"disks":    []interface{}{},
+			"networks": []interface{}{},
+		}
+	}
+
+	return config
+}
+
+// getVMDomInfo gets VM domain information using virsh dominfo
+func (v *VMAdapter) getVMDomInfo(vmName string) map[string]interface{} {
+	info := make(map[string]interface{})
+
+	// Execute virsh dominfo command
+	cmd := v.monitor.cmd.Command("virsh", "dominfo", vmName)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	// Parse dominfo output
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				switch key {
+				case "UUID":
+					info["uuid"] = value
+				case "Max memory":
+					info["max_memory"] = value
+				case "Used memory":
+					info["used_memory"] = value
+				case "CPU(s)":
+					info["vcpus"] = value
+				case "Autostart":
+					info["autostart"] = value == "enable"
+				case "Persistent":
+					info["persistent"] = value == "yes"
+				}
+			}
+		}
+	}
+
+	return info
+}
+
+// getVMConsoleInfo gets VM console/VNC information
+func (v *VMAdapter) getVMConsoleInfo(vmName string) map[string]interface{} {
+	console := map[string]interface{}{
+		"vnc_enabled": false,
+		"vnc_port":    0,
+		"spice_port":  0,
+	}
+
+	// Try to get VNC display
+	cmd := v.monitor.cmd.Command("virsh", "vncdisplay", vmName)
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		vncDisplay := strings.TrimSpace(string(output))
+		if vncDisplay != "" && !strings.Contains(vncDisplay, "error") {
+			console["vnc_enabled"] = true
+			// Parse VNC display (format: :1, :2, etc.)
+			if strings.HasPrefix(vncDisplay, ":") {
+				if displayNum := strings.TrimPrefix(vncDisplay, ":"); displayNum != "" {
+					if num, err := strconv.Atoi(displayNum); err == nil {
+						console["vnc_port"] = 5900 + num
+					}
+				}
+			}
+		}
+	}
+
+	return console
 }
 
 // NotificationAdapter adapts notification operations
