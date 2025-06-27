@@ -59,15 +59,23 @@ func (h *StorageHandler) HandleStorageDisks(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Use the system interface to get real disk info with usage data
-	disks, err := h.api.GetSystem().GetRealDisks()
+	// Try to get comprehensive disk info, fallback to basic disk info if needed
+	disks, err := h.api.GetStorage().GetConsolidatedDisksInfo()
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get disk information: %v", err))
+		// Fallback to basic disk information from system interface
+		basicDisks, fallbackErr := h.api.GetSystem().GetRealDisks()
+		if fallbackErr != nil {
+			utils.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get disk information: %v", fallbackErr))
+			return
+		}
+		// Transform basic disk data
+		transformedDisks := h.transformDisksData(basicDisks)
+		utils.WriteJSON(w, http.StatusOK, transformedDisks)
 		return
 	}
 
-	// Transform the disk data to match the OpenAPI schema
-	transformedDisks := h.transformDisksData(disks)
+	// Transform the comprehensive disk data to include hardware information
+	transformedDisks := h.transformComprehensiveDisksData(disks)
 	utils.WriteJSON(w, http.StatusOK, transformedDisks)
 }
 
@@ -1106,6 +1114,92 @@ func (h *StorageHandler) getDiskAssignments() map[string]interface{} {
 	return assignments
 }
 
+// transformComprehensiveDisksData transforms consolidated disk data to include hardware information
+func (h *StorageHandler) transformComprehensiveDisksData(disksData interface{}) []map[string]interface{} {
+	var allDisks []map[string]interface{}
+
+	// Handle the consolidated disk response structure
+	if disksResponse, ok := disksData.(map[string]interface{}); ok {
+		// Process array disks
+		if arrayDisks, ok := disksResponse["array_disks"].([]interface{}); ok {
+			for _, disk := range arrayDisks {
+				if diskMap, ok := disk.(map[string]interface{}); ok {
+					transformed := h.transformSingleDiskWithHardware(diskMap, "array")
+					allDisks = append(allDisks, transformed)
+				}
+			}
+		}
+
+		// Process parity disks
+		if parityDisks, ok := disksResponse["parity_disks"].([]interface{}); ok {
+			for _, disk := range parityDisks {
+				if diskMap, ok := disk.(map[string]interface{}); ok {
+					transformed := h.transformSingleDiskWithHardware(diskMap, "parity")
+					allDisks = append(allDisks, transformed)
+				}
+			}
+		}
+
+		// Process cache disks
+		if cacheDisks, ok := disksResponse["cache_disks"].([]interface{}); ok {
+			for _, disk := range cacheDisks {
+				if diskMap, ok := disk.(map[string]interface{}); ok {
+					transformed := h.transformSingleDiskWithHardware(diskMap, "cache")
+					allDisks = append(allDisks, transformed)
+				}
+			}
+		}
+
+		// Process boot disk
+		if bootDisk, ok := disksResponse["boot_disk"].(map[string]interface{}); ok {
+			transformed := h.transformSingleDiskWithHardware(bootDisk, "boot")
+			allDisks = append(allDisks, transformed)
+		}
+	}
+
+	return allDisks
+}
+
+// transformSingleDiskWithHardware transforms a single disk with comprehensive hardware information
+func (h *StorageHandler) transformSingleDiskWithHardware(disk map[string]interface{}, diskRole string) map[string]interface{} {
+	transformed := map[string]interface{}{
+		"name":          h.getStringValue(disk, "name"),
+		"device":        h.getStringValue(disk, "device"),
+		"size":          h.getIntValue(disk, "size"),
+		"used":          h.getIntValue(disk, "used"),
+		"available":     h.getIntValue(disk, "available"),
+		"usage_percent": h.getFloatValue(disk, "usage_percent"),
+		"mount_point":   h.getStringValue(disk, "mount_point"),
+		"status":        h.getStringValue(disk, "status"),
+		"health":        h.getStringValue(disk, "health"),
+		"temperature":   h.getIntValue(disk, "temperature"),
+		"type":          diskRole,
+		"last_updated":  time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Add hardware information
+	transformed["model"] = h.getStringValue(disk, "model")
+	transformed["serial_number"] = h.getStringValue(disk, "serial_number")
+	transformed["disk_type"] = h.getStringValue(disk, "disk_type")     // HDD/SSD
+	transformed["interface"] = h.getStringValue(disk, "interface")     // SATA/USB
+	transformed["power_state"] = h.getStringValue(disk, "power_state") // active/standby
+
+	// Add filesystem information
+	transformed["filesystem"] = h.getStringValue(disk, "file_system")
+
+	// Add spin down delay with proper formatting
+	spinDownDelay := h.getIntValue(disk, "spin_down_delay")
+	if spinDownDelay == 0 {
+		transformed["spin_down_delay"] = "Never"
+	} else if spinDownDelay > 0 {
+		transformed["spin_down_delay"] = fmt.Sprintf("%d minutes", spinDownDelay)
+	} else {
+		transformed["spin_down_delay"] = "Default"
+	}
+
+	return transformed
+}
+
 // transformZFSInfo transforms ZFS pools array to ZFS info object matching schema
 func (h *StorageHandler) transformZFSInfo(zfsPools interface{}) map[string]interface{} {
 	zfsInfo := map[string]interface{}{
@@ -1332,4 +1426,64 @@ func (h *StorageHandler) HandleArrayStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	utils.WriteJSON(w, http.StatusOK, arrayStatus)
+}
+
+// Helper methods for extracting values from disk maps
+
+// getStringValue safely extracts a string value from a map
+func (h *StorageHandler) getStringValue(data map[string]interface{}, key string) string {
+	if value, ok := data[key]; ok {
+		if str, ok := value.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+// getIntValue safely extracts an integer value from a map
+func (h *StorageHandler) getIntValue(data map[string]interface{}, key string) int64 {
+	if value, ok := data[key]; ok {
+		switch v := value.(type) {
+		case int:
+			return int64(v)
+		case int64:
+			return v
+		case float64:
+			return int64(v)
+		case string:
+			if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0
+}
+
+// getFloatValue safely extracts a float value from a map
+func (h *StorageHandler) getFloatValue(data map[string]interface{}, key string) float64 {
+	if value, ok := data[key]; ok {
+		switch v := value.(type) {
+		case float64:
+			return v
+		case int:
+			return float64(v)
+		case int64:
+			return float64(v)
+		case string:
+			if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0.0
+}
+
+// getBoolValue safely extracts a boolean value from a map
+func (h *StorageHandler) getBoolValue(data map[string]interface{}, key string) bool {
+	if value, ok := data[key]; ok {
+		if b, ok := value.(bool); ok {
+			return b
+		}
+	}
+	return false
 }

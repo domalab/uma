@@ -8,6 +8,7 @@ import (
 
 	"github.com/domalab/uma/daemon/logger"
 	"github.com/domalab/uma/daemon/plugins/docker"
+	"github.com/domalab/uma/daemon/plugins/storage"
 	"github.com/domalab/uma/daemon/services/api/utils"
 	upsDetector "github.com/domalab/uma/daemon/services/ups"
 )
@@ -194,6 +195,12 @@ func (s *StorageAdapter) GetArrayInfo() (interface{}, error) {
 func (s *StorageAdapter) GetDisks() (interface{}, error) {
 	// Use real storage monitoring
 	return s.monitor.GetRealDisks()
+}
+
+func (s *StorageAdapter) GetConsolidatedDisksInfo() (interface{}, error) {
+	// Create a new storage monitor instance from the storage plugin
+	storageMonitor := &storage.StorageMonitor{}
+	return storageMonitor.GetConsolidatedDisksInfo()
 }
 
 func (s *StorageAdapter) GetZFSPools() (interface{}, error) {

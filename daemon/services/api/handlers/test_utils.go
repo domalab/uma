@@ -190,6 +190,19 @@ func (m *MockStorageInterface) GetDisks() (interface{}, error) {
 	return []interface{}{}, nil
 }
 
+func (m *MockStorageInterface) GetConsolidatedDisksInfo() (interface{}, error) {
+	return map[string]interface{}{
+		"array_disks":  []interface{}{},
+		"parity_disks": []interface{}{},
+		"cache_disks":  []interface{}{},
+		"boot_disk":    nil,
+		"summary": map[string]interface{}{
+			"total_disks": 0,
+			"total_size":  0,
+		},
+	}, nil
+}
+
 func (m *MockStorageInterface) GetZFSPools() (interface{}, error) {
 	return []interface{}{}, nil
 }

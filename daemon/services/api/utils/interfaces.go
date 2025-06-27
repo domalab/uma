@@ -34,6 +34,7 @@ type SystemInterface interface {
 type StorageInterface interface {
 	GetArrayInfo() (interface{}, error)
 	GetDisks() (interface{}, error)
+	GetConsolidatedDisksInfo() (interface{}, error)
 	GetZFSPools() (interface{}, error)
 	GetCacheInfo() (interface{}, error)
 	StartArray(request interface{}) error
