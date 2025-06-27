@@ -9,7 +9,7 @@ The UMA API provides comprehensive access to Unraid system monitoring, managemen
 - **Authentication**: None (runs on trusted network)
 - **Versioning**: Accept header-based (`application/vnd.uma.v1+json`)
 - **Compression**: Gzip supported
-- **Documentation**: Interactive Swagger UI available
+- **Documentation**: Comprehensive API documentation available
 - **Data Quality**: 100% real measurements, no placeholder or hardcoded values
 
 ## Enhanced Monitoring Capabilities
@@ -42,9 +42,10 @@ UMA provides comprehensive real-time monitoring across all major Unraid system c
 ## Quick Start
 
 ### 1. Access API Documentation
-Visit the interactive Swagger UI:
+Refer to the comprehensive API documentation in this repository:
 ```
-http://your-unraid-ip:34600/api/v1/docs
+docs/api/endpoints.md - Complete endpoint reference
+docs/api/quick-start.md - Getting started guide
 ```
 
 ### 2. Get System Health

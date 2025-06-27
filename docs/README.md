@@ -13,11 +13,15 @@ Welcome to the UMA (Unraid Management Agent) documentation. This comprehensive g
 
 ### 📚 API Documentation
 
-- **[API Overview](api/README.md)** - Complete API reference
-- **[Quick Start Guide](api/quick-start.md)** - Essential endpoints and usage patterns
-- **[Endpoints Reference](api/endpoints.md)** - All available endpoints with examples
-- **[OpenAPI Guide](api/openapi-guide.md)** - Using Swagger UI and OpenAPI spec
+- **[API Overview](api/README.md)** - Complete API reference with enhanced monitoring capabilities
+- **[Quick Start Guide](api/quick-start.md)** - Essential endpoints with real response examples
+- **[Endpoints Reference](api/endpoints.md)** - All available endpoints with production data
+- **[Integration Guide](api/integration-guide.md)** - Home Assistant, Prometheus, and automation platforms
 - **[WebSocket Guide](api/websockets.md)** - Real-time monitoring via WebSockets
+
+### 🏠 Integration Guides
+
+- **[Home Assistant Developer Guide](integrations/home-assistant-developer-guide.md)** - Complete HA integration with real examples
 
 ### 🔧 Development
 

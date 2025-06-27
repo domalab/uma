@@ -649,49 +649,40 @@ curl http://your-unraid-ip:34600/api/v1/system/ups
 }
 ```
 
-## Documentation Endpoints
+## MCP (Model Context Protocol) Endpoints
 
-### GET /docs
-Interactive Swagger UI documentation.
-
-**Example Request:**
-```bash
-curl http://your-unraid-ip:34600/api/v1/docs
-```
-
-**Response:** HTML page with Swagger UI interface
-
-### GET /openapi.json
-OpenAPI 3.1.1 specification in JSON format.
+### GET /mcp/status
+Get MCP server status and statistics.
 
 **Example Request:**
 ```bash
-curl http://your-unraid-ip:34600/api/v1/openapi.json
+curl http://your-unraid-ip:34600/api/v1/mcp/status
 ```
 
-**Response:**
+**Real Response Example:**
 ```json
 {
-  "openapi": "3.1.1",
-  "info": {
-    "title": "Unraid Management Agent REST API",
-    "version": "2025.06.22",
-    "description": "Comprehensive REST API for Unraid server management"
+  "data": {
+    "active_connections": 0,
+    "enabled": true,
+    "max_connections": 100,
+    "message": "MCP server is integrated and available on HTTP port",
+    "status": "running",
+    "total_tools": 51
   },
-  "paths": {
-    "/api/v1/health": {
-      "get": {
-        "summary": "Get system health status",
-        "responses": {
-          "200": {
-            "description": "Health status"
-          }
-        }
-      }
-    }
-  }
+  "success": true
 }
 ```
+
+### GET /mcp/tools
+Get available MCP tools for AI assistant integration.
+
+**Example Request:**
+```bash
+curl http://your-unraid-ip:34600/api/v1/mcp/tools
+```
+
+**Response:** List of 51+ available tools for system management and monitoring
 
 ## Metrics Endpoint
 

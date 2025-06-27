@@ -455,13 +455,13 @@ print(f"System Status: {health['status']}")
 
 ## Interactive Documentation
 
-For hands-on API exploration, visit the Swagger UI:
-```
-http://your-unraid-ip:34600/api/v1/docs
-```
+For comprehensive API reference, see:
+- **[Complete Endpoints Reference](endpoints.md)** - All available endpoints with real examples
+- **[Integration Guide](integration-guide.md)** - Home Assistant and automation platform integration
+- **[WebSocket Documentation](websockets.md)** - Real-time event streaming
 
-This interactive interface allows you to:
-- Browse all available endpoints
-- Test API calls directly from your browser
-- View request/response schemas
-- Generate code examples in multiple languages
+The documentation provides:
+- Real response examples from production Unraid servers
+- Complete endpoint specifications with actual data
+- Integration patterns for automation platforms
+- WebSocket streaming for real-time monitoring
