@@ -120,10 +120,9 @@ func DefaultMetricsConfig() MetricsConfig {
 			"/favicon.ico",
 		},
 		EndpointNormalization: map[string]string{
-			// Normalize endpoints with IDs
-			"/api/v1/docker/containers/": "/api/v1/docker/containers/{id}",
-			"/api/v1/vms/":               "/api/v1/vms/{name}",
-			"/api/v1/operations/":        "/api/v1/operations/{id}",
+			// v2 endpoint normalization only
+			"/api/v2/containers/": "/api/v2/containers/{id}",
+			"/api/v2/vms/":        "/api/v2/vms/{name}",
 		},
 		CustomLabels: map[string]string{
 			"service": "uma",

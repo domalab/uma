@@ -293,9 +293,9 @@ func (wd *WebSocketDocumenter) generateTypeExample(typeName string) interface{} 
 
 func (wd *WebSocketDocumenter) inferEndpointPath(handlerName string) string {
 	if strings.Contains(handlerName, "Unified") {
-		return "/api/v1/ws"
+		return "/api/v2/stream"
 	}
-	return "/api/v1/ws/unknown"
+	return "/api/v2/stream/unknown"
 }
 
 func (wd *WebSocketDocumenter) generateHandlerDescription(handlerName string) string {
@@ -499,8 +499,8 @@ func (wd *WebSocketDocumenter) LoadExistingSchemas() error {
 	// Add main WebSocket endpoint
 	wd.endpoints = []WebSocketEndpoint{
 		{
-			Path:        "/api/v1/ws",
-			Description: "Unified WebSocket endpoint with subscription management for real-time monitoring",
+			Path:        "/api/v2/stream",
+			Description: "v2 WebSocket streaming endpoint with real-time metrics and delta compression",
 			Channels:    wd.channels,
 			Messages:    wd.messages,
 			Events:      wd.events,

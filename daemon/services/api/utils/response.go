@@ -89,8 +89,8 @@ func WritePaginatedResponse(w http.ResponseWriter, status int, data interface{},
 // WriteVersionedResponse writes a response with version-specific formatting
 func WriteVersionedResponse(w http.ResponseWriter, r *http.Request, status int, data interface{}, pagination *responses.PaginationInfo, requestID string, version string) {
 	switch version {
-	case "v1":
-		// Current v1 format with standardized response structure
+	case "v2":
+		// v2 format with enhanced response structure
 		WriteStandardResponse(w, status, data, pagination, requestID, version)
 	default:
 		// Future versions can have different response formats
@@ -179,7 +179,7 @@ func GenerateRequestID() string {
 }
 
 // ExtractURLParam extracts a URL parameter from the path (replacement for chi.URLParam)
-// Example: ExtractURLParam(r, "/api/v1/vms/", "name") extracts "myvm" from "/api/v1/vms/myvm/action"
+// Example: ExtractURLParam(r, "/api/v2/vms/", "name") extracts "myvm" from "/api/v2/vms/myvm/action"
 func ExtractURLParam(r *http.Request, prefix string, paramName string) string {
 	path := r.URL.Path
 	if !strings.HasPrefix(path, prefix) {

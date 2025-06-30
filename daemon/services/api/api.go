@@ -19,7 +19,6 @@ import (
 	"github.com/domalab/uma/daemon/plugins/system"
 	"github.com/domalab/uma/daemon/plugins/ups"
 	"github.com/domalab/uma/daemon/plugins/vm"
-	"github.com/domalab/uma/daemon/services/api/events"
 	"github.com/domalab/uma/daemon/services/async"
 	"github.com/domalab/uma/daemon/services/cache"
 	"github.com/domalab/uma/daemon/services/config"
@@ -38,7 +37,6 @@ type Api struct {
 	// Services
 	configManager *config.Manager
 	asyncManager  *async.AsyncManager
-	eventManager  *events.EventManager
 
 	// Data providers
 	origin        *dto.Origin
@@ -115,12 +113,7 @@ func (a *Api) Run() error {
 	// Register async operation executors
 	a.registerAsyncExecutors()
 
-	// Initialize and start event manager for WebSocket functionality
-	if a.httpServer != nil && a.httpServer.webSocketHandler != nil {
-		a.eventManager = events.NewEventManager(a.httpServer.apiAdapter, a.ctx.Hub, a.httpServer.webSocketHandler)
-		a.eventManager.Start()
-		logger.Green("Event Manager started for real-time monitoring")
-	}
+	// v2 WebSocket streaming is handled by v2RESTServer - no separate event manager needed
 
 	// Start HTTP server if configured
 	if a.httpServer != nil {
@@ -179,10 +172,7 @@ func (a *Api) Stop() error {
 		}
 	}
 
-	// Stop event manager
-	if a.eventManager != nil {
-		a.eventManager.Stop()
-	}
+	// v2 WebSocket cleanup is handled by v2RESTServer
 
 	// Stop async manager
 	if a.asyncManager != nil {
@@ -217,19 +207,9 @@ func (a *Api) handleUnixSocketConnection(conn net.Conn) {
 
 	var resp []byte
 	switch req.Action {
-	case "get_info":
-		reply := a.getInfo()
-		resp, _ = json.Marshal(reply)
-
-	case "get_logs":
-		params := req.Params
-		logType := params["logType"]
-		reply := a.getLogs(logType)
-		resp, _ = json.Marshal(reply)
-
-	case "get_origin":
-		reply := a.getOrigin()
-		resp, _ = json.Marshal(reply)
+	case "get_info", "get_logs", "get_origin":
+		// v1 methods removed - use v2 API endpoints instead
+		resp, _ = json.Marshal(map[string]string{"error": "Use UMA v2 API endpoints instead"})
 
 	default:
 		resp, _ = json.Marshal(map[string]string{"error": "Unsupported action"})

@@ -67,13 +67,11 @@ func DefaultCompressionConfig() CompressionConfig {
 		Level:     gzip.DefaultCompression,
 		MinLength: 1024, // 1KB minimum
 		CompressiblePaths: []string{
-			"/api/v1/storage/disks",
-			"/api/v1/storage/zfs",
-			"/api/v1/docker/containers",
-			"/api/v1/notifications",
-			"/api/v1/system/resources",
-			"/api/v1/system/logs",
-			// Removed OpenAPI path - system removed
+			"/api/v2/storage/config",
+			"/api/v2/storage/layout",
+			"/api/v2/containers/list",
+			"/api/v2/vms/list",
+			"/api/v2/system/info",
 		},
 		CompressibleTypes: []string{
 			"application/json",
@@ -85,7 +83,7 @@ func DefaultCompressionConfig() CompressionConfig {
 			"application/javascript",
 		},
 		ExcludedPaths: []string{
-			"/api/v1/ws/", // WebSocket endpoints
+			"/api/v2/stream", // WebSocket streaming endpoint
 		},
 		ExcludedTypes: []string{
 			"image/",

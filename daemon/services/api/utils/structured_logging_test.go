@@ -189,7 +189,7 @@ func TestHTTPRequestLogging(t *testing.T) {
 		var buf bytes.Buffer
 		logger := NewStructuredLogger(LogLevelInfo, &buf, "test")
 
-		req := httptest.NewRequest("GET", "/api/v1/test", nil)
+		req := httptest.NewRequest("GET", "/api/v2/test", nil)
 		req.RemoteAddr = "192.168.1.1:12345"
 		req.Header.Set("User-Agent", "Test-Agent/1.0")
 
@@ -204,8 +204,8 @@ func TestHTTPRequestLogging(t *testing.T) {
 		if entry.Method != "GET" {
 			t.Errorf("Expected method GET, got %s", entry.Method)
 		}
-		if entry.Path != "/api/v1/test" {
-			t.Errorf("Expected path '/api/v1/test', got '%s'", entry.Path)
+		if entry.Path != "/api/v2/test" {
+			t.Errorf("Expected path '/api/v2/test', got '%s'", entry.Path)
 		}
 		if entry.StatusCode != 200 {
 			t.Errorf("Expected status code 200, got %d", entry.StatusCode)
@@ -295,7 +295,7 @@ func TestLoggingMiddleware(t *testing.T) {
 		wrappedHandler := LoggingMiddleware(logger)(handler)
 
 		// Create test request
-		req := httptest.NewRequest("POST", "/api/v1/test", nil)
+		req := httptest.NewRequest("POST", "/api/v2/test", nil)
 		req.Header.Set("User-Agent", "Test-Client/1.0")
 		w := httptest.NewRecorder()
 

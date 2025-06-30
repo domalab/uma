@@ -79,8 +79,8 @@ func BenchmarkVersioningMiddleware(b *testing.B) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/v1/test", nil)
-	req.Header.Set("Accept", "application/vnd.uma.v1+json")
+	req := httptest.NewRequest("GET", "/api/v2/test", nil)
+	req.Header.Set("Accept", "application/vnd.uma.v2+json")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -126,7 +126,7 @@ func BenchmarkMiddlewareChain(b *testing.B) {
 		),
 	)
 
-	req := httptest.NewRequest("GET", "/api/v1/test", nil)
+	req := httptest.NewRequest("GET", "/api/v2/test", nil)
 	req.Header.Set("Origin", "http://localhost:3000")
 	req.Header.Set("Accept-Encoding", "gzip")
 

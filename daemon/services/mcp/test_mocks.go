@@ -22,3 +22,5 @@ func (m *MockAPIInterface) GetAuth() utils.AuthInterface       { return nil }
 
 func (m *MockAPIInterface) GetNotifications() utils.NotificationInterface { return nil }
 func (m *MockAPIInterface) GetUPSDetector() utils.UPSDetectorInterface    { return nil }
+func (m *MockAPIInterface) GetConfigManager() interface{}                 { return nil }
+func (m *MockAPIInterface) GetMCPServer() interface{}                     { return nil }
