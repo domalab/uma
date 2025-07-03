@@ -73,6 +73,15 @@ var (
 		"Cache hit for",
 		"WebSocket ping",
 		"Heartbeat",
+		"Collected system.cpu",
+		"Collected system.memory",
+		"Collected system.network",
+		"Collected containers.stats",
+		"Collected storage.usage",
+		"Collected storage.disks",
+		"Collected system.hardware",
+		"Collection failed for",
+		"Performance target missed",
 	}
 )
 

@@ -16,7 +16,7 @@ import (
 var Version = "dev" // Default version for development builds
 
 var cli struct {
-	LogsDir    string `default:"/var/log" help:"directory to store logs"`
+	LogsDir    string `default:"/var/log" help:"directory to store logs (must be /var/log for Unraid)"`
 	ConfigPath string `default:"" help:"path to configuration file"`
 	HTTPPort   int    `default:"34600" help:"HTTP API server port"`
 
@@ -27,7 +27,13 @@ var cli struct {
 func main() {
 	ctx := kong.Parse(&cli)
 
-	// Clean up any existing backup log files first
+	// Enforce /var/log as the only logging location for Unraid
+	if cli.LogsDir != "/var/log" {
+		log.Printf("Warning: LogsDir should be /var/log for Unraid systems, got: %s", cli.LogsDir)
+		cli.LogsDir = "/var/log"
+	}
+
+	// Clean up any existing backup log files first (including timestamped files)
 	if err := logger.CleanupOldLogFiles(cli.LogsDir); err != nil {
 		log.Printf("Warning: failed to cleanup old log files: %v", err)
 	}
@@ -36,6 +42,12 @@ func main() {
 	logConfig := logger.UnraidOptimizedConfig(cli.LogsDir)
 	if err := logger.ValidateLogConfiguration(logConfig); err != nil {
 		log.Fatalf("Invalid log configuration: %v", err)
+	}
+
+	// Truncate existing log file if it's too large
+	logPath := logConfig.Filename
+	if err := logger.TruncateLogIfNeeded(logPath, logConfig.MaxSize); err != nil {
+		log.Printf("Warning: failed to truncate log file: %v", err)
 	}
 
 	log.SetOutput(&lumberjack.Logger{

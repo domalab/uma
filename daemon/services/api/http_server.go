@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/domalab/uma/daemon/logger"
+	restapi "github.com/domalab/uma/daemon/services/api/rest"
 	"github.com/domalab/uma/daemon/services/api/services"
+	"github.com/domalab/uma/daemon/services/collectors"
 	"github.com/domalab/uma/daemon/services/command"
 	"github.com/domalab/uma/daemon/services/config"
-	v2api "github.com/domalab/uma/daemon/services/v2/api"
-	"github.com/domalab/uma/daemon/services/v2/collectors"
-	"github.com/domalab/uma/daemon/services/v2/streaming"
+	"github.com/domalab/uma/daemon/services/streaming"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -31,7 +31,7 @@ type HTTPServer struct {
 	// UMA v2 Components - Pure v2 implementation
 	v2Collector  *collectors.SystemCollector
 	v2Streamer   *streaming.WebSocketEngine
-	v2RESTServer *v2api.RESTServer
+	v2RESTServer *restapi.RESTServer
 }
 
 // NewHTTPServer creates a new HTTP server instance - UMA v2 only
@@ -48,7 +48,7 @@ func NewHTTPServer(api *Api, port int) *HTTPServer {
 	// Initialize v2 components only - no v1 compatibility
 	httpServer.v2Collector = collectors.NewSystemCollector()
 	httpServer.v2Streamer = streaming.NewWebSocketEngine(httpServer.v2Collector)
-	httpServer.v2RESTServer = v2api.NewRESTServer(httpServer.v2Collector, httpServer.v2Streamer)
+	httpServer.v2RESTServer = restapi.NewRESTServer(httpServer.v2Collector, httpServer.v2Streamer)
 
 	return httpServer
 }

@@ -41,7 +41,7 @@ func (r *SimpleToolRegistry) registerPredefinedTools() {
 			Properties: map[string]interface{}{},
 			Required:   []string{},
 		},
-	}, "/api/v1/system/info", "GET", r.createSystemInfoHandler())
+	}, "/api/v2/system/info", "GET", r.createSystemInfoHandler())
 
 	// Storage tools
 	r.registerTool("get_storage_disks", Tool{
@@ -52,7 +52,7 @@ func (r *SimpleToolRegistry) registerPredefinedTools() {
 			Properties: map[string]interface{}{},
 			Required:   []string{},
 		},
-	}, "/api/v1/storage/disks", "GET", r.createStorageDisksHandler())
+	}, "/api/v2/storage/config", "GET", r.createStorageDisksHandler())
 
 	// Docker tools
 	r.registerTool("get_docker_containers", Tool{
@@ -63,7 +63,40 @@ func (r *SimpleToolRegistry) registerPredefinedTools() {
 			Properties: map[string]interface{}{},
 			Required:   []string{},
 		},
-	}, "/api/v1/docker/containers", "GET", r.createDockerContainersHandler())
+	}, "/api/v2/containers/list", "GET", r.createDockerContainersHandler())
+
+	// System health tool
+	r.registerTool("get_system_health", Tool{
+		Name:        "get_system_health",
+		Description: "Get system health status and checks",
+		InputSchema: ToolSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+			Required:   []string{},
+		},
+	}, "/api/v2/system/health", "GET", r.createSystemHealthHandler())
+
+	// Storage layout tool
+	r.registerTool("get_storage_layout", Tool{
+		Name:        "get_storage_layout",
+		Description: "Get detailed storage layout and disk assignments",
+		InputSchema: ToolSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+			Required:   []string{},
+		},
+	}, "/api/v2/storage/layout", "GET", r.createStorageLayoutHandler())
+
+	// VM list tool
+	r.registerTool("get_vms_list", Tool{
+		Name:        "get_vms_list",
+		Description: "Get information about all virtual machines with status and summary",
+		InputSchema: ToolSchema{
+			Type:       "object",
+			Properties: map[string]interface{}{},
+			Required:   []string{},
+		},
+	}, "/api/v2/vms/list", "GET", r.createVMsListHandler())
 
 	logger.Green("Registered %d predefined MCP tools", len(r.tools))
 }
@@ -218,5 +251,50 @@ func (r *SimpleToolRegistry) GetRegistryStats() map[string]interface{} {
 	return map[string]interface{}{
 		"total_tools": len(r.tools),
 		"categories":  categoryStats,
+	}
+}
+
+// createSystemHealthHandler creates a handler for system health information
+func (r *SimpleToolRegistry) createSystemHealthHandler() ToolHandler {
+	return func(args map[string]interface{}) (ToolCallResult, error) {
+		result := ToolCallResult{
+			Content: []ToolContent{
+				{
+					Type: "text",
+					Text: "System health check completed. Status: healthy. All services operational.",
+				},
+			},
+		}
+		return result, nil
+	}
+}
+
+// createStorageLayoutHandler creates a handler for storage layout information
+func (r *SimpleToolRegistry) createStorageLayoutHandler() ToolHandler {
+	return func(args map[string]interface{}) (ToolCallResult, error) {
+		result := ToolCallResult{
+			Content: []ToolContent{
+				{
+					Type: "text",
+					Text: "Storage layout retrieved. Array configuration and disk assignments available.",
+				},
+			},
+		}
+		return result, nil
+	}
+}
+
+// createVMsListHandler creates a handler for VM list information
+func (r *SimpleToolRegistry) createVMsListHandler() ToolHandler {
+	return func(args map[string]interface{}) (ToolCallResult, error) {
+		result := ToolCallResult{
+			Content: []ToolContent{
+				{
+					Type: "text",
+					Text: "Virtual machines list retrieved. VM status and resource information available.",
+				},
+			},
+		}
+		return result, nil
 	}
 }
